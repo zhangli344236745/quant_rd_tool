@@ -1,0 +1,56 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "quant-rd-tool"
+version = "0.1.0"
+description = "Investment research & stock factor utilities with Microsoft RD-Agent hooks (uv)."
+readme = "README.md"
+requires-python = ">=3.11,<3.13"
+license = "MIT"
+authors = [{ name = "quant-rd-tool" }]
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "pydantic>=2.9.0",
+    "pydantic-settings>=2.6.0",
+    "numpy>=2.0.0",
+    "pandas>=2.2.0",
+    "yfinance>=0.2.50",
+    "httpx>=0.27.0",
+    "rdagent>=0.8.0",
+    "akshare>=1.18.62",
+    "pyqlib>=0.9.6",
+    "protobuf>=3.20,<4",
+    "xgboost>=3.2.0",
+    "lightgbm>=4.6.0",
+    "openbb>=4.0.0",
+    "ccxt>=4.5.54",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+    "ruff>=0.8.0",
+]
+
+[project.scripts]
+quant-rd = "quant_rd_tool.cli:main"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["src"]
+norecursedirs = [
+    ".worktrees",
+    "{{cookiecutter.project_slug}}",
+]

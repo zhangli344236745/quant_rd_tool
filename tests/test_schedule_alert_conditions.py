@@ -1,0 +1,65 @@
+from quant_rd_tool.schedule_alert_conditions import (
+    normalize_symbol,
+    row_matches_conditions,
+    rule_matches_cycle,
+    validate_custom_rule,
+)
+from quant_rd_tool.schedule_alerts import evaluate_custom_rules, save_alert_rules
+
+
+def test_normalize_symbol():
+    assert normalize_symbol("BTC/USDT") == "BTC"
+    assert normalize_symbol("CRYPTO_ETH") == "ETH"
+
+
+def test_row_matches_and_logic():
+    row = {"symbol": "BTC", "stance": "看涨", "action": "buy", "new_bars": 3}
+    assert row_matches_conditions(
+        row,
+        [
+            {"field": "symbol", "op": "eq", "value": "BTC"},
+            {"field": "stance", "op": "eq", "value": "看涨"},
+        ],
+        logic="and",
+    )
+    assert row_matches_conditions(
+        row,
+        [
+            {"field": "stance", "op": "eq", "value": "看跌"},
+            {"field": "action", "op": "eq", "value": "sell"},
+        ],
+        logic="or",
+    ) is False
+
+
+def test_custom_rule_fires(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    save_alert_rules(
+        custom_rules=[
+            {
+                "id": "btc-bull",
+                "enabled": True,
+                "conditions": [
+                    {"field": "symbol", "op": "eq", "value": "BTC"},
+                    {"field": "stance", "op": "eq", "value": "看涨"},
+                ],
+                "message": "hit {symbol}",
+            }
+        ],
+        cooldown_minutes=0,
+    )
+    fired = evaluate_custom_rules(
+        "job-1",
+        last_cycle_summary=[
+            {"symbol": "BTC", "pair": "BTC/USDT", "stance": "看涨", "action": "buy"},
+            {"symbol": "ETH", "pair": "ETH/USDT", "stance": "中性", "action": "hold"},
+        ],
+    )
+    assert fired and fired[0]["symbol"] == "BTC"
+
+
+def test_validate_custom_rule():
+    assert validate_custom_rule({"id": "x", "conditions": []})
+    errs = validate_custom_rule({"conditions": [{"field": "bad", "op": "eq", "value": "1"}]})
+    assert "id is required" in errs
+    assert any("unsupported" in e for e in errs)

@@ -1,0 +1,182 @@
+:root {
+  --bg-deep: #0c0f14;
+  --bg-panel: #12171f;
+  --bg-elevated: #1a2230;
+  --bg-table-stripe: #161d28;
+  --border: rgba(148, 163, 184, 0.12);
+  --text: #e8edf4;
+  --text-muted: #8b9cb3;
+  --accent: #3dd6c3;
+  --accent-dim: rgba(61, 214, 195, 0.15);
+  --warn: #f0b429;
+  --danger: #f07178;
+  --font-sans: "DM Sans", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  /* Element Plus 深色面 — 避免 el-table 斑马纹/悬停等使用默认白底 */
+  --el-bg-color: var(--bg-panel);
+  --el-bg-color-page: var(--bg-deep);
+  --el-bg-color-overlay: var(--bg-elevated);
+  --el-fill-color-blank: var(--bg-panel);
+  --el-fill-color-light: var(--bg-elevated);
+  --el-fill-color-lighter: var(--bg-table-stripe);
+  --el-fill-color-extra-light: var(--bg-elevated);
+  --el-fill-color-dark: var(--bg-deep);
+  --el-fill-color-darker: var(--bg-deep);
+  --el-text-color-primary: var(--text);
+  --el-text-color-regular: var(--text);
+  --el-text-color-secondary: var(--text-muted);
+  --el-text-color-placeholder: #6b7d94;
+  --el-border-color: var(--border);
+  --el-border-color-light: var(--border);
+  --el-border-color-lighter: var(--border);
+  --el-border-color-extra-light: var(--border);
+  --el-color-primary-light-9: var(--accent-dim);
+  --el-drawer-bg-color: var(--bg-panel);
+  --el-dialog-bg-color: var(--bg-panel);
+  --el-mask-color: rgba(0, 0, 0, 0.55);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--bg-deep);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+
+.page-title {
+  margin: 0 0 4px;
+  font-size: 1.35rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.page-desc {
+  margin: 0 0 20px;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.panel-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+}
+
+.el-menu {
+  border-right: none !important;
+}
+
+.el-card {
+  --el-card-bg-color: var(--bg-panel);
+  --el-card-border-color: var(--border);
+  color: var(--text);
+}
+
+.el-form-item__label {
+  color: var(--text-muted) !important;
+}
+
+.el-input__wrapper,
+.el-textarea__inner,
+.el-select__wrapper {
+  background: var(--bg-elevated) !important;
+  box-shadow: 0 0 0 1px var(--border) inset !important;
+}
+
+.el-table {
+  --el-table-bg-color: transparent;
+  --el-table-tr-bg-color: transparent;
+  --el-table-header-bg-color: var(--bg-elevated);
+  --el-table-row-hover-bg-color: var(--accent-dim);
+  --el-table-current-row-bg-color: rgba(61, 214, 195, 0.18);
+  --el-table-expanded-cell-bg-color: var(--bg-panel);
+  --el-table-border-color: var(--border);
+  --el-table-text-color: var(--text);
+  --el-table-header-text-color: var(--text-muted);
+  background-color: transparent !important;
+}
+
+.el-table .el-table__inner-wrapper,
+.el-table__empty-block {
+  background-color: transparent;
+}
+
+.el-table th.el-table__cell {
+  background-color: var(--bg-elevated) !important;
+}
+
+.el-table td.el-table__cell {
+  background-color: transparent;
+  border-bottom-color: var(--border);
+}
+
+.el-table--striped .el-table__body tr.el-table__row--striped td.el-table__cell {
+  background-color: var(--bg-table-stripe) !important;
+}
+
+.el-table--enable-row-hover .el-table__body tr:hover > td.el-table__cell,
+.el-table__body tr.hover-row > td.el-table__cell {
+  background-color: var(--accent-dim) !important;
+}
+
+.el-table__body tr.current-row > td.el-table__cell {
+  background-color: rgba(61, 214, 195, 0.18) !important;
+}
+
+.el-table__fixed,
+.el-table__fixed-right,
+.el-table__fixed-left,
+.el-table__fixed-right-patch,
+.el-table__fixed-left-patch {
+  background-color: var(--bg-panel) !important;
+}
+
+.el-table__fixed::before,
+.el-table__fixed-right::before {
+  background-color: var(--bg-panel);
+}
+
+.json-viewer {
+  max-height: 480px;
+  overflow: auto;
+  padding: 14px;
+  background: var(--bg-elevated);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.signal-tag-buy {
+  --el-tag-bg-color: rgba(61, 214, 195, 0.12);
+  --el-tag-border-color: rgba(61, 214, 195, 0.35);
+  --el-tag-text-color: var(--accent);
+}
+
+.signal-tag-sell {
+  --el-tag-bg-color: rgba(240, 113, 120, 0.12);
+  --el-tag-border-color: rgba(240, 113, 120, 0.35);
+  --el-tag-text-color: var(--danger);
+}
