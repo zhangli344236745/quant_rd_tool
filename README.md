@@ -215,6 +215,12 @@ HTTP（单次执行，不注册任务）：
 - `POST /api/v1/crypto/perp-bot/run` — `{"base":"BTC","timeframe":"5m","dry_run":true}`
 - `POST /api/v1/crypto/perp-portfolio/run` — `{"symbols":["BTC","ETH"],"dry_run":true,"signal_only":false}`
 - `GET /api/v1/crypto/ops/summary` — 调度 + 永续状态 + 遥测摘要（Web **Crypto 运营** 看板）
+- `GET /api/v1/crypto/options/volatility-scan` — Binance 期权 ATM IV 扫描（分位 / 24h 变化 / 横向排名 + 研究性建议）
+- `GET /api/v1/crypto/options/strike-probability?base=BTC&n=5` — ATM±N 行权价：qlib+GBM 模型概率 vs IV 隐含概率（到期 ITM + 触达）
+- `GET /api/v1/crypto/options/volatility-scan/history?symbol=BTC` — 本地 IV 历史（`data/crypto/options_iv/`）
+- CLI：`uv run quant-rd crypto options-scan --symbols BTC,ETH,SOL,BNB`
+- Web 侧栏：**期权波动**（独立扫描页）
+- **Crypto 行情分析** / `POST /crypto/analyze`：默认 `with_options_vol=true`，报告内合并现货×期权联合研判
 - `GET/POST /api/v1/crypto/ops/control` — Kill Switch、Webhook 告警配置
 - `POST /api/v1/crypto/ops/control/test-webhook` — 发送测试告警
 - `GET/POST /api/v1/crypto/schedules/alerts/rules` — 调度失败/连续失败/卡住检测规则

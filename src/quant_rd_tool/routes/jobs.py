@@ -93,6 +93,7 @@ class CryptoAnalyzeJobRequest(BaseModel):
     data_dir: str = "data/crypto"
     with_ml: bool = True
     ml_algorithm: str = "both"
+    with_options_vol: bool = True
 
 
 def _store(request: Request):

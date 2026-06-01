@@ -12,6 +12,7 @@ const form = reactive({
   data_dir: "data/crypto",
   with_ml: true,
   ml_algorithm: "both",
+  with_options_vol: true,
 });
 
 const { submit, polling } = useJobSubmit();
@@ -25,7 +26,12 @@ async function run(wait: boolean) {
     await submit(() => jobsApi.cryptoAnalyze({ ...form }), {
       wait,
       onDone: (r) => {
-        result.value = { combined_signal: r.combined_signal, ...r };
+        result.value = {
+          combined_signal: r.combined_signal,
+          options_vol: r.options_vol,
+          narrative: r.narrative,
+          ...r,
+        };
       },
     });
   } catch (e) {
@@ -35,12 +41,23 @@ async function run(wait: boolean) {
 
 const combined = () =>
   (result.value?.combined_signal as Record<string, unknown>) || undefined;
+
+const optionsVol = () =>
+  (result.value?.options_vol as Record<string, unknown>) || undefined;
+
+function optAlertType(level: string) {
+  if (level === "hot") return "danger";
+  if (level === "elevated") return "warning";
+  return "info";
+}
 </script>
 
 <template>
   <div>
     <h1 class="page-title">Crypto 行情分析</h1>
-    <p class="page-desc">技术面 + ML 综合信号；默认后台任务，可在任务中心查看。</p>
+    <p class="page-desc">
+      技术面 + ML + Binance 期权 IV 联合研判；默认后台任务，可在任务中心查看。
+    </p>
 
     <el-row :gutter="20">
       <el-col :span="10">
@@ -64,6 +81,9 @@ const combined = () =>
             <el-form-item label="ML">
               <el-switch v-model="form.with_ml" />
             </el-form-item>
+            <el-form-item label="期权 IV">
+              <el-switch v-model="form.with_options_vol" />
+            </el-form-item>
             <el-form-item label="算法">
               <el-select v-model="form.ml_algorithm">
                 <el-option label="both" value="both" />
@@ -83,8 +103,68 @@ const combined = () =>
           <template #header>综合信号</template>
           <SignalSummary :signal="combined()" />
         </el-card>
+        <el-card
+          v-if="optionsVol()?.enabled"
+          shadow="never"
+          class="panel-card mt"
+        >
+          <template #header>期权波动 × 现货方向</template>
+          <el-tag
+            :type="optAlertType(String(optionsVol()?.alert_level || 'normal'))"
+            size="small"
+            class="mb"
+          >
+            {{ optionsVol()?.alert_level }}
+          </el-tag>
+          <p v-if="(optionsVol()?.cross_view as any)?.summary" class="cross-summary">
+            {{ (optionsVol()?.cross_view as any).summary }}
+          </p>
+          <el-descriptions :column="2" size="small" border class="mt">
+            <el-descriptions-item label="ATM IV">
+              {{
+                optionsVol()?.atm_iv != null
+                  ? (Number(optionsVol()?.atm_iv) * 100).toFixed(1) + "%"
+                  : "—"
+              }}
+            </el-descriptions-item>
+            <el-descriptions-item label="IV 分位">
+              {{ optionsVol()?.iv_percentile ?? "—" }}
+            </el-descriptions-item>
+            <el-descriptions-item label="24h Δ">
+              {{
+                optionsVol()?.iv_change_24h_pct != null
+                  ? optionsVol()?.iv_change_24h_pct + "%"
+                  : "—"
+              }}
+            </el-descriptions-item>
+            <el-descriptions-item label="合约">
+              {{ optionsVol()?.contract || "—" }}
+            </el-descriptions-item>
+          </el-descriptions>
+          <p v-if="(optionsVol()?.advice as any)?.summary" class="muted small mt">
+            {{ (optionsVol()?.advice as any).summary }}
+          </p>
+        </el-card>
         <ResultPanel :loading="polling" :result="result" :error="error" />
       </el-col>
     </el-row>
   </div>
 </template>
+
+<style scoped>
+.mt {
+  margin-top: 16px;
+}
+.mb {
+  margin-bottom: 8px;
+}
+.cross-summary {
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0;
+}
+.muted.small {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+</style>

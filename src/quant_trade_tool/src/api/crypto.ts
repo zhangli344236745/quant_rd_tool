@@ -7,6 +7,7 @@ export interface AnalyzeRequest {
   data_dir: string;
   with_ml: boolean;
   ml_algorithm: string;
+  with_options_vol?: boolean;
 }
 
 export interface PerpBotRequest {
@@ -182,4 +183,112 @@ export const cryptoApi = {
 
   perpStates: (data_dir = "data/crypto") =>
     http.get<{ items: Record<string, unknown>[] }>("/crypto/perp/states", { params: { data_dir } }),
+
+  optionsVolScan: (params?: { symbols?: string; lookback_days?: number; persist?: boolean }) =>
+    http.get<OptionsVolScanResult>("/crypto/options/volatility-scan", { params }),
+
+  optionsVolConfig: () =>
+    http.get<OptionsVolConfig>("/crypto/options/volatility-scan/config"),
+
+  optionsVolHistory: (symbol: string, limit = 120) =>
+    http.get<{ symbol: string; count: number; items: OptionsIvHistoryRow[] }>(
+      "/crypto/options/volatility-scan/history",
+      { params: { symbol, limit } },
+    ),
+
+  optionsStrikeProbability: (base: string, n = 5, expiry?: string) =>
+    http.get<StrikeProbabilityReport>("/crypto/options/strike-probability", {
+      params: { base, n, expiry },
+    }),
 };
+
+export interface OptionsVolConfig {
+  symbols: string[];
+  lookback_days: number;
+  iv_percentile_threshold: number;
+  iv_change_24h_threshold: number;
+  data_dir: string;
+}
+
+export interface OptionsVolItem {
+  base: string;
+  ts?: string;
+  atm_iv?: number | null;
+  iv_percentile?: number | null;
+  iv_change_24h_pct?: number | null;
+  alert_level?: string;
+  alerts?: string[];
+  rank?: number;
+  composite_score?: number;
+  cold_start?: boolean;
+  contract?: string;
+  expiry?: string;
+  dte?: number;
+  underlying_price?: number;
+  strike?: number;
+  error?: string;
+}
+
+export interface OptionsAdviceRow {
+  base: string;
+  stance: string;
+  summary: string;
+  actions: string[];
+  risks: string[];
+  reasons?: string[];
+  confidence?: number;
+}
+
+export interface OptionsVolScanResult {
+  scanned_at: string;
+  config: OptionsVolConfig;
+  items: OptionsVolItem[];
+  advice_pack: {
+    overview: string;
+    disclaimer: string;
+    advice: OptionsAdviceRow[];
+  };
+}
+
+export interface OptionsIvHistoryRow {
+  ts: string;
+  atm_iv?: number;
+  underlying_price?: number;
+  contract?: string;
+}
+
+export interface StrikeProbabilityRow {
+  strike: number;
+  side?: string;
+  symbol?: string;
+  moneyness_pct?: number;
+  mark_iv?: number;
+  model: {
+    expiry_itm_call?: number | null;
+    touch_call?: number | null;
+  };
+  implied: {
+    expiry_itm_call?: number | null;
+    touch_call?: number | null;
+  };
+  edge_expiry?: number | null;
+}
+
+export interface StrikeProbabilityReport {
+  base: string;
+  spot: number;
+  expiry?: string;
+  dte?: number;
+  n: number;
+  model: {
+    enabled: boolean;
+    sigma_ann?: number | null;
+    mu_ann?: number;
+    reason?: string;
+    assumptions?: string;
+    qlib?: Record<string, unknown>;
+  };
+  rows: StrikeProbabilityRow[];
+  warnings: string[];
+  disclaimer: string;
+}

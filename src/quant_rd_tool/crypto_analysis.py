@@ -47,6 +47,7 @@ def analyze_crypto_from_df(
     with_qlib: bool = True,
     with_ml: bool = True,
     ml_algorithm: MlAlgorithm = "both",
+    with_options_vol: bool = True,
 ) -> dict[str, Any]:
     """Run technical + optional qlib ML analysis on an in-memory OHLCV frame."""
     root = crypto_root(data_dir, symbol)
@@ -120,11 +121,21 @@ def analyze_crypto_from_df(
     }
     report["markdown"] = _render_markdown(report)
 
+    if with_options_vol:
+        from quant_rd_tool.crypto_options_integration import attach_options_to_report
+
+        report = attach_options_to_report(
+            report,
+            data_dir=data_dir,
+            with_options_vol=True,
+        )
+
     (root / "report.json").write_text(
         json.dumps({k: v for k, v in report.items() if k != "markdown"}, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
     (root / "report.md").write_text(report["markdown"], encoding="utf-8")
+    report["report_path"] = str((root / "report.json").resolve())
     return report
 
 
@@ -138,6 +149,7 @@ def analyze_crypto(
     with_qlib: bool = True,
     with_ml: bool = True,
     ml_algorithm: MlAlgorithm = "both",
+    with_options_vol: bool = True,
     exchange_id: cxt.ExchangeId = "binance",
 ) -> dict[str, Any]:
     """
@@ -170,6 +182,7 @@ def analyze_crypto(
         with_qlib=with_qlib,
         with_ml=with_ml,
         ml_algorithm=ml_algorithm,
+        with_options_vol=with_options_vol,
     )
 
 
@@ -211,6 +224,26 @@ def _render_markdown(report: dict[str, Any]) -> str:
     if ml:
         lines.extend(["## 机器学习（qlib Alpha158 + XGBoost / LightGBM）", ""])
         lines.extend(ml_markdown_lines(ml))
+
+    opt = report.get("options_vol") or {}
+    if opt.get("enabled"):
+        lines.extend(["## 期权波动率（Binance）", ""])
+        item = opt.get("scan_item") or {}
+        if item.get("atm_iv") is not None:
+            lines.append(f"- ATM IV：{float(item['atm_iv']) * 100:.2f}%")
+        if item.get("iv_percentile") is not None:
+            lines.append(f"- IV 分位：{item['iv_percentile']}%")
+        if item.get("iv_change_24h_pct") is not None:
+            lines.append(f"- 24h IV 变化：{item['iv_change_24h_pct']:+.1f}%")
+        if item.get("contract"):
+            lines.append(f"- 合约：{item['contract']}")
+        cross = opt.get("cross_view") or {}
+        if cross.get("summary"):
+            lines.append(f"- **现货×期权**：{cross['summary']}")
+        adv = opt.get("advice") or {}
+        for action_line in adv.get("actions") or []:
+            lines.append(f"- {action_line}")
+        lines.append("")
 
     lines.extend(
         [

@@ -168,12 +168,14 @@ class JobRunner:
                 data_dir=str(payload.get("data_dir", "data/crypto")),
                 with_ml=bool(payload.get("with_ml", True)),
                 ml_algorithm=str(payload.get("ml_algorithm", "both")),
+                with_options_vol=bool(payload.get("with_options_vol", True)),
             )
             signal = out.get("combined_signal") if isinstance(out.get("combined_signal"), dict) else {}
             snap = {
                 "kind": "crypto_analyze",
                 "symbol": sym,
                 "combined_signal": signal,
+                "options_vol": out.get("options_vol"),
                 "report_path": out.get("report_path"),
             }
             return save_job_result(job_id, snap), out

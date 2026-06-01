@@ -38,6 +38,10 @@ class CryptoAnalyzeRequest(BaseModel):
     data_dir: str = "data/crypto"
     with_ml: bool = True
     ml_algorithm: str = Field("both", description="xgb | lgb | both")
+    with_options_vol: bool = Field(
+        True,
+        description="并入 Binance 期权 ATM IV 与现货/ML 联合研判",
+    )
 
 
 class CryptoMlRequest(BaseModel):
@@ -131,6 +135,7 @@ def crypto_analyze(req: CryptoAnalyzeRequest) -> dict[str, Any]:
             limit=req.limit,
             with_ml=req.with_ml,
             ml_algorithm=req.ml_algorithm,  # type: ignore[arg-type]
+            with_options_vol=req.with_options_vol,
         )
     except (ConnectionError, ValueError) as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
@@ -556,3 +561,91 @@ def crypto_perp_states(data_dir: str = "data/crypto") -> dict[str, Any]:
 
     items = list_perp_states(data_dir)
     return {"data_dir": data_dir, "count": len(items), "items": items}
+
+
+class OptionsVolConfigBody(BaseModel):
+    symbols: list[str] | None = None
+    lookback_days: int | None = Field(None, ge=7, le=365)
+    iv_percentile_threshold: float | None = Field(None, ge=50, le=99)
+    iv_change_24h_threshold: float | None = Field(None, ge=1, le=100)
+
+
+@router.get("/options/volatility-scan")
+def crypto_options_volatility_scan(
+    symbols: str | None = None,
+    lookback_days: int | None = None,
+    data_dir: str = "data/crypto",
+    persist: bool = True,
+) -> dict[str, Any]:
+    from quant_rd_tool.crypto_options_advisor import build_scan_advice
+    from quant_rd_tool.crypto_options_vol_scan import run_volatility_scan
+
+    sym_list = [s.strip() for s in symbols.split(",") if s.strip()] if symbols else None
+    try:
+        scan = run_volatility_scan(
+            symbols=sym_list,
+            lookback_days=lookback_days,
+            data_dir=data_dir,
+            persist_snapshot=persist,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+    advice = build_scan_advice(scan)
+    return {**scan, "advice_pack": advice}
+
+
+@router.get("/options/volatility-scan/config")
+def crypto_options_volatility_config_get(data_dir: str = "data/crypto") -> dict[str, Any]:
+    from quant_rd_tool.crypto_options_vol_scan import get_scan_config
+
+    return get_scan_config(data_dir)
+
+
+@router.post("/options/volatility-scan/config")
+def crypto_options_volatility_config_save(
+    body: OptionsVolConfigBody,
+    data_dir: str = "data/crypto",
+) -> dict[str, Any]:
+    from quant_rd_tool.crypto_options_vol_scan import save_scan_config
+
+    return save_scan_config(
+        data_dir=data_dir,
+        symbols=body.symbols,
+        lookback_days=body.lookback_days,
+        iv_percentile_threshold=body.iv_percentile_threshold,
+        iv_change_24h_threshold=body.iv_change_24h_threshold,
+    )
+
+
+@router.get("/options/volatility-scan/history")
+def crypto_options_volatility_history(
+    symbol: str,
+    data_dir: str = "data/crypto",
+    limit: int = 120,
+) -> dict[str, Any]:
+    from quant_rd_tool.crypto_options_data import load_history
+
+    items = load_history(symbol, data_dir=data_dir, limit=min(limit, 500))
+    return {"symbol": symbol.upper(), "count": len(items), "items": items}
+
+
+@router.get("/options/strike-probability")
+def crypto_options_strike_probability(
+    base: str,
+    n: int | None = None,
+    expiry: str | None = None,
+    data_dir: str = "data/crypto",
+) -> dict[str, Any]:
+    from quant_rd_tool.crypto_options_strike_probs import build_strike_probability_report
+
+    try:
+        return build_strike_probability_report(
+            base,
+            n=n,
+            data_dir=data_dir,
+            expiry_iso=expiry,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e

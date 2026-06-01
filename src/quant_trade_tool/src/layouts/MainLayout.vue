@@ -22,6 +22,7 @@ const menus = [
   { path: "/backtest", icon: "DataLine", label: "组合回测" },
   { path: "/macro", icon: "MapLocation", label: "宏观面板" },
   { path: "/analyze", icon: "TrendCharts", label: "Crypto 行情" },
+  { path: "/crypto-options-vol", icon: "DataAnalysis", label: "期权波动" },
   { path: "/crypto-ops", icon: "Monitor", label: "Crypto 运营" },
   { path: "/spot-bot", icon: "Coin", label: "现货 Bot" },
   { path: "/perp-bot", icon: "Histogram", label: "永续 Bot" },

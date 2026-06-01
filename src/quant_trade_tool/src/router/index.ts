@@ -35,6 +35,11 @@ const router = createRouter({
         { path: "backtest", name: "backtest", component: () => import("@/views/BacktestView.vue") },
         { path: "macro", name: "macro", component: () => import("@/views/MacroView.vue") },
         { path: "analyze", name: "analyze", component: () => import("@/views/AnalyzeView.vue") },
+        {
+          path: "crypto-options-vol",
+          name: "crypto-options-vol",
+          component: () => import("@/views/CryptoOptionsVolView.vue"),
+        },
         { path: "spot-bot", name: "spot-bot", component: () => import("@/views/SpotBotView.vue") },
         { path: "crypto-ops", name: "crypto-ops", component: () => import("@/views/CryptoOpsView.vue") },
         { path: "perp-bot", name: "perp-bot", component: () => import("@/views/PerpBotView.vue") },

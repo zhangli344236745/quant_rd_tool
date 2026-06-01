@@ -129,6 +129,11 @@ def main() -> None:
     cr_an.add_argument("--data-dir", default="data/crypto")
     cr_an.add_argument("--no-ml", action="store_true", help="Skip qlib Alpha158 ML")
     cr_an.add_argument(
+        "--no-options-vol",
+        action="store_true",
+        help="不并入 Binance 期权 IV 联合研判",
+    )
+    cr_an.add_argument(
         "--ml-algo",
         choices=["xgb", "lgb", "both"],
         default="both",
@@ -227,6 +232,19 @@ def main() -> None:
     cr_ping.add_argument("--symbol", default="BTC")
     cr_ping.add_argument("--timeframe", default="5m")
     cr_ping.add_argument("--no-ohlcv", action="store_true", help="仅测 exchangeInfo")
+
+    cr_opt = crypto_sub.add_parser(
+        "options-scan",
+        help="Binance 期权 ATM IV 扫描 + 波动告警 + 研究性建议",
+    )
+    cr_opt.add_argument(
+        "--symbols",
+        default="BTC,ETH,SOL,BNB",
+        help="逗号分隔标的，如 BTC,ETH",
+    )
+    cr_opt.add_argument("--lookback", type=int, default=None, help="IV 分位回看天数")
+    cr_opt.add_argument("--data-dir", default="data/crypto")
+    cr_opt.add_argument("--no-persist", action="store_true", help="不写入本地 IV 历史")
 
     cr_sched = crypto_sub.add_parser(
         "schedule",
@@ -406,6 +424,21 @@ def main() -> None:
                 raise SystemExit(1)
             return
 
+        if args.crypto_cmd == "options-scan":
+            from quant_rd_tool.crypto_options_advisor import build_scan_advice
+            from quant_rd_tool.crypto_options_vol_scan import run_volatility_scan
+
+            sym_list = [s.strip() for s in args.symbols.split(",") if s.strip()]
+            scan = run_volatility_scan(
+                symbols=sym_list,
+                lookback_days=args.lookback,
+                data_dir=args.data_dir,
+                persist_snapshot=not args.no_persist,
+            )
+            out = {**scan, "advice_pack": build_scan_advice(scan)}
+            print(json.dumps(out, ensure_ascii=False, indent=2))
+            return
+
         if args.crypto_cmd == "analyze":
             from quant_rd_tool.crypto_analysis import analyze_crypto
 
@@ -416,6 +449,7 @@ def main() -> None:
                 limit=args.limit,
                 with_ml=not args.no_ml,
                 ml_algorithm=args.ml_algo,
+                with_options_vol=not args.no_options_vol,
             )
             if args.md_only:
                 print(report["markdown"])

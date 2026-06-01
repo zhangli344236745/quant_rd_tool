@@ -179,6 +179,7 @@ def build_investment_brief(
     ml_analysis: dict[str, Any] | None = None,
     pair: str = "",
     timeframe: str = "1d",
+    options_context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Multi-section investment direction memo (not just bullish/bearish label)."""
     combined = combined_signal or signal
@@ -296,6 +297,35 @@ def build_investment_brief(
 
     sections.append({"title": "多维度拆解", "bullets": dim_bullets})
 
+    opt = options_context or {}
+    if opt.get("enabled"):
+        opt_bullets: list[str] = []
+        item = opt.get("scan_item") or {}
+        if item.get("atm_iv") is not None:
+            opt_bullets.append(f"近月 ATM IV 约 **{float(item['atm_iv']) * 100:.1f}%**。")
+        if item.get("iv_percentile") is not None:
+            opt_bullets.append(f"IV 历史分位 **{item['iv_percentile']}%**（告警 {item.get('alert_level')}）。")
+        if item.get("iv_change_24h_pct") is not None:
+            opt_bullets.append(f"24h IV 变化 **{item['iv_change_24h_pct']:+.1f}%**。")
+        if item.get("contract"):
+            opt_bullets.append(f"参考合约：`{item['contract']}`。")
+        cross = opt.get("cross_view") or {}
+        if cross.get("summary"):
+            opt_bullets.append(cross["summary"])
+        adv = opt.get("advice") or {}
+        if adv.get("summary"):
+            opt_bullets.append(adv["summary"])
+        for a in (adv.get("actions") or [])[:3]:
+            opt_bullets.append(a)
+        sections.append({"title": "期权波动率（Binance）", "bullets": opt_bullets})
+    elif opt.get("error"):
+        sections.append(
+            {
+                "title": "期权波动率（Binance）",
+                "bullets": [f"本次未纳入：{opt.get('error')}"],
+            }
+        )
+
     # 4. Position scenarios
     scenarios: list[dict[str, str]] = []
     if stance == "看涨":
@@ -388,6 +418,7 @@ def build_crypto_narrative(
     ml_analysis: dict[str, Any] | None = None,
     pair: str = "",
     timeframe: str = "1d",
+    options_context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     sym = analysis["symbol"]
     price = analysis["price"]
@@ -422,7 +453,22 @@ def build_crypto_narrative(
         ml_analysis=ml_analysis,
         pair=pair,
         timeframe=timeframe,
+        options_context=options_context,
     )
+
+    opt = options_context or {}
+    if opt.get("enabled"):
+        cross = opt.get("cross_view") or {}
+        if cross.get("summary"):
+            summary += f" {cross['summary']}"
+        for n in cross.get("notes") or []:
+            observations.append(f"[期权] {n}")
+        adv = opt.get("advice") or {}
+        for a in adv.get("actions") or []:
+            observations.append(f"[期权建议] {a}")
+        risks.append("期权波动与方向可能背离；卖方策略存在尾部风险。")
+        if opt.get("alert_level") in ("hot", "elevated"):
+            risks.append("当前 IV 偏高，买方权利金成本显著，勿忽视时间价值损耗。")
 
     return {
         "stance": stance,
