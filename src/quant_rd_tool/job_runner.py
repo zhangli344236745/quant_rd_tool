@@ -180,4 +180,20 @@ class JobRunner:
             }
             return save_job_result(job_id, snap), out
 
+        if jtype == "crypto_options_vol_scan":
+            from quant_rd_tool.crypto_options_vol_scan import run_options_iv_maintenance
+
+            self.store.mark_progress(job_id, 0.2, message="options iv scan")
+            out = run_options_iv_maintenance(
+                data_dir=str(payload.get("data_dir", self.data_dir)),
+            )
+            snap = {
+                "kind": "crypto_options_vol_scan",
+                "scanned_at": out.get("scanned_at"),
+                "elevated_bases": out.get("elevated_bases"),
+                "items": out.get("items"),
+                "advice_overview": (out.get("advice_pack") or {}).get("overview"),
+            }
+            return save_job_result(job_id, snap), out
+
         raise ValueError(f"Unknown job type: {jtype}")

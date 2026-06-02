@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import json
 import math
 import time
@@ -29,6 +30,8 @@ _DEFAULT_CONFIG = {
     "cache_seconds": 60,
     "timeframe": "1d",
     "mu_cap_ann": 2.0,
+    "include_strike_ladder_in_analyze": True,
+    "analyze_ladder_n": 3,
 }
 
 _DISCLAIMER = (
@@ -291,6 +294,10 @@ def build_strike_probability_report(
     data_dir: str = "data/crypto",
     expiry_iso: str | None = None,
     client: Any = None,
+    spot_stance: str | None = None,
+    iv_alert_level: str | None = None,
+    iv_percentile: float | None = None,
+    with_purchase_advice: bool = True,
 ) -> dict[str, Any]:
     cfg = get_strike_prob_config(data_dir)
     n_eff = int(n if n is not None else cfg["default_n"])
@@ -299,7 +306,19 @@ def build_strike_probability_report(
     if ttl > 0 and cache_key in _CACHE:
         ts, payload = _CACHE[cache_key]
         if time.time() - ts < ttl:
-            return payload
+            out = copy.deepcopy(payload)
+            if with_purchase_advice and out.get("rows"):
+                from quant_rd_tool.crypto_options_strike_advisor import (
+                    enrich_strike_report_with_advice,
+                )
+
+                enrich_strike_report_with_advice(
+                    out,
+                    spot_stance=spot_stance or "中性",
+                    iv_alert_level=iv_alert_level or "normal",
+                    iv_percentile=iv_percentile,
+                )
+            return out
 
     marks = fetch_mark_rows(client=client)
     spot = fetch_index_price(base, client=client)
@@ -411,4 +430,14 @@ def build_strike_probability_report(
     }
     if ttl > 0:
         _CACHE[cache_key] = (time.time(), payload)
+
+    if with_purchase_advice and payload.get("rows"):
+        from quant_rd_tool.crypto_options_strike_advisor import enrich_strike_report_with_advice
+
+        enrich_strike_report_with_advice(
+            payload,
+            spot_stance=spot_stance or "中性",
+            iv_alert_level=iv_alert_level or "normal",
+            iv_percentile=iv_percentile,
+        )
     return payload

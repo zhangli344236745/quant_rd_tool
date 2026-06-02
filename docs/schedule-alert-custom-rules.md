@@ -38,6 +38,10 @@
 | `stance` | — | 综合立场：`看涨` / `看跌` / `中性` |
 | `action` | — | 建议动作：`buy` / `sell` / `hold` / `long` / `short` 等（英文小写匹配） |
 | `new_bars` | — | 本周期新增 K 线根数（数字） |
+| `iv_alert_level` | `options_alert` | 期权 IV 告警：`normal` / `elevated` / `hot`（需调度分析开启 `with_options_vol`） |
+| `options_stance` | — | 期权规则建议立场，如 `波动溢价偏高` |
+| `iv_percentile` | `iv_pct` | IV 历史分位（0–100） |
+| `iv_change_24h_pct` | `iv_change_24h` | 24h IV 变化（%） |
 
 ### op（运算符）
 
@@ -58,7 +62,7 @@
 
 ## message 占位符
 
-`{job_id}` `{symbol}` `{pair}` `{stance}` `{action}` `{new_bars}` `{rule_id}` `{rule_name}`
+`{job_id}` `{symbol}` `{pair}` `{stance}` `{action}` `{new_bars}` `{iv_alert_level}` `{options_stance}` `{iv_percentile}` `{iv_change_24h_pct}` `{rule_id}` `{rule_name}`
 
 ## 示例
 
@@ -92,6 +96,21 @@
     { "field": "action", "op": "in", "value": ["sell", "short"] }
   ],
   "message": "{symbol} 出现偏空动作 {action}"
+}
+```
+
+### BTC 期权 IV 偏高（hot）
+
+```json
+{
+  "id": "btc-iv-hot",
+  "name": "BTC IV 告警",
+  "enabled": true,
+  "conditions": [
+    { "field": "symbol", "op": "eq", "value": "BTC" },
+    { "field": "iv_alert_level", "op": "in", "value": ["hot", "elevated"] }
+  ],
+  "message": "[{job_id}] {symbol} 期权 IV {iv_alert_level}，分位 {iv_percentile}%，24h {iv_change_24h_pct}%"
 }
 ```
 

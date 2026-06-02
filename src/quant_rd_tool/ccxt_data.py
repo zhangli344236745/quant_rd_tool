@@ -102,9 +102,15 @@ def create_exchange(
     opts: dict = {"enableRateLimit": True}
     if exchange_id == "binance":
         # ccxt binance may fetch spot+fapi+dapi markets by default; that can fail
-        # in restricted networks. Limit market discovery to the requested type.
-        fetch_markets = ["spot"] if market_type == "spot" else ["future"]
-        opts["options"] = {"defaultType": market_type, "fetchMarkets": fetch_markets}
+        # in restricted networks. Avoid forcing fetchMarkets types because ccxt
+        # variants differ; rely on defaultType + lazy market loading.
+        opts["options"] = {
+            "defaultType": market_type,
+            # Reduce -1021 timestamp drift issues for signed endpoints.
+            "adjustForTimeDifference": True,
+            # Safer default for slightly laggy networks.
+            "recvWindow": 5000,
+        }
         if testnet:
             opts["options"]["sandboxMode"] = True
     ex = klass(opts)
@@ -118,6 +124,11 @@ def create_exchange(
         # Allow overriding Binance REST endpoint, e.g. https://api1.binance.com
         try:
             ex.urls["api"] = {"public": api_base, "private": api_base}
+            # Also override futures endpoints if present (some networks block fapi.binance.com).
+            if isinstance(ex.urls.get("api"), dict):
+                for k in ("fapiPublic", "fapiPrivate", "dapiPublic", "dapiPrivate"):
+                    if k in ex.urls["api"]:
+                        ex.urls["api"][k] = api_base
         except Exception:
             pass
     if api_key and api_secret:

@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import json
+import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, Literal
+
+_VOL_SCAN_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
 
 from quant_rd_tool.crypto_options_data import (
     DEFAULT_SYMBOLS,
@@ -154,6 +157,51 @@ def _alert_level(
     return "normal"
 
 
+def _cache_key(data_dir: str, symbols: list[str]) -> str:
+    return f"{data_dir}|{','.join(sorted(s.upper() for s in symbols))}"
+
+
+def clear_vol_scan_cache(data_dir: str | None = None) -> None:
+    if not data_dir:
+        _VOL_SCAN_CACHE.clear()
+        return
+    prefix = f"{data_dir}|"
+    for key in list(_VOL_SCAN_CACHE):
+        if key.startswith(prefix):
+            del _VOL_SCAN_CACHE[key]
+
+
+def get_or_run_volatility_scan(
+    *,
+    symbols: list[str] | None = None,
+    lookback_days: int | None = None,
+    data_dir: str | None = None,
+    persist_snapshot: bool = True,
+    client: Any = None,
+    cache_seconds: int = 60,
+    use_cache: bool = True,
+) -> dict[str, Any]:
+    """Cached wrapper for analyze/scheduler bursts (one EAPI round-trip per TTL)."""
+    cfg = get_scan_config(data_dir or _DEFAULT_CONFIG["data_dir"])
+    syms = [s.upper() for s in (symbols or cfg["symbols"])]
+    dd = str(data_dir or cfg["data_dir"])
+    key = _cache_key(dd, syms)
+    if use_cache and cache_seconds > 0 and key in _VOL_SCAN_CACHE:
+        ts, payload = _VOL_SCAN_CACHE[key]
+        if time.time() - ts < cache_seconds:
+            return payload
+    scan = run_volatility_scan(
+        symbols=syms,
+        lookback_days=lookback_days,
+        data_dir=dd,
+        persist_snapshot=persist_snapshot,
+        client=client,
+    )
+    if cache_seconds > 0:
+        _VOL_SCAN_CACHE[key] = (time.time(), scan)
+    return scan
+
+
 def run_volatility_scan(
     *,
     symbols: list[str] | None = None,
@@ -233,8 +281,42 @@ def run_volatility_scan(
     for rank, row in enumerate(valid, start=1):
         row["rank"] = rank
 
-    return {
+    payload = {
         "scanned_at": datetime.now(UTC).isoformat(),
         "config": {**cfg, "symbols": syms, "lookback_days": lb, "data_dir": dd},
         "items": items,
+    }
+    if persist_snapshot:
+        clear_vol_scan_cache(dd)
+        key = _cache_key(dd, syms)
+        _VOL_SCAN_CACHE[key] = (time.time(), payload)
+    return payload
+
+
+def run_options_iv_maintenance(
+    *,
+    data_dir: str | None = None,
+    client: Any = None,
+) -> dict[str, Any]:
+    """
+    Persist ATM IV snapshots for all configured symbols (scheduler / cron).
+
+    Returns scan summary; does not require spot OHLCV.
+    """
+    from quant_rd_tool.crypto_options_advisor import build_scan_advice
+
+    scan = run_volatility_scan(
+        symbols=None,
+        data_dir=data_dir,
+        persist_snapshot=True,
+        client=client,
+    )
+    clear_vol_scan_cache(str(data_dir or _DEFAULT_CONFIG["data_dir"]))
+    advice = build_scan_advice(scan)
+    hot = [i for i in scan.get("items") or [] if i.get("alert_level") in ("hot", "elevated")]
+    return {
+        **scan,
+        "advice_pack": advice,
+        "elevated_count": len(hot),
+        "elevated_bases": [i.get("base") for i in hot],
     }

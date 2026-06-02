@@ -26,6 +26,10 @@ Supported **fields** (case-insensitive names):
 | stance | | string | 看涨 / 看跌 / 中性 |
 | action | | string | buy, sell, hold, long, short, … |
 | new_bars | new_bars | number | incremental bars this cycle |
+| iv_alert_level | options_alert | string | ``normal`` / ``elevated`` / ``hot`` (from options_vol) |
+| options_stance | options_stance | string | 期权建议立场，如 ``波动溢价偏高`` |
+| iv_percentile | iv_pct | number | IV 历史分位 0–100 |
+| iv_change_24h_pct | iv_change_24h | number | 24h IV 变化百分比 |
 
 Supported **ops**:
 
@@ -45,7 +49,7 @@ Supported **ops**:
 
 Rows with ``error`` are skipped for signal rules.
 
-**message** placeholders: ``{job_id}``, ``{symbol}``, ``{pair}``, ``{stance}``, ``{action}``, ``{new_bars}``, ``{rule_id}``, ``{rule_name}``.
+**message** placeholders: ``{job_id}``, ``{symbol}``, ``{pair}``, ``{stance}``, ``{action}``, ``{new_bars}``, ``{iv_alert_level}``, ``{options_stance}``, ``{iv_percentile}``, ``{iv_change_24h_pct}``, ``{rule_id}``, ``{rule_name}``.
 """
 
 from __future__ import annotations
@@ -63,6 +67,13 @@ _FIELD_ALIASES = {
     "stance": "stance",
     "action": "action",
     "new_bars": "new_bars",
+    "iv_alert_level": "iv_alert_level",
+    "options_alert": "iv_alert_level",
+    "options_stance": "options_stance",
+    "iv_percentile": "iv_percentile",
+    "iv_pct": "iv_percentile",
+    "iv_change_24h_pct": "iv_change_24h_pct",
+    "iv_change_24h": "iv_change_24h_pct",
 }
 
 
@@ -77,12 +88,23 @@ def normalize_symbol(raw: Any) -> str:
 
 def normalize_row(row: dict[str, Any]) -> dict[str, Any]:
     sym = normalize_symbol(row.get("symbol") or row.get("pair"))
+    opt = row.get("options_vol") if isinstance(row.get("options_vol"), dict) else {}
+    iv_level = row.get("iv_alert_level") or opt.get("alert_level")
+    opt_stance = row.get("options_stance")
+    if opt_stance is None and isinstance(opt.get("advice"), dict):
+        opt_stance = opt["advice"].get("stance")
     return {
         "symbol": sym,
         "pair": row.get("pair") or sym,
         "stance": str(row.get("stance") or "").strip(),
         "action": str(row.get("action") or "").strip().lower(),
         "new_bars": row.get("new_bars"),
+        "iv_alert_level": str(iv_level or "").strip().lower() if iv_level else "",
+        "options_stance": str(opt_stance or "").strip(),
+        "iv_percentile": row.get("iv_percentile") if row.get("iv_percentile") is not None else opt.get("iv_percentile"),
+        "iv_change_24h_pct": row.get("iv_change_24h_pct")
+        if row.get("iv_change_24h_pct") is not None
+        else opt.get("iv_change_24h_pct"),
         "error": row.get("error"),
     }
 
@@ -124,9 +146,9 @@ def _compare(condition: dict[str, Any], row: dict[str, Any]) -> bool:
             return bool(re.search(str(value), s_actual, re.I))
         return False
 
-    if field in ("stance", "action"):
+    if field in ("stance", "action", "iv_alert_level", "options_stance"):
         s_actual = str(actual or "")
-        if field == "action":
+        if field in ("action", "iv_alert_level"):
             s_actual = s_actual.lower()
         if op in ("in", "not_in"):
             vals = _coerce_list(value)
@@ -149,9 +171,11 @@ def _compare(condition: dict[str, Any], row: dict[str, Any]) -> bool:
             return bool(re.search(str(value), s_actual, re.I))
         return False
 
-    if field == "new_bars":
+    if field in ("new_bars", "iv_percentile", "iv_change_24h_pct"):
+        if actual is None or actual == "":
+            return False
         try:
-            num = float(actual if actual is not None else 0)
+            num = float(actual)
             thresh = float(value)
         except (TypeError, ValueError):
             return False
@@ -167,6 +191,10 @@ def _compare(condition: dict[str, Any], row: dict[str, Any]) -> bool:
             return num < thresh
         if op == "lte":
             return num <= thresh
+        if op in ("in", "not_in"):
+            vals = [float(v) for v in _coerce_list(value)]
+            hit = num in vals
+            return hit if op == "in" else not hit
         return False
 
     return False
@@ -237,6 +265,10 @@ def format_message(template: str, *, job_id: str, row: dict[str, Any], rule: dic
         stance=row.get("stance", ""),
         action=row.get("action", ""),
         new_bars=row.get("new_bars", ""),
+        iv_alert_level=row.get("iv_alert_level", ""),
+        options_stance=row.get("options_stance", ""),
+        iv_percentile=row.get("iv_percentile", ""),
+        iv_change_24h_pct=row.get("iv_change_24h_pct", ""),
         rule_id=rule.get("id", ""),
         rule_name=rule.get("name", rule.get("id", "")),
     )

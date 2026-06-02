@@ -184,11 +184,81 @@ export const cryptoApi = {
   perpStates: (data_dir = "data/crypto") =>
     http.get<{ items: Record<string, unknown>[] }>("/crypto/perp/states", { params: { data_dir } }),
 
+  perpOpenOrders: (params: { base: string; quote?: string; ccxt_symbol?: string; testnet?: boolean }) =>
+    http.get<{ symbol: string; count: number; items: Record<string, unknown>[] }>("/crypto/perp/orders/open", {
+      params,
+    }),
+
+  perpCancelOrder: (params: {
+    base: string;
+    order_id: string;
+    quote?: string;
+    ccxt_symbol?: string;
+    testnet?: boolean;
+  }) => http.post("/crypto/perp/orders/cancel", null, { params }),
+
+  perpCancelAllOrders: (params: { base: string; quote?: string; ccxt_symbol?: string; testnet?: boolean }) =>
+    http.post("/crypto/perp/orders/cancel-all", null, { params }),
+
+  perpPosition: (params: { base: string; quote?: string; ccxt_symbol?: string; testnet?: boolean }) =>
+    http.get<{
+      enabled: boolean;
+      symbol: string;
+      position: null | {
+        side: string;
+        contracts: number;
+        entry_price?: number | null;
+        unrealized_pnl?: number | null;
+      };
+      error?: string;
+    }>("/crypto/perp/position", { params }),
+
+  perpAccountBalances: (params?: { testnet?: boolean }) =>
+    http.get<{
+      enabled: boolean;
+      summary?: Record<string, unknown>;
+      items: { asset: string; total: number; available?: number | null; used?: number | null }[];
+      error?: string;
+    }>("/crypto/perp/account/balances", { params }),
+
+  perpAccountTrades: (params?: { base?: string; quote?: string; limit?: number; testnet?: boolean }) =>
+    http.get<{
+      enabled: boolean;
+      symbol?: string;
+      count?: number;
+      items: Record<string, unknown>[];
+      error?: string;
+    }>("/crypto/perp/account/trades", { params }),
+
+  perpAccountDailyPnl: (params?: { days?: number; testnet?: boolean }) =>
+    http.get<{
+      enabled: boolean;
+      start?: string;
+      end?: string;
+      count?: number;
+      items: { day: string; realizedPnl: number; funding: number; fees: number; net: number }[];
+      error?: string;
+    }>("/crypto/perp/account/daily-pnl", { params }),
+
+  perpClosePosition: (params: { base: string; quote?: string; ccxt_symbol?: string; testnet?: boolean }) =>
+    http.post("/crypto/perp/position/close", null, { params }),
+
+  perpReconcileProtection: (params: {
+    base: string;
+    data_dir?: string;
+    quote?: string;
+    ccxt_symbol?: string;
+    testnet?: boolean;
+  }) => http.post("/crypto/perp/protection/reconcile", null, { params }),
+
   optionsVolScan: (params?: { symbols?: string; lookback_days?: number; persist?: boolean }) =>
     http.get<OptionsVolScanResult>("/crypto/options/volatility-scan", { params }),
 
   optionsVolConfig: () =>
     http.get<OptionsVolConfig>("/crypto/options/volatility-scan/config"),
+
+  optionsVolConfigSave: (body: Partial<OptionsVolConfig>) =>
+    http.post<OptionsVolConfig>("/crypto/options/volatility-scan/config", body),
 
   optionsVolHistory: (symbol: string, limit = 120) =>
     http.get<{ symbol: string; count: number; items: OptionsIvHistoryRow[] }>(
@@ -196,9 +266,14 @@ export const cryptoApi = {
       { params: { symbol, limit } },
     ),
 
-  optionsStrikeProbability: (base: string, n = 5, expiry?: string) =>
+  optionsStrikeProbability: (
+    base: string,
+    n = 5,
+    expiry?: string,
+    ctx?: { spot_stance?: string; iv_alert_level?: string; iv_percentile?: number },
+  ) =>
     http.get<StrikeProbabilityReport>("/crypto/options/strike-probability", {
-      params: { base, n, expiry },
+      params: { base, n, expiry, ...ctx },
     }),
 };
 
@@ -257,6 +332,14 @@ export interface OptionsIvHistoryRow {
   contract?: string;
 }
 
+export interface StrikePurchaseAdvice {
+  verdict?: string;
+  summary?: string;
+  reasons?: string[];
+  strike?: number;
+  symbol?: string;
+}
+
 export interface StrikeProbabilityRow {
   strike: number;
   side?: string;
@@ -272,6 +355,17 @@ export interface StrikeProbabilityRow {
     touch_call?: number | null;
   };
   edge_expiry?: number | null;
+  purchase?: StrikePurchaseAdvice;
+}
+
+export interface StrikePurchaseSummary {
+  headline?: string;
+  spot_stance?: string;
+  iv_alert_level?: string;
+  consider_count?: number;
+  avoid_count?: number;
+  best_strike?: number | null;
+  best_contract?: string | null;
 }
 
 export interface StrikeProbabilityReport {
@@ -291,4 +385,6 @@ export interface StrikeProbabilityReport {
   rows: StrikeProbabilityRow[];
   warnings: string[];
   disclaimer: string;
+  purchase_summary?: StrikePurchaseSummary;
+  purchase_disclaimer?: string;
 }

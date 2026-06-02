@@ -309,6 +309,12 @@ def build_investment_brief(
             opt_bullets.append(f"24h IV 变化 **{item['iv_change_24h_pct']:+.1f}%**。")
         if item.get("contract"):
             opt_bullets.append(f"参考合约：`{item['contract']}`。")
+        if opt.get("peer_rank") is not None and opt.get("peer_count"):
+            opt_bullets.append(
+                f"配置标的横向波动排名 **#{opt['peer_rank']}/{opt['peer_count']}**。"
+            )
+        if opt.get("hottest_peer") and opt.get("hottest_peer") != opt.get("base"):
+            opt_bullets.append(f"综合 IV 最高标的：**{opt['hottest_peer']}**。")
         cross = opt.get("cross_view") or {}
         if cross.get("summary"):
             opt_bullets.append(cross["summary"])
@@ -317,6 +323,18 @@ def build_investment_brief(
             opt_bullets.append(adv["summary"])
         for a in (adv.get("actions") or [])[:3]:
             opt_bullets.append(a)
+        ladder = opt.get("strike_ladder") or {}
+        if isinstance(ladder, dict) and ladder.get("rows"):
+            ps = ladder.get("purchase_summary") or {}
+            if ps.get("headline"):
+                opt_bullets.append(f"**买 Call 摘要**：{ps['headline']}")
+            for r in (ladder.get("rows") or [])[:5]:
+                pur = r.get("purchase") or {}
+                if not pur.get("verdict"):
+                    continue
+                opt_bullets.append(
+                    f"K={r.get('strike')}：{pur.get('verdict')} — {pur.get('summary', '')}"
+                )
         sections.append({"title": "期权波动率（Binance）", "bullets": opt_bullets})
     elif opt.get("error"):
         sections.append(
@@ -469,6 +487,9 @@ def build_crypto_narrative(
         risks.append("期权波动与方向可能背离；卖方策略存在尾部风险。")
         if opt.get("alert_level") in ("hot", "elevated"):
             risks.append("当前 IV 偏高，买方权利金成本显著，勿忽视时间价值损耗。")
+        ladder = opt.get("strike_ladder") or {}
+        if isinstance(ladder, dict) and ladder.get("purchase_disclaimer"):
+            risks.append(str(ladder["purchase_disclaimer"]))
 
     return {
         "stance": stance,

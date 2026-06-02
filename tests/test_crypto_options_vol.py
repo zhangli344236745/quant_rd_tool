@@ -155,6 +155,55 @@ def test_render_markdown_options_actions_do_not_shadow_analysis():
     assert "期权建议一" in md
 
 
+def test_vol_scan_cache_reuses_payload(monkeypatch):
+    from quant_rd_tool.crypto_options_vol_scan import (
+        clear_vol_scan_cache,
+        get_or_run_volatility_scan,
+    )
+
+    calls = {"n": 0}
+
+    def fake_run(**_kwargs):
+        calls["n"] += 1
+        return {"scanned_at": "t", "items": [], "config": {}}
+
+    monkeypatch.setattr(
+        "quant_rd_tool.crypto_options_vol_scan.run_volatility_scan",
+        fake_run,
+    )
+    clear_vol_scan_cache("data/crypto")
+    get_or_run_volatility_scan(symbols=["BTC"], data_dir="data/crypto", cache_seconds=60)
+    get_or_run_volatility_scan(symbols=["BTC"], data_dir="data/crypto", cache_seconds=60)
+    assert calls["n"] == 1
+
+
+def test_fetch_options_context_includes_peer_rank(monkeypatch):
+    from quant_rd_tool.crypto_options_integration import fetch_options_context
+
+    def fake_scan(**_kwargs):
+        return {
+            "scanned_at": "2026-01-01T00:00:00+00:00",
+            "items": [
+                {"base": "BTC", "atm_iv": 0.7, "rank": 1, "alert_level": "hot"},
+                {"base": "ETH", "atm_iv": 0.5, "rank": 2, "alert_level": "normal"},
+            ],
+        }
+
+    monkeypatch.setattr(
+        "quant_rd_tool.crypto_options_integration.get_or_run_volatility_scan",
+        fake_scan,
+    )
+    monkeypatch.setattr(
+        "quant_rd_tool.crypto_options_integration.advise_item",
+        lambda row: {"stance": "观望", "summary": "t", "actions": [], "risks": []},
+    )
+    ctx = fetch_options_context("ETH", persist_snapshot=False)
+    assert ctx["enabled"] is True
+    assert ctx["peer_rank"] == 2
+    assert ctx["peer_count"] == 2
+    assert ctx["hottest_peer"] == "BTC"
+
+
 def test_synthesize_cross_market_bullish_high_iv():
     from quant_rd_tool.crypto_options_integration import synthesize_cross_market_view
 

@@ -379,6 +379,8 @@ def _summarize_results(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
         pair = r.get("pair", r.get("symbol"))
         from quant_rd_tool.schedule_alert_conditions import normalize_symbol
 
+        opt = r.get("options_vol") if isinstance(r.get("options_vol"), dict) else {}
+        advice = opt.get("advice") if isinstance(opt.get("advice"), dict) else {}
         summary.append(
             {
                 "symbol": normalize_symbol(pair),
@@ -386,6 +388,10 @@ def _summarize_results(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "stance": sig.get("stance"),
                 "action": sig.get("action"),
                 "new_bars": sync.get("new_bars", 0),
+                "iv_alert_level": opt.get("alert_level") if opt.get("enabled") else None,
+                "options_stance": advice.get("stance"),
+                "iv_percentile": opt.get("iv_percentile"),
+                "iv_change_24h_pct": opt.get("iv_change_24h_pct"),
             }
         )
     return summary

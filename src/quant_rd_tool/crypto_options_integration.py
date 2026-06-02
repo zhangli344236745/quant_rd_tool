@@ -7,7 +7,7 @@ from typing import Any
 
 from quant_rd_tool.crypto_options_advisor import advise_item
 from quant_rd_tool.crypto_options_data import fetch_atm_iv_snapshot
-from quant_rd_tool.crypto_options_vol_scan import run_volatility_scan
+from quant_rd_tool.crypto_options_vol_scan import get_or_run_volatility_scan
 
 logger = logging.getLogger(__name__)
 
@@ -29,15 +29,23 @@ def fetch_options_context(
     data_dir: str = "data/crypto",
     persist_snapshot: bool = True,
     client: Any = None,
+    peer_symbols: list[str] | None = None,
 ) -> dict[str, Any]:
-    """Single-underlying options vol snapshot + scan metrics + advice."""
+    """Single-underlying options vol + cross-symbol rank from one EAPI scan."""
+    from quant_rd_tool.crypto_options_vol_scan import get_scan_config
+
     base = base_asset(symbol)
+    cfg = get_scan_config(data_dir)
+    peers = [s.upper() for s in (peer_symbols or cfg.get("symbols") or [base])]
+    if base not in peers:
+        peers = [base, *peers]
     try:
-        scan = run_volatility_scan(
-            symbols=[base],
+        scan = get_or_run_volatility_scan(
+            symbols=peers,
             data_dir=data_dir,
             persist_snapshot=persist_snapshot,
             client=client,
+            use_cache=True,
         )
     except Exception as e:
         logger.warning("options vol scan failed for %s: %s", base, e)
@@ -52,6 +60,8 @@ def fetch_options_context(
             "scan": scan,
         }
     advice = advise_item(item)
+    ranked = [x for x in scan.get("items") or [] if x.get("rank") is not None]
+    top = ranked[0] if ranked else None
     return {
         "enabled": True,
         "base": base,
@@ -63,6 +73,10 @@ def fetch_options_context(
         "atm_iv": item.get("atm_iv"),
         "contract": item.get("contract"),
         "cold_start": item.get("cold_start"),
+        "peer_rank": item.get("rank"),
+        "peer_count": len(ranked),
+        "hottest_peer": top.get("base") if top else None,
+        "scanned_at": scan.get("scanned_at"),
     }
 
 
@@ -93,6 +107,13 @@ def synthesize_cross_market_view(
         notes.append(f"IV 历史分位约 {pct}%。")
     if chg is not None:
         notes.append(f"24h IV 变化约 {chg:+.1f}%。")
+    pr = options_ctx.get("peer_rank")
+    pc = options_ctx.get("peer_count")
+    if pr is not None and pc:
+        notes.append(f"横向波动排名 #{pr}/{pc}（含 BTC/ETH/SOL/BNB 等配置标的）。")
+    hot = options_ctx.get("hottest_peer")
+    if hot and hot != options_ctx.get("base") and alert in ("hot", "elevated"):
+        notes.append(f"当前全市场 IV 综合最高：{hot}。")
 
     high_vol = alert in ("hot", "elevated") or (pct is not None and pct >= 80)
     vol_rising = chg is not None and chg >= 10
@@ -154,6 +175,44 @@ def synthesize_cross_market_view(
     }
 
 
+def _attach_strike_ladder_if_configured(
+    options_ctx: dict[str, Any],
+    *,
+    report: dict[str, Any],
+    data_dir: str,
+    client: Any = None,
+) -> None:
+    if not options_ctx.get("enabled"):
+        return
+    from quant_rd_tool.crypto_options_strike_probs import (
+        build_strike_probability_report,
+        get_strike_prob_config,
+    )
+
+    cfg = get_strike_prob_config(data_dir)
+    if not cfg.get("include_strike_ladder_in_analyze", True):
+        return
+    base = options_ctx.get("base") or ""
+    combined = report.get("combined_signal") or {}
+    scan_item = options_ctx.get("scan_item") or {}
+    try:
+        ladder = build_strike_probability_report(
+            str(base),
+            n=int(cfg.get("analyze_ladder_n") or 3),
+            data_dir=data_dir,
+            expiry_iso=scan_item.get("expiry"),
+            client=client,
+            spot_stance=str(combined.get("stance", "中性")),
+            iv_alert_level=str(options_ctx.get("alert_level") or "normal"),
+            iv_percentile=options_ctx.get("iv_percentile"),
+            with_purchase_advice=True,
+        )
+        options_ctx["strike_ladder"] = ladder
+    except Exception as e:
+        logger.warning("strike ladder for analyze failed: %s", e)
+        options_ctx["strike_ladder"] = {"enabled": False, "error": str(e)}
+
+
 def attach_options_to_report(
     report: dict[str, Any],
     *,
@@ -181,6 +240,12 @@ def attach_options_to_report(
         options_ctx=options_ctx,
     )
     options_ctx["cross_view"] = cross
+    _attach_strike_ladder_if_configured(
+        options_ctx,
+        report=report,
+        data_dir=data_dir,
+        client=client,
+    )
     report["options_vol"] = options_ctx
 
     from quant_rd_tool.crypto_analysis import _render_markdown

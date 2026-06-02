@@ -58,6 +58,38 @@ def test_custom_rule_fires(tmp_path, monkeypatch):
     assert fired and fired[0]["symbol"] == "BTC"
 
 
+def test_iv_alert_level_condition(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    save_alert_rules(
+        custom_rules=[
+            {
+                "id": "btc-iv-hot",
+                "enabled": True,
+                "conditions": [
+                    {"field": "symbol", "op": "eq", "value": "BTC"},
+                    {"field": "iv_alert_level", "op": "eq", "value": "hot"},
+                ],
+                "message": "IV hot {iv_percentile}",
+            }
+        ],
+        cooldown_minutes=0,
+    )
+    fired = evaluate_custom_rules(
+        "job-1",
+        last_cycle_summary=[
+            {
+                "symbol": "BTC",
+                "stance": "中性",
+                "action": "hold",
+                "iv_alert_level": "hot",
+                "iv_percentile": 92,
+            },
+            {"symbol": "ETH", "iv_alert_level": "normal"},
+        ],
+    )
+    assert fired and fired[0]["symbol"] == "BTC"
+
+
 def test_validate_custom_rule():
     assert validate_custom_rule({"id": "x", "conditions": []})
     errs = validate_custom_rule({"conditions": [{"field": "bad", "op": "eq", "value": "1"}]})

@@ -350,6 +350,16 @@ def schedule_alerts_rules_format() -> dict[str, Any]:
                 ],
                 "message": "{symbol} 出现卖出方向信号",
             },
+            {
+                "id": "btc-iv-hot",
+                "name": "BTC 期权 IV 偏高",
+                "enabled": True,
+                "conditions": [
+                    {"field": "symbol", "op": "eq", "value": "BTC"},
+                    {"field": "iv_alert_level", "op": "in", "value": ["hot", "elevated"]},
+                ],
+                "message": "[{job_id}] {symbol} IV {iv_alert_level} 分位{iv_percentile}%",
+            },
         ],
     }
 
@@ -562,6 +572,165 @@ def crypto_perp_states(data_dir: str = "data/crypto") -> dict[str, Any]:
     items = list_perp_states(data_dir)
     return {"data_dir": data_dir, "count": len(items), "items": items}
 
+@router.get("/perp/orders/open")
+def crypto_perp_open_orders(
+    base: str,
+    quote: str = "USDT",
+    ccxt_symbol: str | None = None,
+    testnet: bool = False,
+) -> dict[str, Any]:
+    from quant_rd_tool.perp_order_manager import list_open_orders
+
+    try:
+        return list_open_orders(base=base, quote=quote, ccxt_symbol=ccxt_symbol, testnet=testnet)
+    except ValueError as e:
+        # Allow UI to open even when API keys are missing.
+        msg = str(e)
+        if "BINANCE_API_KEY" in msg or "BINANCE_API_SECRET" in msg:
+            sym = (ccxt_symbol or "").strip() or f"{base.strip().upper()}/{quote.strip().upper()}:{quote.strip().upper()}"
+            return {"enabled": False, "symbol": sym, "count": 0, "items": [], "error": msg}
+        raise HTTPException(status_code=400, detail=msg) from e
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+@router.post("/perp/orders/cancel")
+def crypto_perp_cancel_order(
+    base: str,
+    order_id: str,
+    quote: str = "USDT",
+    ccxt_symbol: str | None = None,
+    testnet: bool = False,
+) -> dict[str, Any]:
+    from quant_rd_tool.perp_order_manager import cancel_order
+
+    try:
+        return cancel_order(
+            base=base,
+            order_id=order_id,
+            quote=quote,
+            ccxt_symbol=ccxt_symbol,
+            testnet=testnet,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+@router.post("/perp/orders/cancel-all")
+def crypto_perp_cancel_all(
+    base: str,
+    quote: str = "USDT",
+    ccxt_symbol: str | None = None,
+    testnet: bool = False,
+) -> dict[str, Any]:
+    from quant_rd_tool.perp_order_manager import cancel_all_orders
+
+    try:
+        return cancel_all_orders(base=base, quote=quote, ccxt_symbol=ccxt_symbol, testnet=testnet)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+@router.get("/perp/position")
+def crypto_perp_position(
+    base: str,
+    quote: str = "USDT",
+    ccxt_symbol: str | None = None,
+    testnet: bool = False,
+) -> dict[str, Any]:
+    from quant_rd_tool.perp_order_manager import get_position
+
+    try:
+        return get_position(base=base, quote=quote, ccxt_symbol=ccxt_symbol, testnet=testnet)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+@router.get("/perp/account/balances")
+def crypto_perp_account_balances(testnet: bool = False) -> dict[str, Any]:
+    from quant_rd_tool.perp_account_analytics import fetch_future_balances
+
+    try:
+        return fetch_future_balances(testnet=testnet)
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+@router.get("/perp/account/trades")
+def crypto_perp_account_trades(
+    base: str = "ETH",
+    quote: str = "USDT",
+    limit: int = 50,
+    testnet: bool = False,
+) -> dict[str, Any]:
+    from quant_rd_tool.perp_account_analytics import fetch_recent_trades
+
+    try:
+        return fetch_recent_trades(base=base, quote=quote, limit=min(limit, 200), testnet=testnet)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+@router.get("/perp/account/daily-pnl")
+def crypto_perp_account_daily_pnl(days: int = 7, testnet: bool = False) -> dict[str, Any]:
+    from quant_rd_tool.perp_account_analytics import fetch_daily_pnl
+
+    try:
+        return fetch_daily_pnl(days=days, testnet=testnet)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+@router.post("/perp/position/close")
+def crypto_perp_close_position(
+    base: str,
+    quote: str = "USDT",
+    ccxt_symbol: str | None = None,
+    testnet: bool = False,
+) -> dict[str, Any]:
+    from quant_rd_tool.perp_order_manager import close_position_market
+
+    try:
+        return close_position_market(base=base, quote=quote, ccxt_symbol=ccxt_symbol, testnet=testnet)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+@router.post("/perp/protection/reconcile")
+def crypto_perp_reconcile_protection(
+    base: str,
+    data_dir: str = "data/crypto",
+    quote: str = "USDT",
+    ccxt_symbol: str | None = None,
+    testnet: bool = False,
+) -> dict[str, Any]:
+    from quant_rd_tool.perp_order_manager import reconcile_protection_from_state
+
+    try:
+        return reconcile_protection_from_state(
+            base=base,
+            data_dir=data_dir,
+            quote=quote,
+            ccxt_symbol=ccxt_symbol,
+            testnet=testnet,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
 
 class OptionsVolConfigBody(BaseModel):
     symbols: list[str] | None = None
@@ -635,6 +804,9 @@ def crypto_options_strike_probability(
     n: int | None = None,
     expiry: str | None = None,
     data_dir: str = "data/crypto",
+    spot_stance: str | None = None,
+    iv_alert_level: str | None = None,
+    iv_percentile: float | None = None,
 ) -> dict[str, Any]:
     from quant_rd_tool.crypto_options_strike_probs import build_strike_probability_report
 
@@ -644,6 +816,9 @@ def crypto_options_strike_probability(
             n=n,
             data_dir=data_dir,
             expiry_iso=expiry,
+            spot_stance=spot_stance,
+            iv_alert_level=iv_alert_level,
+            iv_percentile=iv_percentile,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e

@@ -35,11 +35,117 @@ const webhookOnError = ref(true);
 const webhookOnCb = ref(true);
 const controlSaving = ref(false);
 
+const ordersVisible = ref(false);
+const ordersBase = ref("");
+const ordersLoading = ref(false);
+const ordersError = ref("");
+const openOrders = ref<Record<string, unknown>[]>([]);
+const positionInfo = ref<Record<string, unknown> | null>(null);
+const canceling = ref(false);
+const cancelAllLoading = ref(false);
+const closingLoading = ref(false);
+const reconciling = ref(false);
+const cancelOrderId = ref("");
+
+const acctLoading = ref(false);
+const acctError = ref("");
+const acctBalances = ref<{ asset: string; total: number; available?: number | null; used?: number | null }[]>([]);
+const acctSummary = ref<Record<string, unknown> | null>(null);
+const acctTradeBase = ref("ETH");
+const acctTrades = ref<Record<string, unknown>[]>([]);
+const acctDaily = ref<{ day: string; realizedPnl: number; funding: number; fees: number; net: number }[]>([]);
+
 function decisionTagType(d: string) {
   if (d === "opened" || d === "flipped") return "success";
   if (d === "error") return "danger";
   if (d === "blocked_circuit_breaker") return "warning";
   return "info";
+}
+
+async function openOrderManager(base: string) {
+  ordersBase.value = base;
+  ordersVisible.value = true;
+  positionInfo.value = null;
+  await loadOpenOrders();
+}
+
+async function loadOpenOrders() {
+  if (!ordersBase.value) return;
+  ordersLoading.value = true;
+  ordersError.value = "";
+  try {
+    const pos = await cryptoApi.perpPosition({ base: ordersBase.value, testnet: false });
+    positionInfo.value = (pos.data as Record<string, unknown>) || null;
+    const { data } = await cryptoApi.perpOpenOrders({ base: ordersBase.value, testnet: false });
+    openOrders.value = data.items || [];
+  } catch (e) {
+    ordersError.value = extractError(e);
+    positionInfo.value = null;
+    openOrders.value = [];
+  } finally {
+    ordersLoading.value = false;
+  }
+}
+
+async function cancelOne() {
+  if (!ordersBase.value || !cancelOrderId.value.trim()) return;
+  canceling.value = true;
+  try {
+    await cryptoApi.perpCancelOrder({ base: ordersBase.value, order_id: cancelOrderId.value.trim() });
+    ElMessage.success("已提交取消");
+    cancelOrderId.value = "";
+    await loadOpenOrders();
+    await refreshAll();
+  } catch (e) {
+    ElMessage.error(extractError(e));
+  } finally {
+    canceling.value = false;
+  }
+}
+
+async function cancelAll() {
+  if (!ordersBase.value) return;
+  cancelAllLoading.value = true;
+  try {
+    await cryptoApi.perpCancelAllOrders({ base: ordersBase.value });
+    ElMessage.success("已提交一键取消挂单");
+    await loadOpenOrders();
+    await refreshAll();
+  } catch (e) {
+    ElMessage.error(extractError(e));
+  } finally {
+    cancelAllLoading.value = false;
+  }
+}
+
+async function closePosition() {
+  if (!ordersBase.value) return;
+  closingLoading.value = true;
+  try {
+    await cryptoApi.perpClosePosition({ base: ordersBase.value });
+    ElMessage.success("已提交平仓");
+    await loadOpenOrders();
+    await refreshAll();
+  } catch (e) {
+    ElMessage.error(extractError(e));
+  } finally {
+    closingLoading.value = false;
+  }
+}
+
+async function reconcileProtection() {
+  if (!ordersBase.value) return;
+  reconciling.value = true;
+  try {
+    await cryptoApi.perpReconcileProtection({ base: ordersBase.value, data_dir: dataDir });
+    ElMessage.success("已提交保护单对账/重建（best-effort）");
+    await loadOpenOrders();
+    await refreshAll();
+  } catch (e) {
+    ElMessage.error(extractError(e));
+  } finally {
+    reconciling.value = false;
+  }
 }
 
 async function loadControl() {
@@ -119,6 +225,39 @@ async function loadTelemetry() {
 async function refreshAll() {
   await loadSummary();
   await loadTelemetry();
+  await loadAccountPanel();
+}
+
+async function loadAccountPanel() {
+  acctLoading.value = true;
+  acctError.value = "";
+  try {
+    const [b, t, p] = await Promise.all([
+      cryptoApi.perpAccountBalances({ testnet: false }),
+      cryptoApi.perpAccountTrades({ base: acctTradeBase.value, limit: 20, testnet: false }),
+      cryptoApi.perpAccountDailyPnl({ days: 7, testnet: false }),
+    ]);
+    acctBalances.value = b.data.items || [];
+    acctSummary.value = (b.data.summary as Record<string, unknown>) || null;
+    acctTrades.value = (t.data.items as Record<string, unknown>[]) || [];
+    acctDaily.value = p.data.items || [];
+    if ((b.data as any).error) acctError.value = String((b.data as any).error);
+    if ((t.data as any).error && !acctError.value) acctError.value = String((t.data as any).error);
+    if ((p.data as any).error && !acctError.value) acctError.value = String((p.data as any).error);
+  } catch (e) {
+    acctError.value = extractError(e);
+  } finally {
+    acctLoading.value = false;
+  }
+}
+
+async function reloadTrades() {
+  try {
+    const { data } = await cryptoApi.perpAccountTrades({ base: acctTradeBase.value, limit: 20, testnet: false });
+    acctTrades.value = (data.items as Record<string, unknown>[]) || [];
+  } catch (e) {
+    ElMessage.error(extractError(e));
+  }
 }
 
 async function quickSignalOnly(base: string) {
@@ -236,6 +375,85 @@ onUnmounted(() => {
       </el-col>
     </el-row>
 
+    <el-card shadow="never" class="panel-card mb" v-loading="acctLoading">
+      <template #header>账户概览（永续）</template>
+      <el-alert v-if="acctError" type="warning" :title="acctError" show-icon class="mb" />
+
+      <el-row :gutter="16">
+        <el-col :span="8">
+          <div class="stat-label">USDT 总资产</div>
+          <div class="stat-val">
+            {{ (acctBalances.find((b) => b.asset === "USDT")?.total ?? 0).toFixed(2) }}
+          </div>
+        </el-col>
+        <el-col :span="8">
+          <div class="stat-label">USDT 可用</div>
+          <div class="stat-val">
+            {{ (acctBalances.find((b) => b.asset === "USDT")?.available ?? 0).toFixed(2) }}
+          </div>
+        </el-col>
+        <el-col :span="8">
+          <div class="stat-label">未实现盈亏（合计）</div>
+          <div class="stat-val">
+            {{ Number(acctSummary?.totalUnrealizedProfit ?? 0).toFixed(2) }}
+          </div>
+        </el-col>
+      </el-row>
+
+      <el-row :gutter="16" class="mt">
+        <el-col :span="10">
+          <el-card shadow="never" class="panel-card">
+            <template #header>余额</template>
+            <el-table :data="acctBalances" size="small" max-height="220" stripe>
+              <el-table-column prop="asset" label="资产" width="90" />
+              <el-table-column prop="total" label="总额" width="110">
+                <template #default="{ row }">{{ Number(row.total).toFixed(6) }}</template>
+              </el-table-column>
+              <el-table-column prop="available" label="可用" width="110">
+                <template #default="{ row }">{{ row.available != null ? Number(row.available).toFixed(6) : "—" }}</template>
+              </el-table-column>
+              <el-table-column prop="used" label="占用" width="110">
+                <template #default="{ row }">{{ row.used != null ? Number(row.used).toFixed(6) : "—" }}</template>
+              </el-table-column>
+            </el-table>
+          </el-card>
+        </el-col>
+        <el-col :span="14">
+          <el-card shadow="never" class="panel-card">
+            <template #header>
+              <div class="toolbar" style="margin-bottom: 0">
+                <span>最近交易</span>
+                <el-select v-model="acctTradeBase" style="width: 120px" @change="reloadTrades">
+                  <el-option label="ETH" value="ETH" />
+                  <el-option label="BTC" value="BTC" />
+                </el-select>
+              </div>
+            </template>
+            <el-table :data="acctTrades" size="small" max-height="220" stripe>
+              <el-table-column prop="ts" label="时间" width="180" show-overflow-tooltip />
+              <el-table-column prop="symbol" label="合约" width="120" />
+              <el-table-column prop="side" label="方向" width="70" />
+              <el-table-column prop="price" label="价格" width="100" />
+              <el-table-column prop="qty" label="数量" width="90" />
+              <el-table-column prop="fee" label="手续费" width="90" />
+              <el-table-column prop="orderId" label="orderId" min-width="140" show-overflow-tooltip />
+            </el-table>
+          </el-card>
+        </el-col>
+      </el-row>
+
+      <el-card shadow="never" class="panel-card mt">
+        <template #header>每日盈亏（近 7 日）</template>
+        <el-table :data="acctDaily" size="small" stripe max-height="200">
+          <el-table-column prop="day" label="日期" width="120" />
+          <el-table-column prop="realizedPnl" label="Realized" width="120" />
+          <el-table-column prop="funding" label="Funding" width="120" />
+          <el-table-column prop="fees" label="Fees" width="120" />
+          <el-table-column prop="net" label="Net" width="120" />
+        </el-table>
+      </el-card>
+    </el-card>
+
     <el-row :gutter="16">
       <el-col :span="10">
         <el-card shadow="never" class="panel-card">
@@ -251,7 +469,10 @@ onUnmounted(() => {
               保护 streak {{ (st.protection as Record<string, unknown>).protection_fail_streak ?? 0 }}
               · soft {{ (st.protection as Record<string, unknown>).soft_protection_active ? "ON" : "off" }}
             </div>
-            <el-button size="small" class="mt" @click="quickSignalOnly(String(st.base))">Signal-only 一轮</el-button>
+            <div class="mt state-actions">
+              <el-button size="small" @click="quickSignalOnly(String(st.base))">Signal-only 一轮</el-button>
+              <el-button size="small" @click="openOrderManager(String(st.base))">订单管理</el-button>
+            </div>
           </div>
         </el-card>
 
@@ -309,6 +530,49 @@ onUnmounted(() => {
         </el-card>
       </el-col>
     </el-row>
+
+    <el-dialog v-model="ordersVisible" :title="`订单管理 · ${ordersBase}`" width="860px">
+      <el-alert v-if="ordersError" type="error" :title="ordersError" show-icon class="mb" />
+      <div class="toolbar">
+        <el-button :loading="ordersLoading" @click="loadOpenOrders">刷新 open orders</el-button>
+        <el-button type="warning" :loading="cancelAllLoading" @click="cancelAll">一键取消挂单</el-button>
+        <el-button type="danger" :loading="closingLoading" @click="closePosition">一键平仓（reduceOnly 市价）</el-button>
+        <el-button :loading="reconciling" @click="reconcileProtection">保护单对账/重建</el-button>
+      </div>
+      <div class="toolbar mt">
+        <el-input v-model="cancelOrderId" placeholder="order id / clientOrderId" style="max-width: 280px" />
+        <el-button type="warning" :loading="canceling" @click="cancelOne">取消单笔</el-button>
+        <span class="muted small">提示：Kill Switch 开启时禁止变更类操作（取消/平仓/对账）。</span>
+      </div>
+
+      <el-card shadow="never" class="panel-card mb">
+        <template #header>当前持仓（交易所）</template>
+        <el-descriptions v-if="positionInfo?.position" :column="4" size="small" border>
+          <el-descriptions-item label="symbol">{{ positionInfo.symbol }}</el-descriptions-item>
+          <el-descriptions-item label="side">{{ (positionInfo.position as any).side }}</el-descriptions-item>
+          <el-descriptions-item label="contracts">{{ (positionInfo.position as any).contracts }}</el-descriptions-item>
+          <el-descriptions-item label="uPnL">{{ (positionInfo.position as any).unrealized_pnl ?? "—" }}</el-descriptions-item>
+        </el-descriptions>
+        <p v-else class="muted small">
+          {{
+            positionInfo?.error
+              ? `无法读取持仓：${positionInfo.error}`
+              : "无持仓或 fetch_positions 不可用"
+          }}
+        </p>
+      </el-card>
+
+      <el-table :data="openOrders" size="small" stripe max-height="420" v-loading="ordersLoading">
+        <el-table-column prop="id" label="id" width="120" show-overflow-tooltip />
+        <el-table-column prop="clientOrderId" label="client" width="140" show-overflow-tooltip />
+        <el-table-column prop="type" label="type" width="130" />
+        <el-table-column prop="side" label="side" width="70" />
+        <el-table-column prop="amount" label="amt" width="80" />
+        <el-table-column prop="price" label="price" width="90" />
+        <el-table-column prop="stopPrice" label="stop" width="90" />
+        <el-table-column prop="status" label="status" width="90" />
+      </el-table>
+    </el-dialog>
   </div>
 </template>
 
@@ -392,5 +656,10 @@ onUnmounted(() => {
   width: 28px;
   text-align: right;
   color: var(--text-muted);
+}
+.state-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 </style>

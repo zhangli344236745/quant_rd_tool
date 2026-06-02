@@ -96,6 +96,12 @@ class CryptoAnalyzeJobRequest(BaseModel):
     with_options_vol: bool = True
 
 
+class CryptoOptionsVolScanJobRequest(BaseModel):
+    data_dir: str = "data/crypto"
+    symbols: list[str] | None = None
+    lookback_days: int | None = None
+
+
 def _store(request: Request):
     store = getattr(request.app.state, "job_store", None)
     if store is None:
@@ -154,6 +160,20 @@ def enqueue_crypto_analyze(req: CryptoAnalyzeJobRequest, request: Request) -> di
     job = store.create(
         type="crypto_analyze",
         code=req.symbol.strip(),
+        payload=req.model_dump(),
+    )
+    return {"job_id": job["id"]}
+
+
+@router.post("/crypto-options-vol-scan", status_code=202)
+def enqueue_crypto_options_vol_scan(
+    req: CryptoOptionsVolScanJobRequest,
+    request: Request,
+) -> dict[str, str]:
+    store = _store(request)
+    job = store.create(
+        type="crypto_options_vol_scan",
+        code="OPTIONS_IV",
         payload=req.model_dump(),
     )
     return {"job_id": job["id"]}

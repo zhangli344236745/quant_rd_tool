@@ -140,9 +140,27 @@ function optAlertType(level: string) {
             <el-descriptions-item label="合约">
               {{ optionsVol()?.contract || "—" }}
             </el-descriptions-item>
+            <el-descriptions-item
+              v-if="optionsVol()?.peer_rank != null"
+              label="横向排名"
+            >
+              #{{ optionsVol()?.peer_rank }}/{{ optionsVol()?.peer_count }}
+            </el-descriptions-item>
+            <el-descriptions-item
+              v-if="optionsVol()?.hottest_peer"
+              label="IV 最高"
+            >
+              {{ optionsVol()?.hottest_peer }}
+            </el-descriptions-item>
           </el-descriptions>
           <p v-if="(optionsVol()?.advice as any)?.summary" class="muted small mt">
             {{ (optionsVol()?.advice as any).summary }}
+          </p>
+          <p
+            v-if="((optionsVol()?.strike_ladder as any)?.purchase_summary)?.headline"
+            class="purchase-headline small mt"
+          >
+            {{ ((optionsVol()?.strike_ladder as any).purchase_summary).headline }}
           </p>
         </el-card>
         <ResultPanel :loading="polling" :result="result" :error="error" />

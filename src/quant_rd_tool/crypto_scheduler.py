@@ -27,6 +27,8 @@ def run_scheduled_cycle(
     exchange_id: cxt.ExchangeId = "binance",
     save_snapshot: bool = True,
     precheck_connectivity: bool = True,
+    with_options_vol: bool = True,
+    options_iv_after_cycle: bool = True,
 ) -> list[dict[str, Any]]:
     """Sync incremental OHLCV for each symbol, dump qlib, run technical + ML analysis."""
     if precheck_connectivity and symbols:
@@ -58,6 +60,7 @@ def run_scheduled_cycle(
                 with_qlib=True,
                 with_ml=with_ml,
                 ml_algorithm=ml_algorithm,  # type: ignore[arg-type]
+                with_options_vol=with_options_vol,
             )
             report["sync"] = meta
             if save_snapshot:
@@ -81,6 +84,20 @@ def run_scheduled_cycle(
                     "generated_at": datetime.now(UTC).isoformat(),
                 }
             )
+
+    if options_iv_after_cycle:
+        try:
+            from quant_rd_tool.crypto_options_vol_scan import run_options_iv_maintenance
+
+            iv_summary = run_options_iv_maintenance(data_dir=str(data_dir))
+            logger.info(
+                "Options IV maintenance: elevated=%s bases=%s",
+                iv_summary.get("elevated_count"),
+                iv_summary.get("elevated_bases"),
+            )
+        except Exception as e:
+            logger.warning("Options IV maintenance failed: %s", e)
+
     return results
 
 
@@ -96,6 +113,8 @@ def run_scheduler(
     exchange_id: cxt.ExchangeId = "binance",
     once: bool = False,
     precheck_connectivity: bool = True,
+    with_options_vol: bool = True,
+    options_iv_after_cycle: bool = True,
 ) -> None:
     """Run analysis every ``interval_minutes`` until interrupted (or ``once=True``)."""
     if precheck_connectivity and symbols:
@@ -126,6 +145,8 @@ def run_scheduler(
             ml_algorithm=ml_algorithm,
             exchange_id=exchange_id,
             precheck_connectivity=False,
+            with_options_vol=with_options_vol,
+            options_iv_after_cycle=options_iv_after_cycle,
         )
         _log_cycle_summary(results, started)
         if once:
@@ -162,10 +183,16 @@ def _log_cycle_summary(results: list[dict[str, Any]], started: datetime) -> None
             continue
         sig = r.get("combined_signal", {})
         sync = r.get("sync", {})
+        opt = r.get("options_vol") if isinstance(r.get("options_vol"), dict) else {}
         start, end = format_period_bounds_from_report(r)
+        iv_note = ""
+        if opt.get("enabled") and opt.get("alert_level") not in (None, "normal"):
+            iv_note = f" | IV {opt.get('alert_level')}"
+            if opt.get("iv_percentile") is not None:
+                iv_note += f" pct={opt.get('iv_percentile')}%"
         lines.append(
             f"{r.get('pair', r.get('symbol'))}: {sig.get('stance')} ({sig.get('action')}) "
-            f"+{sync.get('new_bars', 0)} bars | {start} ~ {end}"
+            f"+{sync.get('new_bars', 0)} bars{iv_note} | {start} ~ {end}"
         )
     logger.info("Cycle finished in %.1fs\n%s", (datetime.now(UTC) - started).total_seconds(), "\n".join(lines))
 

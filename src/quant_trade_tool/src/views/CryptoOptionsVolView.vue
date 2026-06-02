@@ -7,6 +7,11 @@ import {
   type StrikeProbabilityReport,
 } from "@/api/crypto";
 import { extractError } from "@/api/http";
+import { jobsApi } from "@/api/jobs";
+import { useRouter } from "vue-router";
+
+const router = useRouter();
+const jobEnqueueing = ref(false);
 
 const loading = ref(false);
 const scan = ref<OptionsVolScanResult | null>(null);
@@ -16,6 +21,18 @@ const error = ref("");
 const strikeLoading = ref(false);
 const strikeReport = ref<StrikeProbabilityReport | null>(null);
 const strikeError = ref("");
+
+const configVisible = ref(false);
+const configForm = ref({
+  symbols: "BTC,ETH,SOL,BNB",
+  lookback_days: 30,
+  iv_percentile_threshold: 80,
+  iv_change_24h_threshold: 10,
+});
+const configSaving = ref(false);
+
+const ivHistory = ref<{ ts: string; atm_iv?: number }[]>([]);
+const historyLoading = ref(false);
 
 function alertTagType(level: string) {
   if (level === "hot") return "danger";
@@ -35,6 +52,12 @@ function edgeClass(edge: number | null | undefined) {
   return "";
 }
 
+function verdictTagType(verdict: string | undefined) {
+  if (verdict === "可考虑买入") return "success";
+  if (verdict === "不建议买入") return "danger";
+  return "info";
+}
+
 function selectedAdvice() {
   if (!scan.value || !selectedBase.value) return null;
   return scan.value.advice_pack.advice.find((a) => a.base === selectedBase.value);
@@ -52,18 +75,91 @@ async function loadStrikeProbability() {
   strikeLoading.value = true;
   strikeError.value = "";
   try {
-    const expiry = selectedRow()?.expiry;
-    const { data } = await cryptoApi.optionsStrikeProbability(
-      selectedBase.value,
-      5,
-      expiry,
-    );
+    const row = selectedRow();
+    const expiry = row?.expiry;
+    const { data } = await cryptoApi.optionsStrikeProbability(selectedBase.value, 5, expiry, {
+      iv_alert_level: row?.alert_level,
+      iv_percentile: row?.iv_percentile ?? undefined,
+    });
     strikeReport.value = data;
   } catch (e) {
     strikeError.value = extractError(e);
     strikeReport.value = null;
   } finally {
     strikeLoading.value = false;
+  }
+}
+
+async function loadConfig() {
+  try {
+    const { data } = await cryptoApi.optionsVolConfig();
+    configForm.value = {
+      symbols: (data.symbols || []).join(","),
+      lookback_days: data.lookback_days,
+      iv_percentile_threshold: data.iv_percentile_threshold,
+      iv_change_24h_threshold: data.iv_change_24h_threshold,
+    };
+  } catch {
+    /* use defaults */
+  }
+}
+
+async function saveConfig() {
+  configSaving.value = true;
+  try {
+    const symbols = configForm.value.symbols
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    await cryptoApi.optionsVolConfigSave({
+      symbols,
+      lookback_days: configForm.value.lookback_days,
+      iv_percentile_threshold: configForm.value.iv_percentile_threshold,
+      iv_change_24h_threshold: configForm.value.iv_change_24h_threshold,
+    });
+    ElMessage.success("扫描配置已保存");
+    configVisible.value = false;
+    await runScan();
+  } catch (e) {
+    ElMessage.error(extractError(e));
+  } finally {
+    configSaving.value = false;
+  }
+}
+
+async function loadIvHistory() {
+  if (!selectedBase.value) {
+    ivHistory.value = [];
+    return;
+  }
+  historyLoading.value = true;
+  try {
+    const { data } = await cryptoApi.optionsVolHistory(selectedBase.value, 30);
+    ivHistory.value = [...(data.items || [])].reverse();
+  } catch {
+    ivHistory.value = [];
+  } finally {
+    historyLoading.value = false;
+  }
+}
+
+async function enqueueVolScanJob() {
+  jobEnqueueing.value = true;
+  try {
+    const symbols = configForm.value.symbols
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const { data } = await jobsApi.cryptoOptionsVolScan({
+      symbols: symbols.length ? symbols : undefined,
+      lookback_days: configForm.value.lookback_days,
+    });
+    ElMessage.success(`已入队任务 ${data.job_id}`);
+    router.push({ name: "tasks" });
+  } catch (e) {
+    ElMessage.error(extractError(e));
+  } finally {
+    jobEnqueueing.value = false;
   }
 }
 
@@ -85,9 +181,13 @@ async function runScan() {
 
 watch(selectedBase, () => {
   loadStrikeProbability();
+  loadIvHistory();
 });
 
-onMounted(runScan);
+onMounted(async () => {
+  await loadConfig();
+  await runScan();
+});
 </script>
 
 <template>
@@ -100,8 +200,31 @@ onMounted(runScan);
     <el-card shadow="never" class="panel-card">
       <div class="toolbar">
         <el-button type="primary" :loading="loading" @click="runScan">立即扫描</el-button>
+        <el-button :loading="jobEnqueueing" @click="enqueueVolScanJob">后台任务扫描</el-button>
+        <el-button @click="configVisible = true">扫描配置</el-button>
         <span v-if="scan" class="muted mono small">扫描于 {{ scan.scanned_at }}</span>
       </div>
+
+      <el-dialog v-model="configVisible" title="期权 IV 扫描配置" width="420px">
+        <el-form label-width="120px" size="small">
+          <el-form-item label="标的列表">
+            <el-input v-model="configForm.symbols" placeholder="BTC,ETH,SOL,BNB" />
+          </el-form-item>
+          <el-form-item label="分位回看(天)">
+            <el-input-number v-model="configForm.lookback_days" :min="7" :max="365" />
+          </el-form-item>
+          <el-form-item label="分位告警≥">
+            <el-input-number v-model="configForm.iv_percentile_threshold" :min="50" :max="99" />
+          </el-form-item>
+          <el-form-item label="24h IV Δ≥%">
+            <el-input-number v-model="configForm.iv_change_24h_threshold" :min="1" :max="100" />
+          </el-form-item>
+        </el-form>
+        <template #footer>
+          <el-button @click="configVisible = false">取消</el-button>
+          <el-button type="primary" :loading="configSaving" @click="saveConfig">保存</el-button>
+        </template>
+      </el-dialog>
       <el-alert v-if="error" type="error" :title="error" show-icon class="mb" />
 
       <el-table
@@ -170,7 +293,22 @@ onMounted(runScan);
             <el-descriptions-item label="到期">{{ selectedRow()!.expiry }}</el-descriptions-item>
             <el-descriptions-item label="DTE">{{ selectedRow()!.dte }}</el-descriptions-item>
             <el-descriptions-item label="行权价">{{ selectedRow()!.strike }}</el-descriptions-item>
+            <el-descriptions-item v-if="selectedRow()!.rank" label="横向排名">
+              #{{ selectedRow()!.rank }}
+            </el-descriptions-item>
           </el-descriptions>
+          <el-card v-loading="historyLoading" shadow="never" class="mt inner-card">
+            <template #header>IV 历史（近 30 次快照）</template>
+            <el-table v-if="ivHistory.length" :data="ivHistory" size="small" max-height="200">
+              <el-table-column prop="ts" label="时间" min-width="140" show-overflow-tooltip />
+              <el-table-column label="ATM IV" width="80">
+                <template #default="{ row }">
+                  {{ row.atm_iv != null ? (row.atm_iv * 100).toFixed(1) + "%" : "—" }}
+                </template>
+              </el-table-column>
+            </el-table>
+            <p v-else class="muted small">暂无本地历史；定时扫描或多次「立即扫描」后累积。</p>
+          </el-card>
         </el-card>
       </el-col>
     </el-row>
@@ -195,6 +333,14 @@ onMounted(runScan);
         show-icon
         class="mb"
         :title="strikeReport.model.reason || '模型概率不可用（缺 OHLCV 或 qlib 样本）'"
+      />
+      <el-alert
+        v-if="strikeReport?.purchase_summary?.headline"
+        type="warning"
+        :closable="false"
+        show-icon
+        class="mb"
+        :title="strikeReport.purchase_summary.headline"
       />
       <el-table
         v-if="strikeReport?.rows?.length"
@@ -232,6 +378,23 @@ onMounted(runScan);
                   : "—"
               }}
             </span>
+          </template>
+        </el-table-column>
+        <el-table-column label="买 Call 建议" width="108">
+          <template #default="{ row }">
+            <el-tag
+              v-if="row.purchase?.verdict"
+              :type="verdictTagType(row.purchase.verdict)"
+              size="small"
+            >
+              {{ row.purchase.verdict }}
+            </el-tag>
+            <span v-else>—</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="说明" min-width="200" show-overflow-tooltip>
+          <template #default="{ row }">
+            {{ row.purchase?.summary || "—" }}
           </template>
         </el-table-column>
       </el-table>
@@ -285,6 +448,10 @@ onMounted(runScan);
 }
 .overview {
   margin-top: 16px;
+}
+.inner-card {
+  margin-top: 12px;
+  background: transparent;
 }
 .disclaimer {
   margin-top: 12px;

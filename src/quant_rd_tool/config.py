@@ -1,10 +1,20 @@
+from __future__ import annotations
+
+from pathlib import Path
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+def _project_root() -> Path:
+    # .../quant_rd_tool/src/quant_rd_tool/config.py -> repo root is parents[2]
+    return Path(__file__).resolve().parents[2]
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        # Do not depend on process cwd; always load repo-root .env.
+        env_file=str(_project_root() / ".env"),
         env_file_encoding="utf-8",
         extra="ignore",
     )

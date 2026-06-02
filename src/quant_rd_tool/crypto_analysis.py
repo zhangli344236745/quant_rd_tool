@@ -237,6 +237,14 @@ def _render_markdown(report: dict[str, Any]) -> str:
             lines.append(f"- 24h IV 变化：{item['iv_change_24h_pct']:+.1f}%")
         if item.get("contract"):
             lines.append(f"- 合约：{item['contract']}")
+        if opt.get("peer_rank") is not None and opt.get("peer_count"):
+            lines.append(f"- 横向 IV 排名：#{opt['peer_rank']}/{opt['peer_count']}")
+        if opt.get("hottest_peer"):
+            lines.append(f"- 综合 IV 最高：{opt['hottest_peer']}")
+        ladder = opt.get("strike_ladder") or {}
+        ps = ladder.get("purchase_summary") if isinstance(ladder, dict) else None
+        if ps and ps.get("headline"):
+            lines.append(f"- **行权价买 Call**：{ps['headline']}")
         cross = opt.get("cross_view") or {}
         if cross.get("summary"):
             lines.append(f"- **现货×期权**：{cross['summary']}")

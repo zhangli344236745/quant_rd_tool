@@ -220,7 +220,10 @@ HTTP（单次执行，不注册任务）：
 - `GET /api/v1/crypto/options/volatility-scan/history?symbol=BTC` — 本地 IV 历史（`data/crypto/options_iv/`）
 - CLI：`uv run quant-rd crypto options-scan --symbols BTC,ETH,SOL,BNB`
 - Web 侧栏：**期权波动**（独立扫描页）
-- **Crypto 行情分析** / `POST /crypto/analyze`：默认 `with_options_vol=true`，报告内合并现货×期权联合研判
+- **Crypto 行情分析** / `POST /crypto/analyze`：默认 `with_options_vol=true`，报告内合并现货×期权联合研判（含横向 IV 排名）
+- `POST /api/v1/jobs/crypto-options-vol-scan` — 异步全市场 IV 维护扫描
+- 定时任务 `crypto schedule` 每轮结束自动跑 IV 快照（累积分位历史，减轻冷启动）；周期摘要含 `iv_alert_level` 等字段，可配 [调度自定义告警](docs/schedule-alert-custom-rules.md)
+- analyze 集成使用 **60s 扫描缓存**，同一周期多标的只打一次 Binance EAPI
 - `GET/POST /api/v1/crypto/ops/control` — Kill Switch、Webhook 告警配置
 - `POST /api/v1/crypto/ops/control/test-webhook` — 发送测试告警
 - `GET/POST /api/v1/crypto/schedules/alerts/rules` — 调度失败/连续失败/卡住检测规则

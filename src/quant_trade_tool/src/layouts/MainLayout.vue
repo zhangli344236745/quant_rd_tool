@@ -12,21 +12,44 @@ const { activeCount: jobBadge } = useActiveJobsPoll();
 
 const active = computed(() => route.path);
 
-const menus = [
+type MenuItem = { path: string; icon: string; label: string };
+type MenuGroup = { key: string; icon: string; label: string; items: MenuItem[] };
+
+const rootMenus: MenuItem[] = [
   { path: "/", icon: "Odometer", label: "概览" },
   { path: "/tasks", icon: "List", label: "任务中心" },
-  { path: "/astocks", icon: "OfficeBuilding", label: "A 股公司" },
-  { path: "/astocks-reports", icon: "FolderOpened", label: "报告库" },
-  { path: "/astocks-screener", icon: "Filter", label: "选股器" },
-  { path: "/stock-analyze", icon: "Document", label: "个股分析" },
-  { path: "/backtest", icon: "DataLine", label: "组合回测" },
-  { path: "/macro", icon: "MapLocation", label: "宏观面板" },
-  { path: "/analyze", icon: "TrendCharts", label: "Crypto 行情" },
-  { path: "/crypto-options-vol", icon: "DataAnalysis", label: "期权波动" },
-  { path: "/crypto-ops", icon: "Monitor", label: "Crypto 运营" },
-  { path: "/spot-bot", icon: "Coin", label: "现货 Bot" },
-  { path: "/perp-bot", icon: "Histogram", label: "永续 Bot" },
-  { path: "/perp-portfolio", icon: "Grid", label: "组合永续" },
+];
+
+const groups: MenuGroup[] = [
+  {
+    key: "astock",
+    icon: "OfficeBuilding",
+    label: "A股管理",
+    items: [
+      { path: "/astocks", icon: "OfficeBuilding", label: "A 股公司" },
+      { path: "/astocks-reports", icon: "FolderOpened", label: "报告库" },
+      { path: "/astocks-screener", icon: "Filter", label: "选股器" },
+      { path: "/stock-analyze", icon: "Document", label: "个股分析" },
+      { path: "/backtest", icon: "DataLine", label: "组合回测" },
+      { path: "/macro", icon: "MapLocation", label: "宏观面板" },
+    ],
+  },
+  {
+    key: "crypto",
+    icon: "Coin",
+    label: "数字货币管理",
+    items: [
+      { path: "/analyze", icon: "TrendCharts", label: "Crypto 行情" },
+      { path: "/crypto-options-vol", icon: "DataAnalysis", label: "期权波动" },
+      { path: "/crypto-ops", icon: "Monitor", label: "Crypto 运营" },
+      { path: "/spot-bot", icon: "Coin", label: "现货 Bot" },
+      { path: "/perp-bot", icon: "Histogram", label: "永续 Bot" },
+      { path: "/perp-portfolio", icon: "Grid", label: "组合永续" },
+    ],
+  },
+];
+
+const tailMenus: MenuItem[] = [
   { path: "/schedules", icon: "Timer", label: "定时任务" },
   { path: "/settings", icon: "Setting", label: "设置" },
 ];
@@ -51,7 +74,23 @@ const apiHint = computed(() => getApiBase() || "代理 → 127.0.0.1:8765");
         active-text-color="#3dd6c3"
         router
       >
-        <el-menu-item v-for="m in menus" :key="m.path" :index="m.path" @click="router.push(m.path)">
+        <el-menu-item v-for="m in rootMenus" :key="m.path" :index="m.path" @click="router.push(m.path)">
+          <el-icon><component :is="m.icon" /></el-icon>
+          <span>{{ m.label }}</span>
+        </el-menu-item>
+
+        <el-sub-menu v-for="g in groups" :key="g.key" :index="`group:${g.key}`">
+          <template #title>
+            <el-icon><component :is="g.icon" /></el-icon>
+            <span>{{ g.label }}</span>
+          </template>
+          <el-menu-item v-for="m in g.items" :key="m.path" :index="m.path" @click="router.push(m.path)">
+            <el-icon><component :is="m.icon" /></el-icon>
+            <span>{{ m.label }}</span>
+          </el-menu-item>
+        </el-sub-menu>
+
+        <el-menu-item v-for="m in tailMenus" :key="m.path" :index="m.path" @click="router.push(m.path)">
           <el-icon><component :is="m.icon" /></el-icon>
           <span>{{ m.label }}</span>
         </el-menu-item>
