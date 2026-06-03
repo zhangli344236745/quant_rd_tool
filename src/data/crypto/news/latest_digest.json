@@ -1,0 +1,76 @@
+{
+  "generated_at": "2026-06-03T08:01:41.154289+00:00",
+  "top_items": [
+    {
+      "id": "https://cointelegraph.com/news/bitcoin-falls-below-66k-as-us-iran-strikes-resume",
+      "title": "Bitcoin falls below $66K as US and Iran launch new strikes",
+      "link": "https://cointelegraph.com/news/bitcoin-falls-below-66k-as-us-iran-strikes-resume?utm_source=rss_feed&utm_medium=rss&utm_campaign=rss_partner_inbound",
+      "published": "Wed, 03 Jun 2026 06:18:37 +0000",
+      "summary": "Bitcoin saw its largest daily drop since early February on Tuesday as the cryptocurrency shed more than $4,500 in a single day.",
+      "source_id": "cointelegraph",
+      "score": 70,
+      "category": "crypto_native",
+      "symbols": [
+        "BTC"
+      ],
+      "impact_direction": "neutral",
+      "matched_keywords": [
+        "drop",
+        "bitcoin",
+        "crypto"
+      ],
+      "advice": {
+        "headline": "Bitcoin falls below $66K as US and Iran launch new strikes",
+        "impact": "neutral",
+        "confidence": 0.45,
+        "affected_symbols": [
+          "BTC"
+        ],
+        "horizon": "days",
+        "advice": "【加密原生】Bitcoin falls below $66K as US and Iran launch new strikes — 规则判断中性，可能波及 BTC。请结合仓位与流动性自行评估。仅供参考，不构成投资建议。",
+        "advice_template": true,
+        "risk_note": "规则引擎输出，未调用 LLM。仅供参考，不构成投资建议。"
+      }
+    },
+    {
+      "id": "https://cointelegraph.com/news/us-sanctions-irans-top-crypto-exchange-as-war-rages-on",
+      "title": "US Treasury issues sanctions on Iran, targets 4 crypto exchanges",
+      "link": "https://cointelegraph.com/news/us-sanctions-irans-top-crypto-exchange-as-war-rages-on?utm_source=rss_feed&utm_medium=rss&utm_campaign=rss_partner_inbound",
+      "published": "Wed, 03 Jun 2026 06:12:44 +0000",
+      "summary": "The sanctions come four days after Treasury Secretary Scott Bessent said the US had seized nearly $1 billion in crypto from Iranian crypto exchanges and wallets since late February.",
+      "source_id": "cointelegraph",
+      "score": 40,
+      "category": "crypto_native",
+      "symbols": [],
+      "impact_direction": "neutral",
+      "matched_keywords": [
+        "treasury",
+        "sec",
+        "crypto",
+        "wallet",
+        "exchange"
+      ],
+      "advice": {
+        "headline": "US Treasury issues sanctions on Iran, targets 4 crypto exchanges",
+        "impact": "neutral",
+        "confidence": 0.45,
+        "affected_symbols": [
+          "BTC"
+        ],
+        "horizon": "days",
+        "advice": "【加密原生】US Treasury issues sanctions on Iran, targets 4 crypto exchanges — 规则判断中性，可能波及 主流加密资产。请结合仓位与流动性自行评估。仅供参考，不构成投资建议。",
+        "advice_template": true,
+        "risk_note": "规则引擎输出，未调用 LLM。仅供参考，不构成投资建议。"
+      }
+    }
+  ],
+  "market_stance": "neutral",
+  "items_scored": 5,
+  "items_new": 5,
+  "fetch_errors": [],
+  "sources": {
+    "rss": 100,
+    "web_search": 0,
+    "web_search_provider": null
+  }
+}
