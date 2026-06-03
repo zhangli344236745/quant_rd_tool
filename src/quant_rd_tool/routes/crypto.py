@@ -124,6 +124,7 @@ class CryptoScheduleCreateRequest(BaseModel):
     with_ml: bool = True
     ml_algorithm: str = "both"
     auto_start: bool = False
+    job_type: str = Field("analysis", description="analysis | news")
 
 
 @router.post("/analyze")
@@ -313,6 +314,7 @@ class ScheduleAlertRulesRequest(BaseModel):
     bark: dict[str, Any] | None = None
     webhook_on_alert: bool | None = None
     on_cycle_complete: bool | None = None
+    crypto_news: dict[str, Any] | None = None
 
 
 @router.get("/schedules/alerts/rules")
@@ -408,6 +410,7 @@ def schedule_alerts_rules_save(req: ScheduleAlertRulesRequest) -> dict[str, Any]
             bark=req.bark,
             webhook_on_alert=req.webhook_on_alert,
             on_cycle_complete=req.on_cycle_complete,
+            crypto_news=req.crypto_news,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
@@ -524,6 +527,7 @@ def crypto_schedules_create(req: CryptoScheduleCreateRequest) -> dict[str, Any]:
         data_dir=req.data_dir,
         with_ml=req.with_ml,
         ml_algorithm=req.ml_algorithm,
+        job_type=req.job_type if req.job_type in ("analysis", "news") else "analysis",  # type: ignore[arg-type]
     )
     try:
         return mgr.add_job(cfg, auto_start=req.auto_start)
@@ -911,6 +915,99 @@ def crypto_var_symbol_history(
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+class CryptoNewsConfigBody(BaseModel):
+    enabled: bool | None = None
+    min_score: int | None = Field(None, ge=0, le=100)
+    llm_top_n: int | None = Field(None, ge=1, le=50)
+    attach_to_analysis_cycle: bool | None = None
+    digest_max_age_minutes: int | None = Field(None, ge=1, le=1440)
+    feeds: list[dict[str, Any]] | None = None
+    web_search: dict[str, Any] | None = None
+
+
+class CryptoNewsScanRequest(BaseModel):
+    data_dir: str = "data"
+    feed_ids: list[str] | None = None
+
+
+@router.get("/news/digest")
+def crypto_news_digest_get(data_dir: str = "data") -> dict[str, Any]:
+    from quant_rd_tool.crypto_news_config import resolve_news_data_dir_for_api
+    from quant_rd_tool.crypto_news_storage import empty_digest, load_digest
+
+    root = resolve_news_data_dir_for_api(data_dir)
+    digest = load_digest(root)
+    return digest if digest else empty_digest()
+
+
+@router.get("/news/items")
+def crypto_news_items_get(
+    data_dir: str = "data",
+    limit: int = Query(50, ge=1, le=500),
+) -> dict[str, Any]:
+    from quant_rd_tool.crypto_news_config import resolve_news_data_dir_for_api
+    from quant_rd_tool.crypto_news_storage import load_items
+
+    root = resolve_news_data_dir_for_api(data_dir)
+    items = load_items(root, limit=limit)
+    return {"count": len(items), "items": items}
+
+
+@router.post("/news/scan")
+def crypto_news_scan_post(req: CryptoNewsScanRequest) -> dict[str, Any]:
+    from quant_rd_tool.crypto_news_config import resolve_news_data_dir_for_api
+    from quant_rd_tool.crypto_news_scheduler import run_news_cycle
+
+    root = resolve_news_data_dir_for_api(req.data_dir)
+    try:
+        return run_news_cycle(data_dir=root, feed_ids=req.feed_ids)
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+@router.get("/news/search-usage")
+def crypto_news_search_usage_get(data_dir: str = "data") -> dict[str, Any]:
+    from quant_rd_tool.crypto_news_config import get_crypto_news_config, resolve_news_data_dir_for_api
+    from quant_rd_tool.crypto_news_search import resolve_web_search_provider
+    from quant_rd_tool.crypto_news_search_usage import usage_summary
+
+    root = resolve_news_data_dir_for_api(data_dir)
+    cfg = get_crypto_news_config()
+    ws = cfg.get("web_search") if isinstance(cfg.get("web_search"), dict) else {}
+    provider = resolve_web_search_provider(ws)
+    return usage_summary(root, ws, provider=provider)
+
+
+@router.get("/news/config")
+def crypto_news_config_get(data_dir: str | None = None) -> dict[str, Any]:
+    from quant_rd_tool.crypto_news_config import get_crypto_news_config, resolve_news_data_dir_for_api
+    from quant_rd_tool.crypto_news_search import resolve_web_search_provider
+    from quant_rd_tool.crypto_news_search_usage import usage_summary
+
+    cfg = get_crypto_news_config()
+    if data_dir:
+        root = resolve_news_data_dir_for_api(data_dir)
+        ws = cfg.get("web_search") if isinstance(cfg.get("web_search"), dict) else {}
+        provider = resolve_web_search_provider(ws)
+        cfg["search_usage"] = usage_summary(root, ws, provider=provider)
+    return cfg
+
+
+@router.post("/news/config")
+def crypto_news_config_save(body: CryptoNewsConfigBody) -> dict[str, Any]:
+    from quant_rd_tool.crypto_news_config import save_crypto_news_config
+
+    return save_crypto_news_config(
+        enabled=body.enabled,
+        min_score=body.min_score,
+        llm_top_n=body.llm_top_n,
+        attach_to_analysis_cycle=body.attach_to_analysis_cycle,
+        digest_max_age_minutes=body.digest_max_age_minutes,
+        feeds=body.feeds,
+        web_search=body.web_search,
+    )
 
 
 class OptionsVolConfigBody(BaseModel):

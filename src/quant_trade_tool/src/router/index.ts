@@ -45,6 +45,11 @@ const router = createRouter({
           name: "crypto-var",
           component: () => import("@/views/CryptoVarView.vue"),
         },
+        {
+          path: "crypto-news",
+          name: "crypto-news",
+          component: () => import("@/views/CryptoNewsView.vue"),
+        },
         { path: "spot-bot", name: "spot-bot", component: () => import("@/views/SpotBotView.vue") },
         { path: "crypto-ops", name: "crypto-ops", component: () => import("@/views/CryptoOpsView.vue") },
         { path: "perp-bot", name: "perp-bot", component: () => import("@/views/PerpBotView.vue") },

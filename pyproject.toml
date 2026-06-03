@@ -27,6 +27,7 @@ dependencies = [
     "lightgbm>=4.6.0",
     "openbb>=4.0.0",
     "ccxt>=4.5.54",
+    "feedparser>=6.0.11",
 ]
 
 [project.optional-dependencies]

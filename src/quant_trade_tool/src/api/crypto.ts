@@ -59,6 +59,102 @@ export interface ScheduleCreateRequest {
   with_ml: boolean;
   ml_algorithm: string;
   auto_start: boolean;
+  job_type?: "analysis" | "news";
+}
+
+export interface CryptoNewsFeed {
+  id: string;
+  name: string;
+  url: string;
+  enabled?: boolean;
+}
+
+export interface CryptoNewsAdvice {
+  headline?: string;
+  impact?: "bullish" | "bearish" | "neutral" | "mixed";
+  confidence?: number;
+  affected_symbols?: string[];
+  horizon?: string;
+  advice?: string;
+  risk_note?: string;
+}
+
+export interface CryptoNewsItem {
+  id?: string;
+  title: string;
+  link?: string;
+  published?: string;
+  summary?: string;
+  source_id?: string;
+  score?: number;
+  category?: string;
+  symbols?: string[];
+  impact_direction?: string;
+  advice?: CryptoNewsAdvice;
+}
+
+export interface CryptoNewsDigest {
+  generated_at?: string | null;
+  market_stance?: "bullish" | "bearish" | "neutral" | "mixed";
+  top_items?: CryptoNewsItem[];
+  items_processed?: number;
+  errors?: string[];
+  empty?: boolean;
+}
+
+export interface CryptoNewsWebSearchConfig {
+  enabled?: boolean;
+  provider?: "auto" | "tavily" | "serpapi" | "none";
+  max_results_per_query?: number;
+  max_queries_per_cycle?: number;
+  monthly_query_limit?: number;
+  monthly_query_limit_tavily?: number | null;
+  monthly_query_limit_serpapi?: number | null;
+  queries?: string[];
+}
+
+export interface CryptoNewsSearchUsageProvider {
+  queries_used: number;
+  results_fetched: number;
+  monthly_query_limit?: number | null;
+  queries_remaining?: number | null;
+  limit_reached?: boolean;
+}
+
+export interface CryptoNewsSearchUsage {
+  month: string;
+  providers: Record<string, CryptoNewsSearchUsageProvider>;
+  active_provider?: string | null;
+  queries_used?: number;
+  monthly_query_limit?: number | null;
+  queries_remaining?: number | null;
+  limit_reached?: boolean;
+}
+
+export interface CryptoNewsSearchProviders {
+  tavily_configured?: boolean;
+  serpapi_configured?: boolean;
+  enabled?: boolean;
+  active_provider?: string | null;
+}
+
+export interface CryptoNewsConfig {
+  enabled: boolean;
+  min_score: number;
+  llm_top_n: number;
+  attach_to_analysis_cycle: boolean;
+  digest_max_age_minutes: number;
+  feeds: CryptoNewsFeed[];
+  web_search?: CryptoNewsWebSearchConfig;
+  search_providers?: CryptoNewsSearchProviders;
+  search_usage?: CryptoNewsSearchUsage;
+  updated_at?: string;
+}
+
+export interface CryptoNewsScanResult {
+  items_processed?: number;
+  digest?: CryptoNewsDigest;
+  errors?: string[];
 }
 
 export const cryptoApi = {
@@ -335,6 +431,29 @@ export const cryptoApi = {
     horizon_days?: number;
     notional_usdt?: number;
   }) => http.get<SymbolVarHistory>("/crypto/var/symbol/history", { params }),
+
+  newsDigest: (data_dir = "data") =>
+    http.get<CryptoNewsDigest>("/crypto/news/digest", { params: { data_dir } }),
+
+  newsItems: (params?: { data_dir?: string; limit?: number }) =>
+    http.get<{ count: number; items: CryptoNewsItem[] }>("/crypto/news/items", {
+      params: { data_dir: params?.data_dir ?? "data", limit: params?.limit ?? 50 },
+    }),
+
+  newsScan: (body?: { data_dir?: string; feed_ids?: string[] }) =>
+    http.post<CryptoNewsScanResult>("/crypto/news/scan", {
+      data_dir: body?.data_dir ?? "data",
+      feed_ids: body?.feed_ids,
+    }),
+
+  newsConfigGet: (data_dir = "data") =>
+    http.get<CryptoNewsConfig>("/crypto/news/config", { params: { data_dir } }),
+
+  newsSearchUsage: (data_dir = "data") =>
+    http.get<CryptoNewsSearchUsage>("/crypto/news/search-usage", { params: { data_dir } }),
+
+  newsConfigSave: (body: Partial<CryptoNewsConfig>) =>
+    http.post<CryptoNewsConfig>("/crypto/news/config", body),
 };
 
 export interface OptionsVolConfig {

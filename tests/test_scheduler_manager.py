@@ -66,3 +66,38 @@ def test_get_scheduler_manager_singleton(tmp_path: Path, monkeypatch):
     mgr.add_job(ScheduleJobConfig(symbols=["SOL"], timeframe="5m"))
     assert len(get_scheduler_manager(str(tmp_path / "data" / "crypto")).list_jobs()) == 1
     reset_scheduler_manager()
+
+
+def test_news_job_runs_pipeline(tmp_path: Path):
+    registry = tmp_path / "schedules.json"
+    mgr = SchedulerManager(registry)
+    mgr.add_job(
+        ScheduleJobConfig(
+            symbols=[],
+            job_type="news",
+            interval_minutes=60,
+            data_dir=str(tmp_path / "data" / "crypto"),
+            id="news-test",
+        )
+    )
+    fake_result = {
+        "items_processed": 2,
+        "items_new": 1,
+        "top_items": 1,
+        "digest": {"generated_at": "2026-06-03T12:00:00+00:00", "top_items": [], "market_stance": "neutral"},
+    }
+    with patch("quant_rd_tool.scheduler_manager._run_news_cycle", return_value=fake_result) as mock_news:
+        out = mgr.run_once("news-test", precheck_connectivity=False)
+    mock_news.assert_called_once()
+    assert out["job"]["job_type"] == "news"
+    assert out["job"]["run_count"] == 1
+    assert out["job"]["last_cycle_summary"][0]["job_type"] == "news"
+
+
+def test_news_job_type_persisted(tmp_path: Path):
+    registry = tmp_path / "schedules.json"
+    mgr1 = SchedulerManager(registry)
+    mgr1.add_job(ScheduleJobConfig(symbols=[], job_type="news", id="news-persist"))
+    mgr2 = SchedulerManager(registry)
+    jobs = mgr2.list_jobs()
+    assert jobs[0]["job_type"] == "news"

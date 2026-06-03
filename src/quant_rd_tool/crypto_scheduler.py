@@ -16,6 +16,50 @@ from quant_rd_tool.crypto_storage import sync_ohlcv
 logger = logging.getLogger(__name__)
 
 
+def attach_news_digest(
+    report: dict[str, Any],
+    *,
+    data_dir: str | Path = "data/crypto",
+) -> dict[str, Any]:
+    """Attach latest news digest to an analysis report when fresh enough."""
+    try:
+        from datetime import timedelta
+
+        from quant_rd_tool.crypto_news_config import get_crypto_news_config, resolve_news_data_dir
+        from quant_rd_tool.crypto_news_storage import load_digest
+
+        cfg = get_crypto_news_config()
+        if not cfg.get("attach_to_analysis_cycle", True):
+            return report
+
+        news_dir = resolve_news_data_dir(data_dir)
+        digest = load_digest(news_dir)
+        if not digest or not digest.get("generated_at"):
+            return report
+
+        generated_at = digest["generated_at"]
+        try:
+            gen_dt = datetime.fromisoformat(str(generated_at).replace("Z", "+00:00"))
+            if gen_dt.tzinfo is None:
+                gen_dt = gen_dt.replace(tzinfo=UTC)
+        except Exception:
+            return report
+
+        max_age = int(cfg.get("digest_max_age_minutes", 180))
+        age_min = (datetime.now(UTC) - gen_dt).total_seconds() / 60.0
+        if age_min > max_age:
+            return report
+
+        report["news_digest"] = {
+            "generated_at": digest.get("generated_at"),
+            "top_items": digest.get("top_items") or [],
+            "market_stance": digest.get("market_stance"),
+        }
+    except Exception as e:
+        logger.debug("News digest attach skipped: %s", e)
+    return report
+
+
 def run_scheduled_cycle(
     symbols: list[str],
     *,
@@ -70,6 +114,7 @@ def run_scheduled_cycle(
                     report.update(build_var_cycle_fields(sym))
             except Exception as ve:
                 logger.warning("VaR enrichment skipped for %s: %s", sym, ve)
+            attach_news_digest(report, data_dir=data_dir)
             if save_snapshot:
                 _save_scheduler_snapshot(report, data_dir=data_dir, timeframe=timeframe)
             results.append(report)

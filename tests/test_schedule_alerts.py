@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 from quant_rd_tool.schedule_alerts import (
     evaluate_after_cycle,
+    evaluate_news_alerts,
     evaluate_stale_jobs,
     get_alert_rules,
     save_alert_rules,
@@ -255,3 +256,65 @@ def test_schedule_alerts_http_routes(tmp_path, monkeypatch):
             json={},
         )
         assert r2.status_code == 200, r2.text
+
+
+def test_news_high_impact_alert(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    save_alert_rules(
+        cooldown_minutes=0,
+        bark={"enabled": True, "device_key": "k1"},
+        crypto_news={"on_high_impact": True, "min_score": 70, "min_llm_confidence": 0.8},
+    )
+    digest = {
+        "generated_at": "2026-06-03T12:00:00+00:00",
+        "top_items": [
+            {
+                "title": "Fed raises rates",
+                "score": 85,
+                "advice": {"impact": "bearish", "confidence": 0.9, "headline": "Fed raises rates"},
+            },
+            {
+                "title": "Minor market note",
+                "score": 50,
+                "advice": {"impact": "neutral", "confidence": 0.5},
+            },
+        ],
+    }
+    with patch("quant_rd_tool.bark_push.post_bark") as post_bark:
+        fired = evaluate_news_alerts("news-job", digest)
+    assert any(f["rule"] == "news_high_impact" for f in fired)
+    assert post_bark.called
+    assert len(fired) == 1
+
+
+def test_news_high_impact_respects_thresholds(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    save_alert_rules(
+        cooldown_minutes=0,
+        crypto_news={"on_high_impact": True, "min_score": 90, "min_llm_confidence": 0.95},
+    )
+    digest = {
+        "top_items": [
+            {"title": "Fed raises rates", "score": 85, "advice": {"confidence": 0.9}},
+        ],
+    }
+    with patch("quant_rd_tool.bark_push.post_bark") as post_bark:
+        fired = evaluate_news_alerts("news-job", digest)
+    assert fired == []
+    assert not post_bark.called
+
+
+def test_run_news_cycle_evaluates_alerts(tmp_path):
+    config = {"enabled": True, "min_score": 40, "llm_top_n": 1, "feeds": []}
+    digest = {
+        "generated_at": "2026-06-03T12:00:00+00:00",
+        "top_items": [{"title": "X", "score": 80, "advice": {"confidence": 0.9}}],
+    }
+    expected = {"items_processed": 1, "digest": digest}
+    with patch("quant_rd_tool.crypto_news_scheduler.get_crypto_news_config", return_value=config):
+        with patch("quant_rd_tool.crypto_news_scheduler.run_news_scan", return_value=expected):
+            with patch("quant_rd_tool.schedule_alerts.evaluate_news_alerts") as mock_alert:
+                from quant_rd_tool.crypto_news_scheduler import run_news_cycle
+
+                run_news_cycle(data_dir=tmp_path, job_id="j-news")
+    mock_alert.assert_called_once_with("j-news", digest)

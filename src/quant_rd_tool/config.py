@@ -43,6 +43,8 @@ class Settings(BaseSettings):
         validation_alias="BARK_SERVER",
         description="Bark API root, default https://api.day.app",
     )
+    tavily_api_key: str | None = Field(default=None, validation_alias="TAVILY_API_KEY")
+    serpapi_api_key: str | None = Field(default=None, validation_alias="SERPAPI_API_KEY")
 
 
 settings = Settings()

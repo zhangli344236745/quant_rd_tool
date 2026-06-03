@@ -32,14 +32,21 @@ class ScheduleJobConfig:
     exchange_id: cxt.ExchangeId = "binance"
     name: str = ""
     id: str = ""
+    job_type: Literal["analysis", "news"] = "analysis"
     created_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
     def __post_init__(self) -> None:
         self.symbols = [s.strip().upper() for s in self.symbols if s.strip()]
         if not self.name:
-            self.name = f"{'-'.join(self.symbols).lower()} {self.timeframe}"
+            if self.job_type == "news":
+                self.name = "crypto news scan"
+            else:
+                self.name = f"{'-'.join(self.symbols).lower()} {self.timeframe}"
         if not self.id:
-            self.id = _slug_id(self.symbols, self.timeframe)
+            if self.job_type == "news":
+                self.id = "news-scan"
+            else:
+                self.id = _slug_id(self.symbols, self.timeframe)
 
 
 @dataclass
@@ -124,7 +131,7 @@ class SchedulerManager:
             if not running:
                 raise KeyError(f"未找到任务: {job_id}")
             cfg = running.record.config
-        if run_immediately and cfg.symbols:
+        if run_immediately and cfg.symbols and cfg.job_type != "news":
             from quant_rd_tool.ccxt_connectivity import require_connectivity
 
             require_connectivity(
@@ -186,7 +193,7 @@ class SchedulerManager:
             if not running:
                 raise KeyError(f"未找到任务: {job_id}")
             cfg = running.record.config
-        if precheck_connectivity and cfg.symbols:
+        if precheck_connectivity and cfg.symbols and cfg.job_type != "news":
             from quant_rd_tool.ccxt_connectivity import require_connectivity
 
             require_connectivity(
@@ -195,24 +202,32 @@ class SchedulerManager:
                 symbol=cfg.symbols[0],
                 timeframe=cfg.timeframe,
             )
-        results = run_scheduled_cycle(
-            cfg.symbols,
-            data_dir=cfg.data_dir,
-            timeframe=cfg.timeframe,
-            backfill_days=cfg.backfill_days,
-            with_ml=cfg.with_ml,
-            ml_algorithm=cfg.ml_algorithm,
-            exchange_id=cfg.exchange_id,
-        )
+        if cfg.job_type == "news":
+            results = _run_news_cycle(cfg, job_id=job_id)
+        else:
+            results = run_scheduled_cycle(
+                cfg.symbols,
+                data_dir=cfg.data_dir,
+                timeframe=cfg.timeframe,
+                backfill_days=cfg.backfill_days,
+                with_ml=cfg.with_ml,
+                ml_algorithm=cfg.ml_algorithm,
+                exchange_id=cfg.exchange_id,
+            )
         with self._lock:
             running = self._jobs[job_id]
             running.record.run_count += 1
             running.record.last_run_at = datetime.now(UTC).isoformat()
-            running.record.last_error = _first_error(results)
-            running.record.last_cycle_summary = _summarize_results(results)
+            if cfg.job_type == "news":
+                running.record.last_error = _first_news_error(results)
+                running.record.last_cycle_summary = _summarize_news_result(results)
+            else:
+                running.record.last_error = _first_error(results)
+                running.record.last_cycle_summary = _summarize_results(results)
             record = running.record
             self._save()
-        self._evaluate_alerts(job_id, record)
+        if cfg.job_type != "news":
+            self._evaluate_alerts(job_id, record)
         return {
             "job": record.to_public_dict(),
             "results": results,
@@ -244,28 +259,36 @@ class SchedulerManager:
                     break
 
             try:
-                results = run_scheduled_cycle(
-                    cfg.symbols,
-                    data_dir=cfg.data_dir,
-                    timeframe=cfg.timeframe,
-                    backfill_days=cfg.backfill_days,
-                    with_ml=cfg.with_ml,
-                    ml_algorithm=cfg.ml_algorithm,
-                    exchange_id=cfg.exchange_id,
-                    precheck_connectivity=False,
-                )
+                if cfg.job_type == "news":
+                    results = _run_news_cycle(cfg, job_id=job_id)
+                    last_error = _first_news_error(results)
+                    summary = _summarize_news_result(results)
+                else:
+                    results = run_scheduled_cycle(
+                        cfg.symbols,
+                        data_dir=cfg.data_dir,
+                        timeframe=cfg.timeframe,
+                        backfill_days=cfg.backfill_days,
+                        with_ml=cfg.with_ml,
+                        ml_algorithm=cfg.ml_algorithm,
+                        exchange_id=cfg.exchange_id,
+                        precheck_connectivity=False,
+                    )
+                    last_error = _first_error(results)
+                    summary = _summarize_results(results)
                 with self._lock:
                     running = self._jobs.get(job_id)
                     if not running:
                         break
                     running.record.run_count += 1
                     running.record.last_run_at = datetime.now(UTC).isoformat()
-                    running.record.last_error = _first_error(results)
-                    running.record.last_cycle_summary = _summarize_results(results)
+                    running.record.last_error = last_error
+                    running.record.last_cycle_summary = summary
                     running.record.status = "running"
                     record = running.record
                     self._save()
-                self._evaluate_alerts(job_id, record)
+                if cfg.job_type != "news":
+                    self._evaluate_alerts(job_id, record)
             except Exception as e:
                 logger.exception("Schedule job %s failed", job_id)
                 with self._lock:
@@ -366,6 +389,36 @@ def _first_error(results: list[dict[str, Any]]) -> str | None:
         if r.get("error"):
             return str(r["error"])
     return None
+
+
+def _run_news_cycle(cfg: ScheduleJobConfig, *, job_id: str) -> dict[str, Any]:
+    from quant_rd_tool.crypto_news_config import resolve_news_data_dir
+    from quant_rd_tool.crypto_news_scheduler import run_news_cycle
+
+    return run_news_cycle(
+        data_dir=resolve_news_data_dir(cfg.data_dir),
+        job_id=job_id,
+    )
+
+
+def _first_news_error(result: dict[str, Any]) -> str | None:
+    errors = result.get("fetch_errors") or []
+    if errors:
+        return str(errors[0])
+    return None
+
+
+def _summarize_news_result(result: dict[str, Any]) -> list[dict[str, Any]]:
+    digest = result.get("digest") or {}
+    return [
+        {
+            "job_type": "news",
+            "items_new": result.get("items_new", 0),
+            "items_processed": result.get("items_processed", 0),
+            "top_items": len(digest.get("top_items") or []),
+            "market_stance": digest.get("market_stance"),
+        }
+    ]
 
 
 def _summarize_results(results: list[dict[str, Any]]) -> list[dict[str, Any]]:

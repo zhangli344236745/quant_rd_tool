@@ -62,7 +62,29 @@ def get_alert_rules() -> dict[str, Any]:
     out["on_cycle_complete"] = raw.get("on_cycle_complete", True) is not False
     bark = raw.get("bark")
     out["bark"] = _public_bark_config(bark if isinstance(bark, dict) else {})
+    crypto_news = raw.get("crypto_news")
+    out["crypto_news"] = crypto_news if isinstance(crypto_news, dict) else _default_crypto_news_alert_config()
     return out
+
+
+def _default_crypto_news_alert_config() -> dict[str, Any]:
+    return {
+        "on_high_impact": True,
+        "min_score": 70,
+        "min_llm_confidence": 0.8,
+    }
+
+
+def get_crypto_news_alert_config(raw: dict[str, Any] | None = None) -> dict[str, Any]:
+    raw = raw or get_alert_rules()
+    section = raw.get("crypto_news")
+    cfg = _default_crypto_news_alert_config()
+    if isinstance(section, dict):
+        cfg.update({k: section[k] for k in cfg if k in section})
+    cfg["on_high_impact"] = cfg.get("on_high_impact", True) is not False
+    cfg["min_score"] = int(cfg.get("min_score", 70))
+    cfg["min_llm_confidence"] = float(cfg.get("min_llm_confidence", 0.8))
+    return cfg
 
 
 def _format_cycle_complete_message(job_id: str, rows: list[dict[str, Any]]) -> str:
@@ -156,6 +178,7 @@ def save_alert_rules(
     bark: dict[str, Any] | None = None,
     webhook_on_alert: bool | None = None,
     on_cycle_complete: bool | None = None,
+    crypto_news: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     data = load_settings(_SETTINGS_PATH)
     raw = dict(data.get("schedule_alerts") or {}) if isinstance(data.get("schedule_alerts"), dict) else {}
@@ -201,6 +224,14 @@ def save_alert_rules(
         raw["webhook_on_alert"] = webhook_on_alert
     if on_cycle_complete is not None:
         raw["on_cycle_complete"] = on_cycle_complete
+    if crypto_news is not None:
+        if not isinstance(crypto_news, dict):
+            raise ValueError("crypto_news must be an object")
+        ent = dict(raw.get("crypto_news") or {}) if isinstance(raw.get("crypto_news"), dict) else {}
+        for k in ("on_high_impact", "min_score", "min_llm_confidence"):
+            if k in crypto_news and crypto_news[k] is not None:
+                ent[k] = crypto_news[k]
+        raw["crypto_news"] = ent
     raw["updated_at"] = datetime.now(UTC).isoformat()
     data["schedule_alerts"] = raw
     _SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -494,6 +525,64 @@ def evaluate_after_cycle(
             raw=raw,
         )
     )
+
+    return fired
+
+
+def evaluate_news_alerts(
+    job_id: str,
+    digest: dict[str, Any],
+    *,
+    state_path: Path = _DEFAULT_STATE,
+) -> list[dict[str, Any]]:
+    """Alert when digest top items exceed high-impact score/confidence thresholds."""
+    raw = get_alert_rules()
+    rules = ScheduleAlertRules(
+        **{k: v for k, v in raw.items() if k in ScheduleAlertRules.__dataclass_fields__}
+    )
+    if not rules.enabled:
+        return []
+
+    cfg = get_crypto_news_alert_config(raw)
+    if not cfg.get("on_high_impact", True):
+        return []
+
+    min_score = int(cfg.get("min_score", 70))
+    min_conf = float(cfg.get("min_llm_confidence", 0.8))
+    fired: list[dict[str, Any]] = []
+
+    for item in digest.get("top_items") or []:
+        if not isinstance(item, dict):
+            continue
+        score = item.get("score")
+        advice = item.get("advice") if isinstance(item.get("advice"), dict) else {}
+        confidence = advice.get("confidence")
+        try:
+            if score is None or int(score) < min_score:
+                continue
+        except (TypeError, ValueError):
+            continue
+        try:
+            if confidence is None or float(confidence) < min_conf:
+                continue
+        except (TypeError, ValueError):
+            continue
+
+        title = str(item.get("title") or advice.get("headline") or "News item")
+        impact = advice.get("impact") or item.get("impact_direction") or "neutral"
+        msg = (
+            f"[{job_id}] 高影响舆论: {title}\n"
+            f"分数 {score} | 置信 {float(confidence):.0%} | 方向 {impact}"
+        )
+        if _fire_alert(
+            job_id=job_id,
+            rule="news_high_impact",
+            message=msg,
+            detail={"item": item, "digest_generated_at": digest.get("generated_at")},
+            state_path=state_path,
+            rules=rules,
+        ):
+            fired.append({"rule": "news_high_impact", "message": msg, "title": title})
 
     return fired
 

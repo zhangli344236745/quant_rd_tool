@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { reactive, ref } from "vue";
-import { cryptoApi, type SymbolVarReport } from "@/api/crypto";
+import { cryptoApi, type CryptoNewsDigest, type SymbolVarReport } from "@/api/crypto";
 import { jobsApi } from "@/api/jobs";
 import { useJobSubmit } from "@/composables/useJobSubmit";
 import ResultPanel from "@/components/ResultPanel.vue";
@@ -53,6 +53,7 @@ async function run(wait: boolean) {
         result.value = {
           combined_signal: r.combined_signal,
           options_vol: r.options_vol,
+          news_digest: r.news_digest,
           narrative: r.narrative,
           ...r,
         };
@@ -71,6 +72,23 @@ const combined = () =>
 
 const optionsVol = () =>
   (result.value?.options_vol as Record<string, unknown>) || undefined;
+
+const newsDigest = () =>
+  (result.value?.news_digest as CryptoNewsDigest) || undefined;
+
+function newsImpactType(impact: string) {
+  if (impact === "bullish") return "success";
+  if (impact === "bearish") return "danger";
+  if (impact === "mixed") return "warning";
+  return "info";
+}
+
+const newsStanceLabel: Record<string, string> = {
+  bullish: "偏多",
+  bearish: "偏空",
+  neutral: "中性",
+  mixed: "分化",
+};
 
 function optAlertType(level: string) {
   if (level === "hot") return "danger";
@@ -145,6 +163,37 @@ function optAlertType(level: string) {
             </router-link>
           </template>
           <p v-else class="muted small">{{ symbolVarError }}</p>
+        </el-card>
+        <el-card
+          v-if="newsDigest()?.market_stance"
+          shadow="never"
+          class="panel-card mt"
+        >
+          <template #header>舆论雷达摘要</template>
+          <el-tag
+            :type="newsImpactType(String(newsDigest()?.market_stance || 'neutral'))"
+            size="small"
+            class="mb"
+          >
+            {{ newsStanceLabel[String(newsDigest()?.market_stance)] || newsDigest()?.market_stance }}
+          </el-tag>
+          <ul v-if="(newsDigest()?.top_items || []).length" class="news-headlines">
+            <li
+              v-for="(item, i) in (newsDigest()?.top_items || []).slice(0, 2)"
+              :key="item.id || item.link || i"
+            >
+              <el-tag
+                :type="newsImpactType(String(item.advice?.impact || item.impact_direction || 'neutral'))"
+                size="small"
+                effect="plain"
+                class="mr"
+              >
+                {{ newsStanceLabel[String(item.advice?.impact || item.impact_direction)] || "中性" }}
+              </el-tag>
+              {{ item.advice?.headline || item.title }}
+            </li>
+          </ul>
+          <router-link to="/crypto-news" class="var-link">查看舆论雷达 →</router-link>
         </el-card>
         <el-card
           v-if="optionsVol()?.enabled"
@@ -237,5 +286,17 @@ function optAlertType(level: string) {
 }
 .var-link:hover {
   text-decoration: underline;
+}
+.news-headlines {
+  margin: 0 0 8px;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.news-headlines li {
+  margin-bottom: 4px;
+}
+.mr {
+  margin-right: 6px;
 }
 </style>

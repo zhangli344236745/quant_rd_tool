@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from "vue";
+import { onMounted, reactive, ref, watch } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { cryptoApi } from "@/api/crypto";
 import { extractError } from "@/api/http";
@@ -42,7 +42,28 @@ const createForm = reactive({
   interval_minutes: 30,
   backfill_days: 90,
   auto_start: false,
+  job_type: "analysis" as "analysis" | "news",
 });
+
+watch(
+  () => createForm.job_type,
+  (t) => {
+    if (t === "news") {
+      createForm.interval_minutes = 120;
+      if (!createForm.name || createForm.name === "BTC+ETH 5m") {
+        createForm.name = "舆论扫描";
+      }
+    } else if (createForm.interval_minutes === 120 && createForm.name === "舆论扫描") {
+      createForm.interval_minutes = 30;
+      createForm.name = "BTC+ETH 5m";
+    }
+  },
+);
+
+function jobTypeLabel(t: string) {
+  if (t === "news") return "舆论扫描";
+  return "行情分析";
+}
 
 async function load() {
   loading.value = true;
@@ -215,16 +236,24 @@ onMounted(async () => {
 <template>
   <div>
     <h1 class="page-title">定时任务</h1>
-    <p class="page-desc">管理 data/crypto/schedules.json 中的 K 线 + 分析调度任务。</p>
+    <p class="page-desc">
+      管理 data/crypto/schedules.json 中的调度任务：K 线 + 分析，或独立「舆论扫描」RSS 舆情任务。
+    </p>
 
     <el-row :gutter="20">
       <el-col :span="8">
         <el-card shadow="never" class="panel-card">
           <template #header>新建任务</template>
           <el-form label-width="100px" size="small">
+            <el-form-item label="任务类型">
+              <el-select v-model="createForm.job_type" style="width: 100%">
+                <el-option label="行情分析" value="analysis" />
+                <el-option label="舆论扫描" value="news" />
+              </el-select>
+            </el-form-item>
             <el-form-item label="名称"><el-input v-model="createForm.name" /></el-form-item>
             <el-form-item label="ID"><el-input v-model="createForm.id" placeholder="留空自动生成" /></el-form-item>
-            <el-form-item label="标的">
+            <el-form-item v-if="createForm.job_type === 'analysis'" label="标的">
               <el-select v-model="createForm.symbols" multiple>
                 <el-option label="BTC" value="BTC" />
                 <el-option label="ETH" value="ETH" />
@@ -233,6 +262,9 @@ onMounted(async () => {
             <el-form-item label="间隔(分)"><el-input-number v-model="createForm.interval_minutes" :min="5" /></el-form-item>
             <el-form-item label="自动启动"><el-switch v-model="createForm.auto_start" /></el-form-item>
             <el-button type="primary" @click="createJob">创建</el-button>
+            <router-link v-if="createForm.job_type === 'news'" to="/crypto-news" class="news-link">
+              舆论雷达配置 →
+            </router-link>
           </el-form>
         </el-card>
       </el-col>
@@ -245,6 +277,13 @@ onMounted(async () => {
           <el-table v-loading="loading" :data="jobs" size="small">
             <el-table-column prop="id" label="ID" width="140" />
             <el-table-column prop="name" label="名称" />
+            <el-table-column label="类型" width="100">
+              <template #default="{ row }">
+                <el-tag size="small" :type="row.job_type === 'news' ? 'warning' : ''">
+                  {{ jobTypeLabel(String(row.job_type || "analysis")) }}
+                </el-tag>
+              </template>
+            </el-table-column>
             <el-table-column prop="status" label="状态" width="90">
               <template #default="{ row }">
                 <el-tag :type="statusTagType(String(row.status || 'stopped'))" size="small">
@@ -391,6 +430,16 @@ onMounted(async () => {
   margin-left: 8px;
   font-size: 12px;
   color: var(--text-muted);
+}
+.news-link {
+  display: block;
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--el-color-primary);
+  text-decoration: none;
+}
+.news-link:hover {
+  text-decoration: underline;
 }
 .format-doc {
   font-size: 13px;

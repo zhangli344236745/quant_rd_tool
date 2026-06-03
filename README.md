@@ -235,6 +235,15 @@ HTTP（单次执行，不注册任务）：
 - `POST /api/v1/crypto/schedules/alerts/check-stale` — 手动检测长时间未跑完的 running 任务
 - **按标的/信号自定义规则**：见 [docs/schedule-alert-custom-rules.md](docs/schedule-alert-custom-rules.md) · `GET .../schedules/alerts/rules/format`
 - **VaR 调度告警**：`schedule_alerts.var` 启用周期 VaR 计算；`on_symbol_var_breach` / 自定义规则 `var_pct` 等字段触发告警
+- **Crypto 舆论雷达** — RSS 宏观/crypto 舆情 + 可选联网搜索（Tavily/SerpAPI）：规则打分 + LLM Top N 解读
+- `GET /api/v1/crypto/news/digest` — 最新 digest（`market_stance` + `top_items`）
+- `GET /api/v1/crypto/news/items?limit=50` — 历史条目 JSONL
+- `POST /api/v1/crypto/news/scan` — 手动一轮 RSS + 联网搜索扫描
+- `GET/POST /api/v1/crypto/news/config` — 阈值、`web_search`（provider/查询数/月度上限）、feed 列表
+- `GET /api/v1/crypto/news/search-usage?data_dir=data` — 当月 Tavily/SerpAPI 查询次数与剩余配额
+- Web 侧栏：**舆论雷达**（`/crypto-news`）；**Crypto 行情分析** 报告含 `news_digest` 摘要卡片
+- 定时任务 `job_type: "news"` — 独立舆论扫描（默认间隔 120 分钟）；高影响条目可走 Bark/Webhook（`schedule_alerts.crypto_news`）
+- 可选 env：`CRYPTO_NEWS_LLM_TOP_N`、`CRYPTO_NEWS_MIN_SCORE`、`CRYPTO_NEWS_WEB_SEARCH_ENABLED`、`CRYPTO_NEWS_SEARCH_MONTHLY_LIMIT`；搜索 Key：`TAVILY_API_KEY` / `SERPAPI_API_KEY`（默认关闭联网搜索；月度用量写入 `data/crypto/news/search_usage.json`，超限自动跳过搜索）
 - **调度告警推送**：`schedule_alerts.webhook_on_alert`（Crypto 运营 Webhook）与 Bark（`.env` 的 `BARK_DEVICE_KEY` 或 `schedule_alerts.bark`）；`POST .../schedules/alerts/test-bark` 测试
 
 **C+ P0（专业轨）**：
