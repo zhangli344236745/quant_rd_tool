@@ -1,0 +1,22 @@
+{
+  "symbol": "BTC",
+  "qlib_code": "CRYPTO_BTC",
+  "pair": "BTC/USDT",
+  "timeframe": "5m",
+  "bars_count": 801,
+  "last_timestamp_ms": 1780019400000,
+  "last_date": "2026-05-29 09:50:00",
+  "last_date_beijing": "2026-05-29 09:50:00",
+  "last_date_utc": "2026-05-29 01:50:00",
+  "last_date_local": "2026-05-29 09:50:00",
+  "date_timezone": "Asia/Shanghai",
+  "timezone_note": "CSV 列 date 与 last_date 均为北京时间 (UTC+8)；timestamp 列为 UTC 毫秒",
+  "data_lag_minutes": 0,
+  "last_bar_closed": false,
+  "expected_lag_note": "最后一根 K 线北京时间开盘 2026-05-29 09:50:00，理论收盘 2026-05-29 09:55:00；未收盘（当前正在形成的 K 线）。与当前相差约 0 分钟；超过 5 分钟请重新 sync。",
+  "last_close": 73482.87,
+  "updated_at": "2026-05-29T01:50:36.362274+00:00",
+  "updated_at_beijing": "2026-05-29 09:50:36",
+  "last_sync_action": "incremental",
+  "new_bars": 203
+}

@@ -1,0 +1,230 @@
+{
+  "symbol": "CRYPTO_BTC",
+  "pair": "BTC/USDT",
+  "timeframe": "5m",
+  "period": {
+    "start": "2026-05-25 20:10:00",
+    "end": "2026-05-28 16:55:00",
+    "bars": 826
+  },
+  "data_paths": {
+    "root": "/Users/worldunion/projects/pythonprojects/claudedemo/quant_rd_tool/data/crypto/CRYPTO_BTC",
+    "csv": "/Users/worldunion/projects/pythonprojects/claudedemo/quant_rd_tool/data/crypto/CRYPTO_BTC/ohlcv_5m.csv",
+    "qlib": "/Users/worldunion/projects/pythonprojects/claudedemo/quant_rd_tool/data/crypto/CRYPTO_BTC/qlib_5m"
+  },
+  "analysis": {
+    "symbol": "CRYPTO_BTC",
+    "period": {
+      "start": "2026-05-25",
+      "end": "2026-05-28",
+      "bars": 826
+    },
+    "price": {
+      "latest_close": 73342.28,
+      "period_high": 77958.4,
+      "period_low": 72838.6,
+      "pct_from_high": -0.059213
+    },
+    "returns": {
+      "1d": 0.0,
+      "5d": 0.001041,
+      "20d": 0.000713,
+      "60d": 0.00115
+    },
+    "risk": {
+      "annualized_return": -0.015281,
+      "annualized_volatility": 0.001021,
+      "sharpe_ratio": -0.970134,
+      "max_drawdown": -0.067621
+    },
+    "technical": {
+      "ma_alignment": "震荡",
+      "close_vs_sma20": -0.00035,
+      "rsi_14": 53.65,
+      "rsi_zone": "中性",
+      "macd_trend": "MACD 空头",
+      "bollinger_zone": "中轨附近"
+    }
+  },
+  "technical_signal": {
+    "stance": "中性",
+    "action": "hold",
+    "score": -1,
+    "confidence": 0.25,
+    "reasons": [
+      "均线：震荡",
+      "RSI=53.65（中性）",
+      "MACD：MACD 空头",
+      "近20日涨跌：0.07%",
+      "综合得分 -1"
+    ]
+  },
+  "ml_analysis": {
+    "enabled": false,
+    "skipped": true,
+    "reason": "样本不足（826 条 K 线），qlib 训练建议至少 2000 根（5m）。请增大 --backfill-days 或等待定时任务累积。"
+  },
+  "combined_signal": {
+    "stance": "中性",
+    "action": "hold",
+    "score": -1,
+    "confidence": 0.2,
+    "technical": {
+      "stance": "中性",
+      "action": "hold"
+    },
+    "ml": {
+      "stance": null,
+      "signal": null,
+      "predicted_return": null
+    },
+    "agreement": "仅技术面",
+    "reasons": [
+      "均线：震荡",
+      "RSI=53.65（中性）",
+      "MACD：MACD 空头",
+      "近20日涨跌：0.07%",
+      "综合得分 -1"
+    ]
+  },
+  "signal": {
+    "stance": "中性",
+    "action": "hold",
+    "score": -1,
+    "confidence": 0.2,
+    "technical": {
+      "stance": "中性",
+      "action": "hold"
+    },
+    "ml": {
+      "stance": null,
+      "signal": null,
+      "predicted_return": null
+    },
+    "agreement": "仅技术面",
+    "reasons": [
+      "均线：震荡",
+      "RSI=53.65（中性）",
+      "MACD：MACD 空头",
+      "近20日涨跌：0.07%",
+      "综合得分 -1"
+    ]
+  },
+  "narrative": {
+    "stance": "中性",
+    "action": "hold",
+    "summary": "CRYPTO_BTC 最新价 73342.28，研判 **中性**（建议操作：hold），信号置信度约 20%。",
+    "observations": [
+      "均线：震荡",
+      "RSI=53.65（中性）",
+      "MACD：MACD 空头",
+      "近20日涨跌：0.07%",
+      "综合得分 -1"
+    ],
+    "advice": "建议观望或维持现有仓位，等待趋势明朗；详见下方「投资方向说明」。",
+    "investment_brief": {
+      "sections": [
+        {
+          "title": "结论：「中性」在说什么",
+          "paragraphs": [
+            "综合研判为 **中性**（操作建议：hold），置信度约 20%。多空证据均不充分或相互抵消，宜观望或维持仓位，等待结构明朗。",
+            "技术面 中性，机器学习 未参与，二者 **仅技术面**。"
+          ]
+        },
+        {
+          "title": "价格结构",
+          "paragraphs": [
+            "现价约 **73,342.28**，样本区间高/低 **77,958.40 / 72,838.60**。",
+            "距区间高点约 **-5.9%**。",
+            "价格位于区间中下部，偏弱整理或回调后的中段，非明确底部确认。",
+            "样本内最大回撤约 **-6.8%**，波动需纳入仓位管理。"
+          ]
+        },
+        {
+          "title": "多维度拆解",
+          "bullets": [
+            "**趋势（均线）**：震荡。 无明确顺势做多依据。",
+            "**动能（MACD）**：MACD 空头，短期卖压仍在，不宜仅凭小幅下跌抄底。",
+            "**RSI**：53.65（中性）。",
+            "**布林带**：中轨附近。",
+            "**短期收益**（近 5/20/60 根 K 线）：0.10% / 0.07% / 0.11%。",
+            "**机器学习**：未启用（样本不足（826 条 K 线），qlib 训练建议至少 2000 根（5m）。请增大 --backfill-days 或等待定时任务累积。）。"
+          ]
+        },
+        {
+          "title": "按持仓场景的操作倾向",
+          "scenarios": [
+            {
+              "role": "已有多单",
+              "text": "持有但不加仓；止损可设在区间下沿或成本下方固定比例；加仓需 MACD 转多、RSI 回升至 50 上方并站稳均线。"
+            },
+            {
+              "role": "空仓",
+              "text": "不追空、不急于抄底；可等待放量突破均线 + MACD 金叉，或缩量回踩支撑二次确认。"
+            },
+            {
+              "role": "短线/波段",
+              "text": "更适合区间内小仓位高抛低吸，而非重仓赌单边；现价若近布林下轨，偏多等反弹至均线压力再减，而非重仓赌 V 反。"
+            }
+          ]
+        },
+        {
+          "title": "何时会改变方向判断",
+          "upgrades": [
+            {
+              "condition": "均线转多头 + MACD 多头 + RSI 回升至 50 上方",
+              "bias": "偏多 → 可考虑分批建多"
+            },
+            {
+              "condition": "均线空头 + MACD 空头 + RSI 超买",
+              "bias": "偏空 → 减仓或不做多"
+            },
+            {
+              "condition": "放量跌破区间下沿",
+              "bias": "偏空 → 止损/降风险优先"
+            },
+            {
+              "condition": "ML 测试集 IC 持续为正且信号偏多",
+              "bias": "增强看多（需持续验证，不可单根 K 线决策）"
+            }
+          ]
+        }
+      ],
+      "one_liner": "BTC/USDT：中性（hold）— 价 73,342，震荡，MACD 空头；详见多维拆解。",
+      "markdown": "## 投资方向说明（详细）\n\n> 数据周期：**5m**；时间均为**北京时间**；「近 N 根」指 K 线根数，非自然日。\n\n### 结论：「中性」在说什么\n\n综合研判为 **中性**（操作建议：hold），置信度约 20%。多空证据均不充分或相互抵消，宜观望或维持仓位，等待结构明朗。\n\n技术面 中性，机器学习 未参与，二者 **仅技术面**。\n\n\n### 价格结构\n\n现价约 **73,342.28**，样本区间高/低 **77,958.40 / 72,838.60**。\n\n距区间高点约 **-5.9%**。\n\n价格位于区间中下部，偏弱整理或回调后的中段，非明确底部确认。\n\n样本内最大回撤约 **-6.8%**，波动需纳入仓位管理。\n\n\n### 多维度拆解\n\n- **趋势（均线）**：震荡。 无明确顺势做多依据。\n- **动能（MACD）**：MACD 空头，短期卖压仍在，不宜仅凭小幅下跌抄底。\n- **RSI**：53.65（中性）。\n- **布林带**：中轨附近。\n- **短期收益**（近 5/20/60 根 K 线）：0.10% / 0.07% / 0.11%。\n- **机器学习**：未启用（样本不足（826 条 K 线），qlib 训练建议至少 2000 根（5m）。请增大 --backfill-days 或等待定时任务累积。）。\n\n### 按持仓场景的操作倾向\n\n- **已有多单**：持有但不加仓；止损可设在区间下沿或成本下方固定比例；加仓需 MACD 转多、RSI 回升至 50 上方并站稳均线。\n- **空仓**：不追空、不急于抄底；可等待放量突破均线 + MACD 金叉，或缩量回踩支撑二次确认。\n- **短线/波段**：更适合区间内小仓位高抛低吸，而非重仓赌单边；现价若近布林下轨，偏多等反弹至均线压力再减，而非重仓赌 V 反。\n\n### 何时会改变方向判断\n\n- 若 均线转多头 + MACD 多头 + RSI 回升至 50 上方 → 偏多 → 可考虑分批建多\n- 若 均线空头 + MACD 空头 + RSI 超买 → 偏空 → 减仓或不做多\n- 若 放量跌破区间下沿 → 偏空 → 止损/降风险优先\n- 若 ML 测试集 IC 持续为正且信号偏多 → 增强看多（需持续验证，不可单根 K 线决策）\n\n### 一句话\n\nBTC/USDT：中性（hold）— 价 73,342，震荡，MACD 空头；详见多维拆解。\n"
+    },
+    "risks": [
+      "加密货币波动极大，杠杆与合约风险更高。",
+      "短周期（如 5m）信号变化快，需执行纪律，不宜重仓赌方向。",
+      "机器学习在单标的短周期上可能接近随机，勿单独作为开仓依据。",
+      "自动交易可能因滑点、限频、API 故障导致偏离预期。",
+      "不构成投资建议；实盘前请用测试网或 dry-run 验证。"
+    ],
+    "disclaimer": "仅供量化研究学习，不构成投资建议。",
+    "agreement": "仅技术面"
+  },
+  "generated_at": "2026-05-28T08:55:04.472503+00:00",
+  "generated_at_beijing": "2026-05-28 16:55:04",
+  "sync": {
+    "symbol": "BTC",
+    "qlib_code": "CRYPTO_BTC",
+    "pair": "BTC/USDT",
+    "timeframe": "5m",
+    "bars_count": 826,
+    "last_timestamp_ms": 1779958500000,
+    "last_date": "2026-05-28 16:55:00",
+    "last_date_beijing": "2026-05-28 16:55:00",
+    "last_date_utc": "2026-05-28 08:55:00",
+    "last_date_local": "2026-05-28 16:55:00",
+    "date_timezone": "Asia/Shanghai",
+    "timezone_note": "CSV 列 date 与 last_date 均为北京时间 (UTC+8)；timestamp 列为 UTC 毫秒",
+    "data_lag_minutes": 0,
+    "last_bar_closed": false,
+    "expected_lag_note": "最后一根 K 线北京时间开盘 2026-05-28 16:55:00，理论收盘 2026-05-28 17:00:00；未收盘（当前正在形成的 K 线）。与当前相差约 0 分钟；超过 5 分钟请重新 sync。",
+    "last_close": 73342.28,
+    "updated_at": "2026-05-28T08:55:04.428687+00:00",
+    "updated_at_beijing": "2026-05-28 16:55:04",
+    "last_sync_action": "incremental",
+    "new_bars": 26
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "jobs": {
+    "btc-5m": {
+      "failure_streak": 0,
+      "last_alerts": {}
+    }
+  }
+}

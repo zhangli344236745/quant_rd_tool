@@ -1,0 +1,78 @@
+{
+  "generated_at": "2026-05-20T03:37:04.883936+00:00",
+  "macro": {
+    "available": true,
+    "china": {
+      "available": true,
+      "country": "china",
+      "label": "中国",
+      "provider": "econdb",
+      "profile": {
+        "country": "China",
+        "population": 1408280000.0,
+        "gdp_qoq": 0.09738,
+        "gdp_yoy": 0.04458,
+        "cpi_yoy": -0.021318,
+        "retail_sales_yoy": 0.028050000000000002,
+        "industrial_production_yoy": -0.16129000000000002,
+        "policy_rate": 0.0345,
+        "yield_10y": 0.017345,
+        "current_account_gdp": 0.04456,
+        "jobless_rate": 0.052000000000000005
+      },
+      "indicators": [
+        {
+          "name": "CPI",
+          "symbol": "CPI",
+          "frequency": "month",
+          "date": "",
+          "value": 101.0,
+          "change_pct": 0.001984126984127012
+        },
+        {
+          "name": "GDP",
+          "symbol": "GDP",
+          "frequency": "quarter",
+          "date": "",
+          "value": 334193.0,
+          "change_pct": -0.1384802184006125
+        }
+      ],
+      "equity_index": {
+        "name": "OECD 股价指数",
+        "date": "",
+        "value": 108.772,
+        "change_pct": -0.0017785396885995053
+      }
+    },
+    "global": [
+      {
+        "available": true,
+        "country": "united_states",
+        "label": "美国",
+        "provider": "econdb",
+        "profile": {
+          "country": "United States",
+          "population": 342627000.0,
+          "gdp_usd": 31856.256,
+          "gdp_qoq": 0.0049380000000000005,
+          "gdp_yoy": 0.026600000000000002,
+          "cpi_yoy": 0.03773,
+          "core_yoy": 0.027549999999999998,
+          "retail_sales_yoy": 0.05208,
+          "industrial_production_yoy": 0.013531,
+          "policy_rate": 0.0364,
+          "yield_10y": 0.0432,
+          "govt_debt_gdp": 1.2232395420227662,
+          "current_account_gdp": -0.028324,
+          "jobless_rate": 0.043
+        }
+      }
+    ],
+    "summary": "中国 GDP 同比约 4.46%；CPI 同比 -2.13%；政策利率 3.45%；美国 GDP 同比 2.66%。",
+    "credentials": {
+      "fred": false,
+      "fmp": false
+    }
+  }
+}

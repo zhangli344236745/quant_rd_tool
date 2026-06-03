@@ -1,0 +1,16 @@
+{
+  "crypto_ops": {
+    "kill_switch": false,
+    "webhook_url": "",
+    "webhook_on_error": true,
+    "webhook_on_circuit_breaker": true,
+    "updated_at": "2026-06-02T10:12:33.862231+00:00"
+  },
+  "schedule_alerts": {
+    "bark": {
+      "enabled": true,
+      "server": "https://api.day.app"
+    },
+    "updated_at": "2026-06-03T03:18:15.417816+00:00"
+  }
+}

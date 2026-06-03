@@ -1,0 +1,998 @@
+{
+  "symbol": "SH600519",
+  "data_paths": {
+    "root": "/Users/worldunion/projects/pythonprojects/claudedemo/quant_rd_tool/src/quant_trade_tool/data/stocks/SH600519",
+    "csv": "/Users/worldunion/projects/pythonprojects/claudedemo/quant_rd_tool/src/quant_trade_tool/data/stocks/SH600519/ohlcv.csv",
+    "qlib": "/Users/worldunion/projects/pythonprojects/claudedemo/quant_rd_tool/src/quant_trade_tool/data/stocks/SH600519/qlib"
+  },
+  "fetched_new_data": false,
+  "meta": {
+    "symbol": "SH600519",
+    "start_date": "2020-01-01",
+    "end_date": "2026-05-30",
+    "source": "auto(akshare→openbb)",
+    "adjust": "qfq",
+    "updated_at": "2026-05-30T08:18:08.735922+00:00"
+  },
+  "analysis": {
+    "symbol": "SH600519",
+    "bare_code": "600519",
+    "period": {
+      "start": "2020-01-02",
+      "end": "2026-05-29",
+      "bars": 1550
+    },
+    "price": {
+      "latest_close": 1326.0,
+      "period_high": 2386.79,
+      "period_low": 764.77,
+      "pct_from_high": -0.444442,
+      "current_drawdown": -0.444442
+    },
+    "returns": {
+      "1d": 0.039201,
+      "5d": 0.027748,
+      "20d": -0.056228,
+      "60d": -0.079237,
+      "252d": -0.160998
+    },
+    "risk": {
+      "annualized_return": 0.104146,
+      "annualized_volatility": 0.019359,
+      "sharpe_ratio": 0.348708,
+      "max_drawdown": -0.592635
+    },
+    "technical": {
+      "ma_alignment": "空头排列",
+      "close_vs_sma20": -0.005543,
+      "rsi_14": 45.22,
+      "rsi_zone": "中性",
+      "volume_trend_5d_vs_20d": 0.2616
+    },
+    "benchmark": {
+      "benchmark_code": "SH000300",
+      "correlation": 0.6542,
+      "beta": 1.0711,
+      "avg_daily_excess_return": 0.000262
+    }
+  },
+  "narrative": {
+    "stance": "谨慎",
+    "summary": "标的 SH600519，样本区间 2020-01-02 至 2026-05-29，共 1550 个交易日。最新收盘价 1326.0，较区间高点 -44.44%。近 20 日涨跌幅 -5.62%。",
+    "observations": [
+      "均线结构：空头排列。",
+      "RSI(14)=45.22，处于中性区域。",
+      "近 5 日成交量较此前 20 日均值放大（+26.16%）。",
+      "样本年化收益约 10.41%，年化波动约 1.94%，最大回撤约 59.26%。",
+      "相对基准 SH000300：相关系数 0.65，Beta 1.0711。"
+    ],
+    "risks": [
+      "本报告基于历史行情统计，不代表未来表现。",
+      "未包含财务基本面、行业政策与资金面等信息。",
+      "不构成任何证券买卖建议。"
+    ],
+    "disclaimer": "仅供量化研究学习，不构成投资建议。"
+  },
+  "ml_analysis": {
+    "enabled": true,
+    "algorithm": "both",
+    "segments": {
+      "train": [
+        "2020-01-01",
+        "2023-11-05"
+      ],
+      "valid": [
+        "2023-11-06",
+        "2025-02-15"
+      ],
+      "test": [
+        "2025-02-16",
+        "2026-05-30"
+      ]
+    },
+    "models": {
+      "xgb": {
+        "enabled": true,
+        "algorithm": "xgb",
+        "model": "qlib.contrib.model.xgboost.XGBModel",
+        "features": "qlib Alpha158",
+        "label": "Ref($close,-2)/Ref($close,-1)-1",
+        "train_eval": {
+          "best_iteration": 0,
+          "train_metric": [
+            0.02146370404882282,
+            0.02128830052078917,
+            0.02105511731780276,
+            0.02088093589239115,
+            0.02074702348882747,
+            0.02060459231126964,
+            0.02046989090060881,
+            0.02038361060257877,
+            0.02029172814740703,
+            0.02019603735132271,
+            0.02011093778231494,
+            0.01998371860718567,
+            0.01981982668042918,
+            0.01965819384898933,
+            0.01953778225126646,
+            0.01945229790901789,
+            0.01934148590644975,
+            0.01927271182031766,
+            0.01917091919693796,
+            0.01904044660787439,
+            0.01885473676286844,
+            0.01868752429249709,
+            0.01851232911115772,
+            0.01839949406764745,
+            0.01828910139876525,
+            0.01816519596827338,
+            0.01808910600527611,
+            0.01795337965690099,
+            0.01782885420128569,
+            0.01774832029698048,
+            0.01763378944688095
+          ],
+          "valid_metric": [
+            0.0172103523512996,
+            0.01721537883267362,
+            0.01725608396289483,
+            0.0172109139976563,
+            0.01723959161666484,
+            0.01721340742991054,
+            0.01722510154524442,
+            0.01724521026814577,
+            0.01725146556112196,
+            0.01728571271088431,
+            0.01733870751349451,
+            0.01734766524296576,
+            0.01731432328173149,
+            0.01731650394823842,
+            0.01733329310372022,
+            0.01734176115554359,
+            0.01736883548671695,
+            0.01739790921280115,
+            0.01734990667661188,
+            0.01736446198757078,
+            0.01735658723108265,
+            0.01736868355730008,
+            0.01737695592580293,
+            0.01741919329311974,
+            0.01742451761827935,
+            0.01743588216053773,
+            0.0174474852060638,
+            0.01747420868788922,
+            0.01747031210166243,
+            0.01751398910275624,
+            0.01756385549319955
+          ]
+        },
+        "valid_metrics": {
+          "samples": 308,
+          "ic": 0.029379,
+          "rank_ic": -0.05246,
+          "direction_accuracy": 0.4643,
+          "mse": 0.00030849
+        },
+        "test_metrics": {
+          "samples": 310,
+          "ic": 0.004223,
+          "rank_ic": 0.030407,
+          "direction_accuracy": 0.5065,
+          "mse": 0.00017758
+        },
+        "top_features": [
+          {
+            "feature": "f138",
+            "importance": 15.0
+          },
+          {
+            "feature": "f139",
+            "importance": 14.0
+          },
+          {
+            "feature": "f91",
+            "importance": 12.0
+          },
+          {
+            "feature": "f17",
+            "importance": 11.0
+          },
+          {
+            "feature": "f93",
+            "importance": 11.0
+          },
+          {
+            "feature": "f16",
+            "importance": 11.0
+          },
+          {
+            "feature": "f5",
+            "importance": 10.0
+          },
+          {
+            "feature": "f24",
+            "importance": 9.0
+          },
+          {
+            "feature": "f6",
+            "importance": 8.0
+          },
+          {
+            "feature": "f27",
+            "importance": 8.0
+          },
+          {
+            "feature": "f90",
+            "importance": 8.0
+          },
+          {
+            "feature": "f141",
+            "importance": 7.0
+          },
+          {
+            "feature": "f71",
+            "importance": 7.0
+          },
+          {
+            "feature": "f86",
+            "importance": 7.0
+          },
+          {
+            "feature": "f35",
+            "importance": 7.0
+          }
+        ],
+        "latest": {
+          "date": "2026-05-29",
+          "predicted_return": -0.001117,
+          "signal": "中性"
+        },
+        "interpretation": {
+          "summary": "[XGB] 测试集 IC=0.0042，方向命中率=50.65%。最新预测收益代理 -0.0011，信号：中性。主要因子：f138, f139, f91 等。",
+          "signal": "中性",
+          "caveats": [
+            "单标的训练无截面信息，指标仅供样本内参考。",
+            "Alpha158 因子易过拟合，请结合风控与基本面。"
+          ]
+        },
+        "segment_counts": {
+          "train": 930,
+          "valid": 308,
+          "test": 310
+        }
+      },
+      "lgb": {
+        "enabled": true,
+        "algorithm": "lgb",
+        "model": "lightgbm (Alpha158 features via qlib)",
+        "features": "qlib Alpha158",
+        "label": "Ref($close,-2)/Ref($close,-1)-1",
+        "train_eval": {
+          "best_iteration": 5,
+          "train_metric": {
+            "l2": [
+              0.0004612798761787175,
+              0.000456205799785307,
+              0.00045070387052341225,
+              0.00044754976561439794,
+              0.00044310597030406757,
+              0.0004388174507770341,
+              0.00043495639908411565,
+              0.0004304056074507856,
+              0.0004274696195049993,
+              0.0004252110966937154,
+              0.00042176055747391986,
+              0.000418872191088013,
+              0.0004156515005364528,
+              0.0004117530456549597,
+              0.0004074610236363066,
+              0.00040397859212686456,
+              0.0003997561481851624,
+              0.00039609404207157153,
+              0.0003925413593103372,
+              0.0003907081036552731,
+              0.00038393735383152733,
+              0.0003804896604413468,
+              0.0003773859529928414,
+              0.0003738252031448437,
+              0.00037042168468198354,
+              0.00036506483173753276,
+              0.0003636761140675479,
+              0.0003616374609055896,
+              0.00035806538547707145,
+              0.00035217224171504163,
+              0.0003476833747723277,
+              0.0003432235386687699,
+              0.00033946443198294425,
+              0.00033651418988876405,
+              0.00033502871986431336
+            ]
+          },
+          "valid_metric": {
+            "l2": [
+              0.00029695647976086186,
+              0.00029617427174118637,
+              0.00029572838681709006,
+              0.00029547888261763757,
+              0.0002947359899801079,
+              0.00029609398282346913,
+              0.00029603433937015506,
+              0.00029761726197922935,
+              0.00029768768852356904,
+              0.00029774661519639463,
+              0.00029922315928660966,
+              0.00030001372119397446,
+              0.0003001782926853153,
+              0.0003008709067333604,
+              0.0003015619620693248,
+              0.0003019552099523295,
+              0.0003024412031793707,
+              0.0003020934354222853,
+              0.0003037714999271725,
+              0.000303894803589835,
+              0.0003051121478080951,
+              0.00030589701906113447,
+              0.000306406108409779,
+              0.0003072316336593629,
+              0.00030713862628403194,
+              0.0003060147726940974,
+              0.0003054901932636793,
+              0.0003056731353837779,
+              0.000305920201729152,
+              0.00030766804093025266,
+              0.0003080755154848507,
+              0.0003083795728153109,
+              0.0003096707453764637,
+              0.00030967476676883784,
+              0.00030998129818361774
+            ]
+          }
+        },
+        "valid_metrics": {
+          "samples": 308,
+          "ic": 0.079677,
+          "rank_ic": 0.015955,
+          "direction_accuracy": 0.4643,
+          "mse": 0.00029474
+        },
+        "test_metrics": {
+          "samples": 310,
+          "ic": 0.004888,
+          "rank_ic": 0.025432,
+          "direction_accuracy": 0.4581,
+          "mse": 0.00016863
+        },
+        "top_features": [
+          {
+            "feature": "WVMA5",
+            "importance": 0.021414
+          },
+          {
+            "feature": "VSUMN60",
+            "importance": 0.017218
+          },
+          {
+            "feature": "ROC60",
+            "importance": 0.011677
+          },
+          {
+            "feature": "IMXD60",
+            "importance": 0.011577
+          },
+          {
+            "feature": "WVMA30",
+            "importance": 0.010085
+          },
+          {
+            "feature": "STD10",
+            "importance": 0.008708
+          },
+          {
+            "feature": "QTLD30",
+            "importance": 0.008315
+          },
+          {
+            "feature": "CORR60",
+            "importance": 0.008048
+          },
+          {
+            "feature": "KUP2",
+            "importance": 0.007926
+          },
+          {
+            "feature": "RSQR20",
+            "importance": 0.007521
+          },
+          {
+            "feature": "MIN5",
+            "importance": 0.007442
+          },
+          {
+            "feature": "QTLU5",
+            "importance": 0.007221
+          },
+          {
+            "feature": "KUP",
+            "importance": 0.006506
+          },
+          {
+            "feature": "SUMP60",
+            "importance": 0.006504
+          },
+          {
+            "feature": "QTLU60",
+            "importance": 0.006231
+          }
+        ],
+        "latest": {
+          "date": "2026-05-29",
+          "predicted_return": -0.000692,
+          "signal": "中性"
+        },
+        "interpretation": {
+          "summary": "[LGB] 测试集 IC=0.0049，方向命中率=45.81%。最新预测收益代理 -0.0007，信号：中性。主要因子：WVMA5, VSUMN60, ROC60 等。",
+          "signal": "中性",
+          "caveats": [
+            "单标的训练无截面信息，指标仅供样本内参考。",
+            "Alpha158 因子易过拟合，请结合风控与基本面。"
+          ]
+        },
+        "segment_counts": {
+          "train": 930,
+          "valid": 308,
+          "test": 310
+        }
+      }
+    },
+    "comparison": {
+      "summary": "XGB: IC=0.004223, 方向命中率=0.5065, 信号=中性；LGB: IC=0.004888, 方向命中率=0.4581, 信号=中性",
+      "preferred_by_ic": "lgb"
+    }
+  },
+  "openbb": {
+    "available": true,
+    "symbol": "600519",
+    "credentials": {
+      "fred": false,
+      "fmp": false
+    },
+    "capabilities": {
+      "openbb_installed": true,
+      "credentials": {
+        "fred": false,
+        "fmp": false,
+        "tradingeconomics": false,
+        "econdb": false
+      },
+      "features": [
+        {
+          "id": "equity.price.historical",
+          "category": "行情",
+          "endpoint": "obb.equity.price.historical",
+          "providers": [
+            "yfinance",
+            "fmp",
+            "polygon"
+          ],
+          "env": [],
+          "integrated_in": [
+            "market_data",
+            "analyze",
+            "backtest"
+          ],
+          "credentials_ok": true,
+          "available": true
+        },
+        {
+          "id": "equity.profile",
+          "category": "基本面",
+          "endpoint": "obb.equity.profile",
+          "providers": [
+            "yfinance",
+            "fmp"
+          ],
+          "env": [],
+          "integrated_in": [
+            "analyze",
+            "openbb_research"
+          ],
+          "credentials_ok": true,
+          "available": true
+        },
+        {
+          "id": "equity.fundamental.ratios",
+          "category": "基本面",
+          "endpoint": "obb.equity.fundamental.ratios",
+          "providers": [
+            "fmp"
+          ],
+          "env": [
+            "FMP_API_KEY"
+          ],
+          "integrated_in": [
+            "analyze",
+            "openbb_research"
+          ],
+          "credentials_ok": false,
+          "available": false
+        },
+        {
+          "id": "equity.fundamental.metrics",
+          "category": "基本面",
+          "endpoint": "obb.equity.fundamental.metrics",
+          "providers": [
+            "yfinance",
+            "fmp"
+          ],
+          "env": [],
+          "integrated_in": [
+            "openbb_research"
+          ],
+          "credentials_ok": true,
+          "available": true
+        },
+        {
+          "id": "equity.estimates.consensus",
+          "category": "估值预期",
+          "endpoint": "obb.equity.estimates.consensus",
+          "providers": [
+            "fmp"
+          ],
+          "env": [
+            "FMP_API_KEY"
+          ],
+          "integrated_in": [
+            "openbb_research"
+          ],
+          "credentials_ok": false,
+          "available": false
+        },
+        {
+          "id": "equity.estimates.price_target",
+          "category": "估值预期",
+          "endpoint": "obb.equity.estimates.price_target",
+          "providers": [
+            "fmp"
+          ],
+          "env": [
+            "FMP_API_KEY"
+          ],
+          "integrated_in": [
+            "openbb_research"
+          ],
+          "credentials_ok": false,
+          "available": false
+        },
+        {
+          "id": "equity.calendar.earnings",
+          "category": "事件日历",
+          "endpoint": "obb.equity.calendar.earnings",
+          "providers": [
+            "fmp"
+          ],
+          "env": [
+            "FMP_API_KEY"
+          ],
+          "integrated_in": [
+            "openbb_research"
+          ],
+          "credentials_ok": false,
+          "available": false
+        },
+        {
+          "id": "equity.calendar.dividend",
+          "category": "事件日历",
+          "endpoint": "obb.equity.calendar.dividend",
+          "providers": [
+            "fmp"
+          ],
+          "env": [
+            "FMP_API_KEY"
+          ],
+          "integrated_in": [
+            "openbb_research"
+          ],
+          "credentials_ok": false,
+          "available": false
+        },
+        {
+          "id": "equity.compare.peers",
+          "category": "行业",
+          "endpoint": "obb.equity.compare.peers",
+          "providers": [
+            "fmp"
+          ],
+          "env": [
+            "FMP_API_KEY"
+          ],
+          "integrated_in": [
+            "macro",
+            "analyze"
+          ],
+          "credentials_ok": false,
+          "available": false
+        },
+        {
+          "id": "news.company",
+          "category": "新闻",
+          "endpoint": "obb.news.company",
+          "providers": [
+            "yfinance",
+            "fmp"
+          ],
+          "env": [],
+          "integrated_in": [
+            "analyze"
+          ],
+          "credentials_ok": true,
+          "available": true
+        },
+        {
+          "id": "economy.country_profile",
+          "category": "宏观",
+          "endpoint": "obb.economy.country_profile",
+          "providers": [
+            "econdb"
+          ],
+          "env": [],
+          "integrated_in": [
+            "macro",
+            "analyze"
+          ],
+          "credentials_ok": true,
+          "available": true
+        },
+        {
+          "id": "economy.indicators",
+          "category": "宏观",
+          "endpoint": "obb.economy.indicators",
+          "providers": [
+            "econdb"
+          ],
+          "env": [],
+          "integrated_in": [
+            "macro",
+            "analyze"
+          ],
+          "credentials_ok": true,
+          "available": true
+        },
+        {
+          "id": "economy.fred_series",
+          "category": "宏观",
+          "endpoint": "obb.economy.fred_series",
+          "providers": [
+            "fred"
+          ],
+          "env": [
+            "FRED_API_KEY"
+          ],
+          "integrated_in": [
+            "macro",
+            "analyze"
+          ],
+          "credentials_ok": false,
+          "available": false
+        },
+        {
+          "id": "economy.share_price_index",
+          "category": "宏观",
+          "endpoint": "obb.economy.share_price_index",
+          "providers": [
+            "oecd"
+          ],
+          "env": [],
+          "integrated_in": [
+            "macro"
+          ],
+          "credentials_ok": true,
+          "available": true
+        },
+        {
+          "id": "economy.calendar",
+          "category": "宏观",
+          "endpoint": "obb.economy.calendar",
+          "providers": [
+            "fmp",
+            "tradingeconomics"
+          ],
+          "env": [
+            "FMP_API_KEY",
+            "TRADINGECONOMICS_API_KEY"
+          ],
+          "integrated_in": [
+            "openbb_research"
+          ],
+          "credentials_ok": false,
+          "available": false
+        },
+        {
+          "id": "currency.price.historical",
+          "category": "跨资产",
+          "endpoint": "obb.currency.price.historical",
+          "providers": [
+            "yfinance",
+            "fmp"
+          ],
+          "env": [],
+          "integrated_in": [
+            "openbb_research"
+          ],
+          "credentials_ok": true,
+          "available": true
+        },
+        {
+          "id": "derivatives.futures.historical",
+          "category": "跨资产",
+          "endpoint": "obb.derivatives.futures.historical",
+          "providers": [
+            "yfinance",
+            "fmp"
+          ],
+          "env": [],
+          "integrated_in": [],
+          "credentials_ok": true,
+          "available": true
+        },
+        {
+          "id": "local.technical_overlay",
+          "category": "技术面",
+          "endpoint": "local OHLCV → MACD/布林带/ATR",
+          "providers": [
+            "internal"
+          ],
+          "env": [],
+          "integrated_in": [
+            "analyze",
+            "openbb_research"
+          ],
+          "credentials_ok": true,
+          "available": true
+        },
+        {
+          "id": "crypto.qlib_ml",
+          "category": "加密货币",
+          "endpoint": "qlib Alpha158 + XGB/LGB on CRYPTO_*",
+          "providers": [
+            "qlib"
+          ],
+          "env": [],
+          "integrated_in": [
+            "crypto analyze",
+            "crypto ml",
+            "crypto bot --use-ml"
+          ],
+          "credentials_ok": true,
+          "available": false
+        }
+      ],
+      "categories": [
+        "事件日历",
+        "估值预期",
+        "加密货币",
+        "基本面",
+        "宏观",
+        "技术面",
+        "新闻",
+        "行业",
+        "行情",
+        "跨资产"
+      ],
+      "probed": true
+    },
+    "profile": {
+      "name": "Kweichow Moutai Co., Ltd.",
+      "symbol": "600519.SS",
+      "sector": "Consumer Defensive",
+      "currency": "CNY",
+      "market_cap": 1657608339456,
+      "employees": 34992
+    },
+    "news": [
+      {
+        "title": "Kweichow Moutai’s Annual Profit, Revenue Fall for First Time",
+        "date": "2026-04-17 09:17:00+00:00",
+        "url": "https://www.wsj.com/business/earnings/kweichow-moutais-annual-profit-revenue-fall-for-first-time-34a04c83?siteid=yhoof2&yptr=yahoo",
+        "provider": "yfinance"
+      },
+      {
+        "title": "Charlie Munger Handed His Family Fortune Over to The Chinese Warren Buffett Who Flipped It Into $400 Million — 'We Made Unholy Good Returns'",
+        "date": "2026-02-21 19:01:09+00:00",
+        "url": "https://finance.yahoo.com/news/charlie-munger-handed-family-fortune-190109314.html",
+        "provider": "yfinance"
+      },
+      {
+        "title": "Changing times: Cambricon tops Moutai as China's costliest stock as chips trump baijiu",
+        "date": "2025-08-25 09:30:00+00:00",
+        "url": "https://finance.yahoo.com/news/changing-times-cambricon-tops-moutai-093000860.html",
+        "provider": "yfinance"
+      },
+      {
+        "title": "Asian Dividend Stocks To Consider For Your Portfolio",
+        "date": "2025-08-06 22:39:16+00:00",
+        "url": "https://finance.yahoo.com/news/asian-dividend-stocks-consider-portfolio-223916458.html",
+        "provider": "yfinance"
+      }
+    ],
+    "fundamentals": {
+      "metrics": {
+        "symbol": "600519.SS",
+        "currency": "CNY",
+        "market_cap": "1657608339456",
+        "pe_ratio": 20.081781,
+        "forward_pe": 17.721308,
+        "peg_ratio": 1.73,
+        "peg_ratio_ttm": 1.8023,
+        "enterprise_to_ebitda": 14.24,
+        "earnings_growth": 0.018,
+        "earnings_growth_quarterly": 0.015,
+        "revenue_per_share": 137.411,
+        "revenue_growth": 0.065,
+        "enterprise_to_revenue": 9.406,
+        "quick_ratio": 1.41,
+        "current_ratio": 7.061,
+        "debt_to_equity": 0.086,
+        "gross_margin": 0.90514,
+        "operating_margin": 0.68024004,
+        "ebitda_margin": 0.66049004,
+        "profit_margin": 0.48049,
+        "return_on_assets": 0.22059,
+        "return_on_equity": 0.31198,
+        "dividend_yield": 3.89,
+        "dividend_yield_5y_avg": 0.020499999999999997,
+        "payout_ratio": 0.78180003,
+        "book_value": 216.489,
+        "price_to_book": 6.1250224,
+        "enterprise_value": "1619131760640",
+        "overall_risk": 1.0,
+        "audit_risk": 4.0,
+        "board_risk": 1.0,
+        "compensation_risk": 5.0,
+        "shareholder_rights_risk": 3.0,
+        "beta": 0.423,
+        "price_return_1y": -0.121272385
+      }
+    },
+    "estimates": {},
+    "calendar": {},
+    "economy_events": [],
+    "cross_asset": {
+      "fx_usdcny": {
+        "symbol": "USDCNY=X",
+        "date": "2026-05-29",
+        "rate": 6.765699863433838,
+        "change_pct": -0.0019325171456117517
+      }
+    },
+    "macro": {
+      "available": true,
+      "china": {
+        "available": true,
+        "country": "china",
+        "label": "中国",
+        "provider": "econdb",
+        "profile": {
+          "country": "China",
+          "population": 1408280000.0,
+          "gdp_qoq": 0.09738,
+          "gdp_yoy": 0.04458,
+          "cpi_yoy": -0.021318,
+          "retail_sales_yoy": 0.028050000000000002,
+          "industrial_production_yoy": -0.16129000000000002,
+          "policy_rate": 0.0345,
+          "yield_10y": 0.01709,
+          "current_account_gdp": 0.04456,
+          "jobless_rate": 0.052000000000000005
+        },
+        "indicators": [
+          {
+            "name": "CPI",
+            "symbol": "CPI",
+            "frequency": "month",
+            "date": "",
+            "value": 101.0,
+            "change_pct": 0.001984126984127012
+          },
+          {
+            "name": "GDP",
+            "symbol": "GDP",
+            "frequency": "quarter",
+            "date": "",
+            "value": 334193.0,
+            "change_pct": -0.1384802184006125
+          }
+        ],
+        "equity_index": {
+          "name": "OECD 股价指数",
+          "date": "",
+          "value": 108.772,
+          "change_pct": -0.0017785396885995053
+        }
+      },
+      "global": [
+        {
+          "available": true,
+          "country": "united_states",
+          "label": "美国",
+          "provider": "econdb",
+          "profile": {
+            "country": "United States",
+            "population": 342627000.0,
+            "gdp_usd": 31856.256,
+            "gdp_qoq": 0.0049380000000000005,
+            "gdp_yoy": 0.026600000000000002,
+            "cpi_yoy": 0.03773,
+            "core_yoy": 0.027549999999999998,
+            "retail_sales_yoy": 0.05208,
+            "industrial_production_yoy": 0.013531,
+            "policy_rate": 0.0364,
+            "yield_10y": 0.0432,
+            "govt_debt_gdp": 1.2232395420227662,
+            "current_account_gdp": -0.028324,
+            "jobless_rate": 0.043
+          }
+        }
+      ],
+      "summary": "中国 GDP 同比约 4.46%；CPI 同比 -2.13%；政策利率 3.45%；美国 GDP 同比 2.66%。",
+      "credentials": {
+        "fred": false,
+        "fmp": false
+      }
+    },
+    "industry": {
+      "available": true,
+      "sector": "Consumer Defensive",
+      "industry": null,
+      "sector_bucket": "consumer",
+      "sector_macro_metrics": [
+        {
+          "key": "retail_sales_yoy",
+          "label": "社会零售同比",
+          "value": 0.028050000000000002,
+          "formatted": "2.81%"
+        },
+        {
+          "key": "cpi_yoy",
+          "label": "CPI 同比",
+          "value": -0.021318,
+          "formatted": "-2.13%"
+        }
+      ],
+      "indicator_series": [
+        {
+          "name": "CPI 指数",
+          "symbol": "CPI",
+          "date": "",
+          "value": 101.0,
+          "change_pct": 0.001984126984127012
+        },
+        {
+          "name": "GDP",
+          "symbol": "GDP",
+          "date": "",
+          "value": 334193.0,
+          "change_pct": -0.1384802184006125
+        }
+      ],
+      "interpretation": "Kweichow Moutai Co., Ltd.（Consumer Defensive / 未知行业）：与板块相关的中国宏观背景 — 社会零售同比2.81%、CPI 同比-2.13%。"
+    },
+    "technical_overlay": {
+      "macd": {
+        "line": -30.816245617018694,
+        "signal": -30.774028415878263,
+        "histogram": -0.04221720114043137,
+        "trend": "MACD 空头"
+      },
+      "bollinger": {
+        "upper": 1407.945627641683,
+        "middle": 1333.3915000000002,
+        "lower": 1258.8373723583175,
+        "position": 0.45042863330435085,
+        "zone": "中轨附近"
+      },
+      "atr14": 27.110714285714316
+    },
+    "summary": "中国 GDP 同比约 4.46%；CPI 同比 -2.13%；政策利率 3.45%；美国 GDP 同比 2.66%；PE 20.081781；PB 6.1250224；ROE 0.31198；技术 MACD 空头。"
+  },
+  "generated_at": "2026-05-30T08:27:04.962413+00:00"
+}

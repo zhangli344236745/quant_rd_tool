@@ -1,0 +1,8 @@
+{
+  "symbol": "SZ000001",
+  "start_date": "2024-05-29",
+  "end_date": "2026-05-29",
+  "source": "auto(akshare→openbb)",
+  "adjust": "qfq",
+  "updated_at": "2026-05-29T07:47:23.891251+00:00"
+}

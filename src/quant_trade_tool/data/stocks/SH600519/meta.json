@@ -1,0 +1,8 @@
+{
+  "symbol": "SH600519",
+  "start_date": "2020-01-01",
+  "end_date": "2026-05-30",
+  "source": "auto(akshare→openbb)",
+  "adjust": "qfq",
+  "updated_at": "2026-05-30T08:18:08.735922+00:00"
+}

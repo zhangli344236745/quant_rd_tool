@@ -11,7 +11,6 @@ dist/
 .DS_Store
 ./src/quant_trade_tool/node_modules/
 ./src/quant_trade_tool/dist/
-# 本地运行数据与产物（勿提交密钥/行情缓存）
-data/
+# 本地运行数据与产物（勿提交密钥；data/ 已纳入版本库）
 *.db
 *.zip

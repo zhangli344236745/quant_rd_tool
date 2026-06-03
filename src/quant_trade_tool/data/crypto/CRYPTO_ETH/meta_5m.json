@@ -1,0 +1,22 @@
+{
+  "symbol": "ETH",
+  "qlib_code": "CRYPTO_ETH",
+  "pair": "ETH/USDT",
+  "timeframe": "5m",
+  "bars_count": 1019,
+  "last_timestamp_ms": 1780456800000,
+  "last_date": "2026-06-03 11:20:00",
+  "last_date_beijing": "2026-06-03 11:20:00",
+  "last_date_utc": "2026-06-03 03:20:00",
+  "last_date_local": "2026-06-03 11:20:00",
+  "date_timezone": "Asia/Shanghai",
+  "timezone_note": "CSV 列 date 与 last_date 均为北京时间 (UTC+8)；timestamp 列为 UTC 毫秒",
+  "data_lag_minutes": 3,
+  "last_bar_closed": false,
+  "expected_lag_note": "最后一根 K 线北京时间开盘 2026-06-03 11:20:00，理论收盘 2026-06-03 11:25:00；未收盘（当前正在形成的 K 线）。与当前相差约 3 分钟；超过 5 分钟请重新 sync。",
+  "last_close": 1851.0,
+  "updated_at": "2026-06-03T03:23:18.918201+00:00",
+  "updated_at_beijing": "2026-06-03 11:23:18",
+  "last_sync_action": "incremental",
+  "new_bars": 2
+}

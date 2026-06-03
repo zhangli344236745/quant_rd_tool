@@ -1,0 +1,79 @@
+{
+  "symbol": "SH600519",
+  "data_paths": {
+    "root": "/Users/worldunion/projects/pythonprojects/claudedemo/quant_rd_tool/data/stocks/SH600519",
+    "csv": "/Users/worldunion/projects/pythonprojects/claudedemo/quant_rd_tool/data/stocks/SH600519/ohlcv.csv",
+    "qlib": "/Users/worldunion/projects/pythonprojects/claudedemo/quant_rd_tool/data/stocks/SH600519/qlib"
+  },
+  "fetched_new_data": true,
+  "meta": {
+    "symbol": "SH600519",
+    "start_date": "2024-06-02",
+    "end_date": "2026-06-02",
+    "source": "auto(akshare→openbb)",
+    "adjust": "qfq",
+    "updated_at": "2026-06-02T07:24:02.417373+00:00"
+  },
+  "analysis": {
+    "symbol": "SH600519",
+    "bare_code": "600519",
+    "period": {
+      "start": "2024-06-03",
+      "end": "2026-06-01",
+      "bars": 483
+    },
+    "price": {
+      "latest_close": 1309.6,
+      "period_high": 1672.56,
+      "period_low": 1185.56,
+      "pct_from_high": -0.217009,
+      "current_drawdown": -0.217009
+    },
+    "returns": {
+      "1d": -0.012368,
+      "5d": 0.018447,
+      "20d": -0.065353,
+      "60d": -0.081749,
+      "252d": -0.161894
+    },
+    "risk": {
+      "annualized_return": -0.047985,
+      "annualized_volatility": 0.015957,
+      "sharpe_ratio": -0.194922,
+      "max_drawdown": -0.257449
+    },
+    "technical": {
+      "ma_alignment": "空头排列",
+      "close_vs_sma20": -0.014459,
+      "rsi_14": 41.87,
+      "rsi_zone": "中性",
+      "volume_trend_5d_vs_20d": 0.2257
+    },
+    "benchmark": {
+      "benchmark_code": "SH000300",
+      "correlation": 0.5837,
+      "beta": 0.7912,
+      "avg_daily_excess_return": -0.000893
+    }
+  },
+  "narrative": {
+    "stance": "谨慎",
+    "summary": "标的 SH600519，样本区间 2024-06-03 至 2026-06-01，共 483 个交易日。最新收盘价 1309.6，较区间高点 -21.70%。近 20 日涨跌幅 -6.54%。",
+    "observations": [
+      "均线结构：空头排列。",
+      "RSI(14)=41.87，处于中性区域。",
+      "近 5 日成交量较此前 20 日均值放大（+22.57%）。",
+      "样本年化收益约 -4.80%，年化波动约 1.60%，最大回撤约 25.74%。",
+      "相对基准 SH000300：相关系数 0.58，Beta 0.7912。"
+    ],
+    "risks": [
+      "本报告基于历史行情统计，不代表未来表现。",
+      "未包含财务基本面、行业政策与资金面等信息。",
+      "不构成任何证券买卖建议。"
+    ],
+    "disclaimer": "仅供量化研究学习，不构成投资建议。"
+  },
+  "ml_analysis": null,
+  "openbb": null,
+  "generated_at": "2026-06-02T07:24:03.100456+00:00"
+}

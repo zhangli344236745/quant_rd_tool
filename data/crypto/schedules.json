@@ -1,0 +1,38 @@
+{
+  "jobs": [
+    {
+      "symbols": [
+        "BTC",
+        "ETH"
+      ],
+      "timeframe": "5m",
+      "interval_minutes": 30,
+      "backfill_days": 90,
+      "data_dir": "data/crypto",
+      "with_ml": true,
+      "ml_algorithm": "both",
+      "exchange_id": "binance",
+      "name": "btc-eth 5m",
+      "id": "btc-eth-5m",
+      "created_at": "2026-05-27T05:12:25.749481+00:00",
+      "status": "stopped",
+      "run_count": 19,
+      "last_run_at": "2026-05-29T02:42:23.513179+00:00",
+      "last_error": "ccxt incremental fetch failed for BTC/USDT: binance GET https://api.binance.com/api/v3/exchangeInfo",
+      "started_at": null,
+      "next_run_at": null,
+      "last_cycle_summary": [
+        {
+          "symbol": "BTC",
+          "error": "ccxt incremental fetch failed for BTC/USDT: binance GET https://api.binance.com/api/v3/exchangeInfo"
+        },
+        {
+          "pair": "ETH/USDT",
+          "stance": "看跌",
+          "action": "sell",
+          "new_bars": 11
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "jobs": {
+    "btc-eth-5m": {
+      "failure_streak": 0,
+      "last_alerts": {
+        "cycle_complete": "2026-06-03T03:23:22.092998+00:00"
+      }
+    }
+  }
+}

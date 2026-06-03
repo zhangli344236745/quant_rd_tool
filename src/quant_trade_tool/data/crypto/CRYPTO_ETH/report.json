@@ -1,0 +1,516 @@
+{
+  "symbol": "CRYPTO_ETH",
+  "pair": "ETH/USDT",
+  "timeframe": "5m",
+  "period": {
+    "start": "2026-05-30 22:30:00",
+    "end": "2026-06-03 11:20:00",
+    "bars": 1019
+  },
+  "data_paths": {
+    "root": "/Users/worldunion/projects/pythonprojects/claudedemo/quant_rd_tool/src/quant_trade_tool/data/crypto/CRYPTO_ETH",
+    "csv": "/Users/worldunion/projects/pythonprojects/claudedemo/quant_rd_tool/src/quant_trade_tool/data/crypto/CRYPTO_ETH/ohlcv_5m.csv",
+    "qlib": "/Users/worldunion/projects/pythonprojects/claudedemo/quant_rd_tool/src/quant_trade_tool/data/crypto/CRYPTO_ETH/qlib_5m"
+  },
+  "analysis": {
+    "symbol": "CRYPTO_ETH",
+    "period": {
+      "start": "2026-05-30",
+      "end": "2026-06-03",
+      "bars": 1019
+    },
+    "price": {
+      "latest_close": 1851.0,
+      "period_high": 2036.55,
+      "period_low": 1846.33,
+      "pct_from_high": -0.09111
+    },
+    "returns": {
+      "1d": 0.002529,
+      "5d": -0.001667,
+      "20d": -0.000205,
+      "60d": -0.028239
+    },
+    "risk": {
+      "annualized_return": -0.021239,
+      "annualized_volatility": 0.001544,
+      "sharpe_ratio": -0.891426,
+      "max_drawdown": -0.096889
+    },
+    "technical": {
+      "ma_alignment": "空头排列",
+      "close_vs_sma20": -0.002862,
+      "rsi_14": 42.88,
+      "rsi_zone": "中性",
+      "macd_trend": "MACD 空头",
+      "bollinger_zone": "中轨附近"
+    }
+  },
+  "technical_signal": {
+    "stance": "看跌",
+    "action": "sell",
+    "score": -3,
+    "confidence": 0.75,
+    "reasons": [
+      "均线：空头排列",
+      "RSI=42.88（中性）",
+      "MACD：MACD 空头",
+      "近20日涨跌：-0.02%",
+      "综合得分 -3"
+    ]
+  },
+  "ml_analysis": {
+    "enabled": false,
+    "skipped": true,
+    "reason": "样本不足（1019 条 K 线），qlib 训练建议至少 2000 根（5m）。请增大 --backfill-days 或等待定时任务累积。"
+  },
+  "combined_signal": {
+    "stance": "看跌",
+    "action": "sell",
+    "score": -3,
+    "confidence": 0.6,
+    "technical": {
+      "stance": "看跌",
+      "action": "sell"
+    },
+    "ml": {
+      "stance": null,
+      "signal": null,
+      "predicted_return": null
+    },
+    "agreement": "仅技术面",
+    "reasons": [
+      "均线：空头排列",
+      "RSI=42.88（中性）",
+      "MACD：MACD 空头",
+      "近20日涨跌：-0.02%",
+      "综合得分 -3"
+    ]
+  },
+  "signal": {
+    "stance": "看跌",
+    "action": "sell",
+    "score": -3,
+    "confidence": 0.6,
+    "technical": {
+      "stance": "看跌",
+      "action": "sell"
+    },
+    "ml": {
+      "stance": null,
+      "signal": null,
+      "predicted_return": null
+    },
+    "agreement": "仅技术面",
+    "reasons": [
+      "均线：空头排列",
+      "RSI=42.88（中性）",
+      "MACD：MACD 空头",
+      "近20日涨跌：-0.02%",
+      "综合得分 -3"
+    ]
+  },
+  "narrative": {
+    "stance": "看跌",
+    "action": "sell",
+    "summary": "CRYPTO_ETH 最新价 1851.0，研判 **看跌**（建议操作：sell），信号置信度约 60%。 方向偏空且波动偏高：下行风险与期权溢价同向，不宜盲目抄底；卖 Put 需充足保证金与止损。",
+    "observations": [
+      "均线：空头排列",
+      "RSI=42.88（中性）",
+      "MACD：MACD 空头",
+      "近20日涨跌：-0.02%",
+      "综合得分 -3",
+      "[期权] 近月 ATM 隐含波动率约 53.2%。",
+      "[期权] IV 历史分位约 93.1%。",
+      "[期权] 24h IV 变化约 +14.7%。",
+      "[期权] 横向波动排名 #1/4（含 BTC/ETH/SOL/BNB 等配置标的）。",
+      "[期权] 当前全市场 IV 综合最高：BTC。",
+      "[期权] 期权维度：波动溢价偏高。",
+      "[期权建议] ETH 为当前观察列表中波动最突出标的，优先跟踪。",
+      "[期权建议] ETH 期权隐含波动处于偏高且抬升区间，买方权利金昂贵，纯买入期权性价比偏低。",
+      "[期权建议] 若看多波动方向，可考虑小仓位跨式/宽跨并严格止损；更常见思路是卖出波动并配合现货或永续对冲。"
+    ],
+    "advice": "可考虑减仓或观望，避免逆势加仓。",
+    "investment_brief": {
+      "sections": [
+        {
+          "title": "结论：「看跌」在说什么",
+          "paragraphs": [
+            "综合研判为 **看跌**（操作建议：sell），置信度约 60%。动能与结构偏弱，宜降风险、避免逆势加仓。",
+            "技术面 看跌，机器学习 未参与，二者 **仅技术面**。"
+          ]
+        },
+        {
+          "title": "价格结构",
+          "paragraphs": [
+            "现价约 **1,851.00**，样本区间高/低 **2,036.55 / 1,846.33**。",
+            "距区间高点约 **-9.1%**。",
+            "价格位于区间中下部，偏弱整理或回调后的中段，非明确底部确认。",
+            "样本内最大回撤约 **-9.7%**，波动需纳入仓位管理。"
+          ]
+        },
+        {
+          "title": "多维度拆解",
+          "bullets": [
+            "**趋势（均线）**：空头排列。 顺势做空/减仓逻辑增强。",
+            "**动能（MACD）**：MACD 空头，短期卖压仍在，不宜仅凭小幅下跌抄底。",
+            "**RSI**：42.88（中性）。",
+            "**布林带**：中轨附近。",
+            "**短期收益**（近 5/20/60 根 K 线）：-0.17% / -0.02% / -2.82%。",
+            "**机器学习**：未启用（样本不足（1019 条 K 线），qlib 训练建议至少 2000 根（5m）。请增大 --backfill-days 或等待定时任务累积。）。"
+          ]
+        },
+        {
+          "title": "期权波动率（Binance）",
+          "bullets": [
+            "近月 ATM IV 约 **53.2%**。",
+            "IV 历史分位 **93.1%**（告警 hot）。",
+            "24h IV 变化 **+14.7%**。",
+            "参考合约：`ETH-260619-1850-C`。",
+            "配置标的横向波动排名 **#1/4**。",
+            "综合 IV 最高标的：**BTC**。",
+            "方向偏空且波动偏高：下行风险与期权溢价同向，不宜盲目抄底；卖 Put 需充足保证金与止损。",
+            "ETH：波动溢价偏高。 IV 分位 93.1%，24h +14.7%。",
+            "ETH 为当前观察列表中波动最突出标的，优先跟踪。",
+            "ETH 期权隐含波动处于偏高且抬升区间，买方权利金昂贵，纯买入期权性价比偏低。",
+            "若看多波动方向，可考虑小仓位跨式/宽跨并严格止损；更常见思路是卖出波动并配合现货或永续对冲。",
+            "**买 Call 摘要**：当前各档买 Call 性价比均偏差，不建议追涨买入期权。",
+            "K=1600.0：不建议买入 — 现货/综合信号偏空，不宜新建买方 Call（可考虑对冲或观望）。",
+            "K=1700.0：不建议买入 — 现货/综合信号偏空，不宜新建买方 Call（可考虑对冲或观望）。",
+            "K=1800.0：不建议买入 — 现货/综合信号偏空，不宜新建买方 Call（可考虑对冲或观望）。",
+            "K=1850.0：不建议买入 — 现货/综合信号偏空，不宜新建买方 Call（可考虑对冲或观望）。",
+            "K=1900.0：不建议买入 — 现货/综合信号偏空，不宜新建买方 Call（可考虑对冲或观望）。"
+          ]
+        },
+        {
+          "title": "按持仓场景的操作倾向",
+          "scenarios": [
+            {
+              "role": "已有多单",
+              "text": "考虑减仓或收紧止损，避免逆势摊平。"
+            },
+            {
+              "role": "空仓",
+              "text": "观望为主，不宜盲目抄底；若做空需严格止损。"
+            },
+            {
+              "role": "短线",
+              "text": "反弹至均线压力可考虑减多或轻仓空，注意布林下轨附近勿追空。"
+            }
+          ]
+        },
+        {
+          "title": "何时会改变方向判断",
+          "upgrades": [
+            {
+              "condition": "均线转多头 + MACD 多头 + RSI 回升至 50 上方",
+              "bias": "偏多 → 可考虑分批建多"
+            },
+            {
+              "condition": "均线空头 + MACD 空头 + RSI 超买",
+              "bias": "偏空 → 减仓或不做多"
+            },
+            {
+              "condition": "放量跌破区间下沿",
+              "bias": "偏空 → 止损/降风险优先"
+            },
+            {
+              "condition": "ML 测试集 IC 持续为正且信号偏多",
+              "bias": "增强看多（需持续验证，不可单根 K 线决策）"
+            }
+          ]
+        }
+      ],
+      "one_liner": "ETH/USDT：看跌（sell）— 价 1,851，空头排列，MACD 空头；详见多维拆解。",
+      "markdown": "## 投资方向说明（详细）\n\n> 数据周期：**5m**；时间均为**北京时间**；「近 N 根」指 K 线根数，非自然日。\n\n### 结论：「看跌」在说什么\n\n综合研判为 **看跌**（操作建议：sell），置信度约 60%。动能与结构偏弱，宜降风险、避免逆势加仓。\n\n技术面 看跌，机器学习 未参与，二者 **仅技术面**。\n\n\n### 价格结构\n\n现价约 **1,851.00**，样本区间高/低 **2,036.55 / 1,846.33**。\n\n距区间高点约 **-9.1%**。\n\n价格位于区间中下部，偏弱整理或回调后的中段，非明确底部确认。\n\n样本内最大回撤约 **-9.7%**，波动需纳入仓位管理。\n\n\n### 多维度拆解\n\n- **趋势（均线）**：空头排列。 顺势做空/减仓逻辑增强。\n- **动能（MACD）**：MACD 空头，短期卖压仍在，不宜仅凭小幅下跌抄底。\n- **RSI**：42.88（中性）。\n- **布林带**：中轨附近。\n- **短期收益**（近 5/20/60 根 K 线）：-0.17% / -0.02% / -2.82%。\n- **机器学习**：未启用（样本不足（1019 条 K 线），qlib 训练建议至少 2000 根（5m）。请增大 --backfill-days 或等待定时任务累积。）。\n\n### 期权波动率（Binance）\n\n- 近月 ATM IV 约 **53.2%**。\n- IV 历史分位 **93.1%**（告警 hot）。\n- 24h IV 变化 **+14.7%**。\n- 参考合约：`ETH-260619-1850-C`。\n- 配置标的横向波动排名 **#1/4**。\n- 综合 IV 最高标的：**BTC**。\n- 方向偏空且波动偏高：下行风险与期权溢价同向，不宜盲目抄底；卖 Put 需充足保证金与止损。\n- ETH：波动溢价偏高。 IV 分位 93.1%，24h +14.7%。\n- ETH 为当前观察列表中波动最突出标的，优先跟踪。\n- ETH 期权隐含波动处于偏高且抬升区间，买方权利金昂贵，纯买入期权性价比偏低。\n- 若看多波动方向，可考虑小仓位跨式/宽跨并严格止损；更常见思路是卖出波动并配合现货或永续对冲。\n- **买 Call 摘要**：当前各档买 Call 性价比均偏差，不建议追涨买入期权。\n- K=1600.0：不建议买入 — 现货/综合信号偏空，不宜新建买方 Call（可考虑对冲或观望）。\n- K=1700.0：不建议买入 — 现货/综合信号偏空，不宜新建买方 Call（可考虑对冲或观望）。\n- K=1800.0：不建议买入 — 现货/综合信号偏空，不宜新建买方 Call（可考虑对冲或观望）。\n- K=1850.0：不建议买入 — 现货/综合信号偏空，不宜新建买方 Call（可考虑对冲或观望）。\n- K=1900.0：不建议买入 — 现货/综合信号偏空，不宜新建买方 Call（可考虑对冲或观望）。\n\n### 按持仓场景的操作倾向\n\n- **已有多单**：考虑减仓或收紧止损，避免逆势摊平。\n- **空仓**：观望为主，不宜盲目抄底；若做空需严格止损。\n- **短线**：反弹至均线压力可考虑减多或轻仓空，注意布林下轨附近勿追空。\n\n### 何时会改变方向判断\n\n- 若 均线转多头 + MACD 多头 + RSI 回升至 50 上方 → 偏多 → 可考虑分批建多\n- 若 均线空头 + MACD 空头 + RSI 超买 → 偏空 → 减仓或不做多\n- 若 放量跌破区间下沿 → 偏空 → 止损/降风险优先\n- 若 ML 测试集 IC 持续为正且信号偏多 → 增强看多（需持续验证，不可单根 K 线决策）\n\n### 一句话\n\nETH/USDT：看跌（sell）— 价 1,851，空头排列，MACD 空头；详见多维拆解。\n"
+    },
+    "risks": [
+      "加密货币波动极大，杠杆与合约风险更高。",
+      "短周期（如 5m）信号变化快，需执行纪律，不宜重仓赌方向。",
+      "机器学习在单标的短周期上可能接近随机，勿单独作为开仓依据。",
+      "自动交易可能因滑点、限频、API 故障导致偏离预期。",
+      "不构成投资建议；实盘前请用测试网或 dry-run 验证。",
+      "期权波动与方向可能背离；卖方策略存在尾部风险。",
+      "当前 IV 偏高，买方权利金成本显著，勿忽视时间价值损耗。",
+      "行权价建议仅综合概率差、现货方向与 IV 环境，未计手续费、滑点与流动性；不构成投资建议。"
+    ],
+    "disclaimer": "仅供量化研究学习，不构成投资建议。"
+  },
+  "generated_at": "2026-06-03T03:23:18.967616+00:00",
+  "generated_at_beijing": "2026-06-03 11:23:18",
+  "options_vol": {
+    "enabled": true,
+    "base": "ETH",
+    "scan_item": {
+      "base": "ETH",
+      "ts": "2026-06-03T03:23:12.502508+00:00",
+      "atm_iv": 0.5325,
+      "underlying_price": 1849.4993,
+      "contract": "ETH-260619-1850-C",
+      "expiry": "2026-06-19T00:00:00+00:00",
+      "dte": 15.86,
+      "iv_percentile": 93.1,
+      "iv_change_24h_pct": 14.74,
+      "alert_level": "hot",
+      "alerts": [
+        "iv_percentile_high",
+        "iv_change_24h_high"
+      ],
+      "cold_start": false,
+      "composite_score": 0.8881,
+      "rank": 1
+    },
+    "advice": {
+      "base": "ETH",
+      "stance": "波动溢价偏高",
+      "summary": "ETH：波动溢价偏高。 IV 分位 93.1%，24h +14.7%。",
+      "actions": [
+        "ETH 为当前观察列表中波动最突出标的，优先跟踪。",
+        "ETH 期权隐含波动处于偏高且抬升区间，买方权利金昂贵，纯买入期权性价比偏低。",
+        "若看多波动方向，可考虑小仓位跨式/宽跨并严格止损；更常见思路是卖出波动并配合现货或永续对冲。"
+      ],
+      "risks": [
+        "IV 仍可能继续冲高，裸卖波动风险无限，需保证金与止损纪律。",
+        "以下为基于隐含波动率规则的研究性提示，不构成投资建议。期权交易风险极高，请自行评估并控制仓位。"
+      ],
+      "reasons": [
+        "IV 历史分位约 93.1%（近月 ATM mark IV 0.5325）。",
+        "24 小时 IV 变化约 +14.7%。",
+        "横向波动综合排名 #1。"
+      ],
+      "confidence": 0.72
+    },
+    "alert_level": "hot",
+    "iv_percentile": 93.1,
+    "iv_change_24h_pct": 14.74,
+    "atm_iv": 0.5325,
+    "contract": "ETH-260619-1850-C",
+    "cold_start": false,
+    "peer_rank": 1,
+    "peer_count": 4,
+    "hottest_peer": "BTC",
+    "scanned_at": "2026-06-03T03:23:12.598270+00:00",
+    "cross_view": {
+      "alignment": "共振",
+      "summary": "方向偏空且波动偏高：下行风险与期权溢价同向，不宜盲目抄底；卖 Put 需充足保证金与止损。",
+      "notes": [
+        "近月 ATM 隐含波动率约 53.2%。",
+        "IV 历史分位约 93.1%。",
+        "24h IV 变化约 +14.7%。",
+        "横向波动排名 #1/4（含 BTC/ETH/SOL/BNB 等配置标的）。",
+        "当前全市场 IV 综合最高：BTC。",
+        "期权维度：波动溢价偏高。"
+      ],
+      "options_stance": "波动溢价偏高",
+      "spot_stance": "看跌",
+      "spot_action": "sell"
+    },
+    "strike_ladder": {
+      "base": "ETH",
+      "spot": 1850.6165,
+      "expiry": "2026-06-19T00:00:00+00:00",
+      "dte": 15.86,
+      "n": 3,
+      "model": {
+        "enabled": false,
+        "sigma_ann": null,
+        "mu_ann": 0.0,
+        "qlib": {
+          "enabled": false,
+          "reason": "no OHLCV"
+        },
+        "assumptions": "GBM; realized vol + qlib drift; physical approx for model leg",
+        "reason": "no OHLCV"
+      },
+      "rows": [
+        {
+          "strike": 1600.0,
+          "side": "C",
+          "symbol": "ETH-260619-1600-C",
+          "moneyness_pct": -13.54,
+          "mark_iv": 0.6606,
+          "model": {
+            "expiry_itm_call": null,
+            "touch_call": null
+          },
+          "implied": {
+            "expiry_itm_call": 0.8384,
+            "touch_call": null
+          },
+          "edge_expiry": null,
+          "purchase": {
+            "verdict": "不建议买入",
+            "summary": "现货/综合信号偏空，不宜新建买方 Call（可考虑对冲或观望）。",
+            "reasons": [
+              "方向与买 Call 不一致"
+            ],
+            "strike": 1600.0,
+            "symbol": "ETH-260619-1600-C"
+          }
+        },
+        {
+          "strike": 1700.0,
+          "side": "C",
+          "symbol": "ETH-260619-1700-C",
+          "moneyness_pct": -8.14,
+          "mark_iv": 0.5939,
+          "model": {
+            "expiry_itm_call": null,
+            "touch_call": null
+          },
+          "implied": {
+            "expiry_itm_call": 0.7336,
+            "touch_call": null
+          },
+          "edge_expiry": null,
+          "purchase": {
+            "verdict": "不建议买入",
+            "summary": "现货/综合信号偏空，不宜新建买方 Call（可考虑对冲或观望）。",
+            "reasons": [
+              "方向与买 Call 不一致"
+            ],
+            "strike": 1700.0,
+            "symbol": "ETH-260619-1700-C"
+          }
+        },
+        {
+          "strike": 1800.0,
+          "side": "C",
+          "symbol": "ETH-260619-1800-C",
+          "moneyness_pct": -2.74,
+          "mark_iv": 0.5482,
+          "model": {
+            "expiry_itm_call": null,
+            "touch_call": null
+          },
+          "implied": {
+            "expiry_itm_call": 0.5736,
+            "touch_call": null
+          },
+          "edge_expiry": null,
+          "purchase": {
+            "verdict": "不建议买入",
+            "summary": "现货/综合信号偏空，不宜新建买方 Call（可考虑对冲或观望）。",
+            "reasons": [
+              "方向与买 Call 不一致"
+            ],
+            "strike": 1800.0,
+            "symbol": "ETH-260619-1800-C"
+          }
+        },
+        {
+          "strike": 1850.0,
+          "side": "C",
+          "symbol": "ETH-260619-1850-C",
+          "moneyness_pct": -0.03,
+          "mark_iv": 0.5327,
+          "model": {
+            "expiry_itm_call": null,
+            "touch_call": null
+          },
+          "implied": {
+            "expiry_itm_call": 0.4791,
+            "touch_call": null
+          },
+          "edge_expiry": null,
+          "purchase": {
+            "verdict": "不建议买入",
+            "summary": "现货/综合信号偏空，不宜新建买方 Call（可考虑对冲或观望）。",
+            "reasons": [
+              "方向与买 Call 不一致"
+            ],
+            "strike": 1850.0,
+            "symbol": "ETH-260619-1850-C"
+          }
+        },
+        {
+          "strike": 1900.0,
+          "side": "C",
+          "symbol": "ETH-260619-1900-C",
+          "moneyness_pct": 2.67,
+          "mark_iv": 0.5218,
+          "model": {
+            "expiry_itm_call": null,
+            "touch_call": null
+          },
+          "implied": {
+            "expiry_itm_call": 0.3834,
+            "touch_call": null
+          },
+          "edge_expiry": null,
+          "purchase": {
+            "verdict": "不建议买入",
+            "summary": "现货/综合信号偏空，不宜新建买方 Call（可考虑对冲或观望）。",
+            "reasons": [
+              "方向与买 Call 不一致"
+            ],
+            "strike": 1900.0,
+            "symbol": "ETH-260619-1900-C"
+          }
+        },
+        {
+          "strike": 1950.0,
+          "side": "C",
+          "symbol": "ETH-260619-1950-C",
+          "moneyness_pct": 5.37,
+          "mark_iv": 0.5163,
+          "model": {
+            "expiry_itm_call": null,
+            "touch_call": null
+          },
+          "implied": {
+            "expiry_itm_call": 0.2946,
+            "touch_call": null
+          },
+          "edge_expiry": null,
+          "purchase": {
+            "verdict": "不建议买入",
+            "summary": "现货/综合信号偏空，不宜新建买方 Call（可考虑对冲或观望）。",
+            "reasons": [
+              "方向与买 Call 不一致"
+            ],
+            "strike": 1950.0,
+            "symbol": "ETH-260619-1950-C"
+          }
+        },
+        {
+          "strike": 2000.0,
+          "side": "C",
+          "symbol": "ETH-260619-2000-C",
+          "moneyness_pct": 8.07,
+          "mark_iv": 0.5141,
+          "model": {
+            "expiry_itm_call": null,
+            "touch_call": null
+          },
+          "implied": {
+            "expiry_itm_call": 0.2183,
+            "touch_call": null
+          },
+          "edge_expiry": null,
+          "purchase": {
+            "verdict": "不建议买入",
+            "summary": "现货/综合信号偏空，不宜新建买方 Call（可考虑对冲或观望）。",
+            "reasons": [
+              "方向与买 Call 不一致"
+            ],
+            "strike": 2000.0,
+            "symbol": "ETH-260619-2000-C"
+          }
+        }
+      ],
+      "warnings": [],
+      "disclaimer": "研究用途。模型概率（历史波动 + qlib 漂移，GBM）与期权隐含概率（风险中性）口径不同，不构成投资建议。",
+      "purchase_summary": {
+        "headline": "当前各档买 Call 性价比均偏差，不建议追涨买入期权。",
+        "spot_stance": "看跌",
+        "iv_alert_level": "hot",
+        "consider_count": 0,
+        "avoid_count": 7,
+        "best_strike": null,
+        "best_contract": null
+      },
+      "purchase_disclaimer": "行权价建议仅综合概率差、现货方向与 IV 环境，未计手续费、滑点与流动性；不构成投资建议。"
+    }
+  }
+}
