@@ -1,9 +1,13 @@
 <script setup lang="ts">
 import { reactive, ref } from "vue";
+import { cryptoApi, type SymbolVarReport } from "@/api/crypto";
 import { jobsApi } from "@/api/jobs";
 import { useJobSubmit } from "@/composables/useJobSubmit";
 import ResultPanel from "@/components/ResultPanel.vue";
 import SignalSummary from "@/components/SignalSummary.vue";
+
+const symbolVar = ref<SymbolVarReport | null>(null);
+const symbolVarError = ref("");
 
 const form = reactive({
   symbol: "BTC",
@@ -19,25 +23,48 @@ const { submit, polling } = useJobSubmit();
 const result = ref<Record<string, unknown> | null>(null);
 const error = ref("");
 
+async function loadSymbolVarSummary(symbol: string) {
+  symbolVar.value = null;
+  symbolVarError.value = "";
+  try {
+    const { data } = await cryptoApi.varSymbol({
+      symbol,
+      notional_usdt: 10000,
+      confidence: "0.99",
+      horizon_days: 1,
+      lookback_bars: 252,
+      timeframe: "1d",
+    });
+    symbolVar.value = data;
+  } catch (e) {
+    symbolVarError.value = String(e);
+  }
+}
+
 async function run(wait: boolean) {
   error.value = "";
   result.value = null;
+  symbolVar.value = null;
+  symbolVarError.value = "";
   try {
     await submit(() => jobsApi.cryptoAnalyze({ ...form }), {
       wait,
-      onDone: (r) => {
+      onDone: async (r) => {
         result.value = {
           combined_signal: r.combined_signal,
           options_vol: r.options_vol,
           narrative: r.narrative,
           ...r,
         };
+        await loadSymbolVarSummary(form.symbol);
       },
     });
   } catch (e) {
     error.value = String(e);
   }
 }
+
+const var99Usdt = () => symbolVar.value?.metrics?.["0.99"]?.var_usdt;
 
 const combined = () =>
   (result.value?.combined_signal as Record<string, unknown>) || undefined;
@@ -102,6 +129,22 @@ function optAlertType(level: string) {
         <el-card v-if="combined()" shadow="never" class="panel-card">
           <template #header>综合信号</template>
           <SignalSummary :signal="combined()" />
+        </el-card>
+        <el-card v-if="symbolVar || symbolVarError" shadow="never" class="panel-card mt">
+          <template #header>风险 VaR 摘要</template>
+          <template v-if="symbolVar">
+            <p class="cross-summary">
+              1 日 99% VaR（名义 10,000 USDT）：
+              <strong>{{ var99Usdt()?.toLocaleString(undefined, { maximumFractionDigits: 2 }) }} USDT</strong>
+            </p>
+            <router-link
+              :to="{ path: '/crypto-var', query: { symbol: form.symbol, tab: 'symbol' } }"
+              class="var-link"
+            >
+              查看完整 VaR →
+            </router-link>
+          </template>
+          <p v-else class="muted small">{{ symbolVarError }}</p>
         </el-card>
         <el-card
           v-if="optionsVol()?.enabled"
@@ -184,5 +227,15 @@ function optAlertType(level: string) {
 .muted.small {
   font-size: 12px;
   color: var(--text-muted);
+}
+.var-link {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--el-color-primary);
+  text-decoration: none;
+}
+.var-link:hover {
+  text-decoration: underline;
 }
 </style>

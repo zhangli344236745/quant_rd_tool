@@ -1,4 +1,5 @@
 import argparse
+import os
 
 import uvicorn
 
@@ -761,7 +762,7 @@ def main() -> None:
             host=args.host or settings.host,
             port=args.port or settings.port,
             reload=use_reload,
-            reload_dirs=["src/quant_rd_tool"] if use_reload else None,
+            reload_dirs=[os.path.dirname(os.path.abspath(__file__))] if use_reload else None,
         )
 
 

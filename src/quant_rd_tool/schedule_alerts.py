@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
 
 from quant_rd_tool.network_settings import load_settings
+
+logger = logging.getLogger(__name__)
 
 _SETTINGS_PATH = Path("data/settings.json")
 _DEFAULT_LOG = Path("data/crypto/schedule_alert_log.jsonl")
@@ -53,7 +56,91 @@ def get_alert_rules() -> dict[str, Any]:
     out["updated_at"] = raw.get("updated_at")
     custom = raw.get("custom_rules")
     out["custom_rules"] = custom if isinstance(custom, list) else []
+    var = raw.get("var")
+    out["var"] = var if isinstance(var, dict) else {}
+    out["webhook_on_alert"] = raw.get("webhook_on_alert", True) is not False
+    out["on_cycle_complete"] = raw.get("on_cycle_complete", True) is not False
+    bark = raw.get("bark")
+    out["bark"] = _public_bark_config(bark if isinstance(bark, dict) else {})
     return out
+
+
+def _format_cycle_complete_message(job_id: str, rows: list[dict[str, Any]]) -> str:
+    """Short summary for Bark/Webhook after a successful schedule cycle."""
+    lines: list[str] = []
+    for row in rows[:12]:
+        sym = str(row.get("symbol") or row.get("pair") or "?")
+        stance = row.get("stance") or "-"
+        action = row.get("action") or "-"
+        new_bars = row.get("new_bars")
+        extra = f" +{new_bars}K" if new_bars not in (None, 0, "0") else ""
+        lines.append(f"{sym} {stance}/{action}{extra}")
+    if len(rows) > 12:
+        lines.append(f"…共 {len(rows)} 个标的")
+    body = "\n".join(lines) if lines else "（无分析结果）"
+    return f"[{job_id}] 定时分析完成\n{body}"
+
+
+def _bark_from_env() -> dict[str, str]:
+    from quant_rd_tool.config import settings
+
+    return {
+        "device_key": str(settings.bark_device_key or "").strip(),
+        "server": str(settings.bark_server or "").strip(),
+    }
+
+
+def _coerce_bool(val: Any, *, default: bool = False) -> bool:
+    if isinstance(val, bool):
+        return val
+    if isinstance(val, (int, float)):
+        return val != 0
+    if isinstance(val, str):
+        return val.strip().lower() in ("1", "true", "yes", "on")
+    return default
+
+
+def _normalize_bark_config(bark: dict[str, Any]) -> dict[str, Any]:
+    from quant_rd_tool.bark_push import DEFAULT_BARK_SERVER
+
+    env = _bark_from_env()
+    file_key = str(bark.get("device_key") or "").strip()
+    device_key = file_key or env["device_key"]
+    server = (
+        str(bark.get("server") or "").strip()
+        or env["server"]
+        or DEFAULT_BARK_SERVER
+    ).rstrip("/") or DEFAULT_BARK_SERVER
+    return {
+        "enabled": _coerce_bool(bark.get("enabled"), default=False),
+        "device_key": device_key,
+        "server": server,
+        "device_key_from_env": bool(env["device_key"] and not file_key),
+    }
+
+
+def _public_bark_config(bark: dict[str, Any]) -> dict[str, Any]:
+    """API/UI view: never echo device_key when it comes from .env."""
+    cfg = _normalize_bark_config(bark)
+    out = dict(cfg)
+    out["device_key_configured"] = bool(cfg["device_key"])
+    if cfg.get("device_key_from_env"):
+        out["device_key"] = ""
+    return out
+
+
+def _bark_config_for_storage(bark: dict[str, Any]) -> dict[str, Any]:
+    """Persist schedule_alerts.bark without duplicating secrets already in .env."""
+    cfg = _normalize_bark_config(bark)
+    env = _bark_from_env()
+    stored: dict[str, Any] = {
+        "enabled": cfg["enabled"],
+        "server": cfg["server"],
+    }
+    file_key = str(bark.get("device_key") or "").strip()
+    if file_key and file_key != env["device_key"]:
+        stored["device_key"] = file_key
+    return stored
 
 
 def save_alert_rules(
@@ -65,6 +152,10 @@ def save_alert_rules(
     stale_minutes: int | None = None,
     cooldown_minutes: int | None = None,
     custom_rules: list[dict[str, Any]] | None = None,
+    var: dict[str, Any] | None = None,
+    bark: dict[str, Any] | None = None,
+    webhook_on_alert: bool | None = None,
+    on_cycle_complete: bool | None = None,
 ) -> dict[str, Any]:
     data = load_settings(_SETTINGS_PATH)
     raw = dict(data.get("schedule_alerts") or {}) if isinstance(data.get("schedule_alerts"), dict) else {}
@@ -92,6 +183,24 @@ def save_alert_rules(
                 raise ValueError(f"custom_rules[{rule.get('id')}]: {', '.join(errs)}")
             cleaned.append(rule)
         raw["custom_rules"] = cleaned
+    if var is not None:
+        if not isinstance(var, dict):
+            raise ValueError("var must be an object")
+        raw["var"] = var
+    if bark is not None:
+        if not isinstance(bark, dict):
+            raise ValueError("bark must be an object")
+        normalized = _normalize_bark_config(bark)
+        if normalized["enabled"] and not normalized["device_key"]:
+            raise ValueError(
+                "bark.device_key is required when bark.enabled is true "
+                "(set in UI or BARK_DEVICE_KEY in .env)"
+            )
+        raw["bark"] = _bark_config_for_storage(bark)
+    if webhook_on_alert is not None:
+        raw["webhook_on_alert"] = webhook_on_alert
+    if on_cycle_complete is not None:
+        raw["on_cycle_complete"] = on_cycle_complete
     raw["updated_at"] = datetime.now(UTC).isoformat()
     data["schedule_alerts"] = raw
     _SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -195,25 +304,79 @@ def _fire_alert(
     job_st["last_alerts"][rule] = datetime.now(UTC).isoformat()
     _save_state(state, state_path)
 
-    from quant_rd_tool.crypto_ops_control import get_crypto_ops, post_webhook
+    _deliver_schedule_notifications(
+        job_id=job_id,
+        rule=rule,
+        message=message,
+        detail=detail or {},
+    )
+    return True
 
-    ops = get_crypto_ops()
-    url = (ops.get("webhook_url") or "").strip()
-    if url and ops.get("webhook_on_error", True):
+
+def _deliver_schedule_notifications(
+    *,
+    job_id: str,
+    rule: str,
+    message: str,
+    detail: dict[str, Any],
+) -> None:
+    """Push schedule alerts via optional Webhook (Crypto 运营 URL) and/or Bark."""
+    raw = get_alert_rules()
+
+    if raw.get("webhook_on_alert", True):
+        from quant_rd_tool.crypto_ops_control import get_crypto_ops, post_webhook
+
+        ops = get_crypto_ops()
+        url = (ops.get("webhook_url") or "").strip()
+        if url:
+            try:
+                post_webhook(
+                    url,
+                    {
+                        "kind": "schedule_alert",
+                        "decision": rule,
+                        "job_id": job_id,
+                        "message": message,
+                        "detail": detail,
+                    },
+                )
+            except Exception:
+                logger.debug("Schedule webhook failed for %s", job_id, exc_info=True)
+
+    bark_cfg = _normalize_bark_config(
+        raw.get("bark") if isinstance(raw.get("bark"), dict) else {}
+    )
+    if bark_cfg["enabled"] and bark_cfg["device_key"]:
         try:
-            post_webhook(
-                url,
-                {
-                    "kind": "schedule_alert",
-                    "decision": rule,
-                    "job_id": job_id,
-                    "message": message,
-                    "detail": detail,
-                },
+            from quant_rd_tool.bark_push import post_bark
+
+            title = f"[{job_id}] {rule}"
+            post_bark(
+                bark_cfg["device_key"],
+                title=title,
+                body=message,
+                server=bark_cfg["server"],
+                group="schedule",
             )
         except Exception:
-            pass
-    return True
+            logger.debug("Bark push failed for %s", job_id, exc_info=True)
+
+
+def send_test_bark(bark: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Send a test Bark; merges request body with ``BARK_DEVICE_KEY`` from .env."""
+    bark_cfg = _normalize_bark_config(bark if isinstance(bark, dict) else {})
+    if not bark_cfg["device_key"]:
+        raise ValueError("请在 .env 设置 BARK_DEVICE_KEY，或在页面填写 Device Key")
+
+    from quant_rd_tool.bark_push import post_bark
+
+    return post_bark(
+        bark_cfg["device_key"],
+        title="quant-rd 调度告警测试",
+        body="Bark 推送已连通。定时任务分析告警将推送到此设备。",
+        server=bark_cfg["server"],
+        group="schedule",
+    )
 
 
 def record_cycle_outcome(
@@ -295,6 +458,24 @@ def evaluate_after_cycle(
         ):
             fired.append({"rule": "worker_crash", "message": msg})
 
+    if raw.get("on_cycle_complete", True) and not had_error:
+        ok_rows = [r for r in (last_cycle_summary or []) if not r.get("error")]
+        if ok_rows:
+            msg = _format_cycle_complete_message(job_id, ok_rows)
+            bark_cfg = _normalize_bark_config(
+                raw.get("bark") if isinstance(raw.get("bark"), dict) else {}
+            )
+            if bark_cfg["enabled"] and bark_cfg["device_key"]:
+                if _fire_alert(
+                    job_id=job_id,
+                    rule="cycle_complete",
+                    message=msg,
+                    detail={"symbols": ok_rows},
+                    state_path=state_path,
+                    rules=rules,
+                ):
+                    fired.append({"rule": "cycle_complete", "message": msg})
+
     fired.extend(
         evaluate_custom_rules(
             job_id,
@@ -304,6 +485,109 @@ def evaluate_after_cycle(
             raw=raw,
         )
     )
+    fired.extend(
+        evaluate_var_breaches(
+            job_id,
+            last_cycle_summary=last_cycle_summary or [],
+            state_path=state_path,
+            rules=rules,
+            raw=raw,
+        )
+    )
+
+    return fired
+
+
+def evaluate_var_breaches(
+    job_id: str,
+    *,
+    last_cycle_summary: list[dict[str, Any]],
+    state_path: Path = _DEFAULT_STATE,
+    rules: ScheduleAlertRules | None = None,
+    raw: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    """Built-in alerts when symbol VaR or portfolio VaR exceeds configured limits."""
+    from quant_rd_tool.crypto_var_schedule import get_var_schedule_config
+
+    raw = raw or get_alert_rules()
+    rules = rules or ScheduleAlertRules(
+        **{k: v for k, v in raw.items() if k in ScheduleAlertRules.__dataclass_fields__}
+    )
+    if not rules.enabled:
+        return []
+
+    cfg = get_var_schedule_config(raw)
+    fired: list[dict[str, Any]] = []
+
+    if cfg["on_symbol_var_breach"]:
+        max_pct = float(cfg["max_var_pct"])
+        for row in last_cycle_summary:
+            if row.get("error") or row.get("var_enabled") is False:
+                continue
+            var_pct = row.get("var_pct")
+            if var_pct is None:
+                continue
+            try:
+                if float(var_pct) < max_pct:
+                    continue
+            except (TypeError, ValueError):
+                continue
+            sym = row.get("symbol", "")
+            msg = (
+                f"[{job_id}] {sym} VaR 超限: {float(var_pct) * 100:.2f}% "
+                f"(阈值 {max_pct * 100:.2f}%)，约 {row.get('var_usdt')} USDT"
+            )
+            if _fire_alert(
+                job_id=job_id,
+                rule="var_symbol_breach",
+                message=msg,
+                detail={"symbol_row": row, "max_var_pct": max_pct, "var_config": cfg},
+                state_path=state_path,
+                rules=rules,
+            ):
+                fired.append({"rule": "var_symbol_breach", "message": msg, "symbol": sym})
+
+    if cfg["on_portfolio_var_breach"]:
+        try:
+            from quant_rd_tool.crypto_var import build_portfolio_var_report, confidence_key
+
+            report = build_portfolio_var_report(
+                testnet=False,
+                lookback_bars=cfg["lookback_bars"],
+                horizon_days=cfg["horizon_days"],
+                confidence_levels=[cfg["confidence"], 0.95],
+                mc_n_sims=cfg["mc_n_sims"],
+                mc_seed=cfg["mc_seed"],
+            )
+            if report.get("enabled") and report.get("metrics"):
+                key = confidence_key(float(cfg["confidence"]))
+                m = report["metrics"].get(key) or report["metrics"].get("0.99") or {}
+                equity = report.get("account_equity_usdt")
+                var_usdt = m.get("var_usdt")
+                ratio = report.get("var_pct_of_equity")
+                max_eq = float(cfg["max_portfolio_var_pct_of_equity"])
+                breach = False
+                if ratio is not None:
+                    breach = float(ratio) >= max_eq
+                elif equity and var_usdt:
+                    breach = float(var_usdt) / float(equity) >= max_eq
+                if breach:
+                    msg = (
+                        f"[{job_id}] 组合 VaR 占权益超限: "
+                        f"{(float(ratio or 0) * 100):.1f}% (阈值 {max_eq * 100:.1f}%)，"
+                        f"VaR≈{var_usdt} USDT"
+                    )
+                    if _fire_alert(
+                        job_id=job_id,
+                        rule="var_portfolio_breach",
+                        message=msg,
+                        detail={"portfolio_var": report, "max_pct_of_equity": max_eq},
+                        state_path=state_path,
+                        rules=rules,
+                    ):
+                        fired.append({"rule": "var_portfolio_breach", "message": msg})
+        except Exception as e:
+            logger.debug("Portfolio VaR breach check skipped: %s", e)
 
     return fired
 

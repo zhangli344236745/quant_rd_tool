@@ -1,4 +1,6 @@
 import json
+
+import pytest
 from unittest.mock import patch
 
 from quant_rd_tool.schedule_alerts import (
@@ -6,6 +8,7 @@ from quant_rd_tool.schedule_alerts import (
     evaluate_stale_jobs,
     get_alert_rules,
     save_alert_rules,
+    send_test_bark,
     tail_alert_log,
 )
 
@@ -68,8 +71,160 @@ def test_webhook_on_alert(tmp_path, monkeypatch):
         assert post.called
 
 
+def test_webhook_on_alert_can_disable(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    from quant_rd_tool.crypto_ops_control import save_crypto_ops
+
+    save_crypto_ops(webhook_url="https://example.com/hook")
+    save_alert_rules(
+        on_cycle_error=True,
+        cooldown_minutes=0,
+        webhook_on_alert=False,
+    )
+    with patch("quant_rd_tool.crypto_ops_control.post_webhook") as post:
+        evaluate_after_cycle(
+            "j1",
+            last_error="boom",
+            last_cycle_summary=None,
+            status="error",
+        )
+        assert not post.called
+
+
+def test_cycle_complete_bark_on_success(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    save_alert_rules(
+        on_cycle_error=False,
+        on_cycle_complete=True,
+        cooldown_minutes=0,
+        bark={"enabled": True, "device_key": "k1"},
+    )
+    summary = [
+        {"symbol": "BTC", "stance": "看涨", "action": "buy", "new_bars": 3},
+        {"symbol": "ETH", "stance": "中性", "action": "hold", "new_bars": 0},
+    ]
+    with patch("quant_rd_tool.bark_push.post_bark") as post_bark:
+        fired = evaluate_after_cycle(
+            "job-1",
+            last_error=None,
+            last_cycle_summary=summary,
+            status="running",
+        )
+        assert any(f["rule"] == "cycle_complete" for f in fired)
+        assert post_bark.called
+
+
+def test_cycle_complete_skipped_on_error(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    save_alert_rules(
+        on_cycle_error=False,
+        on_cycle_complete=True,
+        cooldown_minutes=0,
+        bark={"enabled": True, "device_key": "k1"},
+    )
+    fired = evaluate_after_cycle(
+        "job-1",
+        last_error="sync failed",
+        last_cycle_summary=[{"symbol": "BTC", "error": "x"}],
+        status="running",
+    )
+    assert not any(f.get("rule") == "cycle_complete" for f in fired)
+
+
+def test_bark_on_alert(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    save_alert_rules(
+        on_cycle_error=True,
+        cooldown_minutes=0,
+        webhook_on_alert=False,
+        bark={"enabled": True, "device_key": "abc123"},
+    )
+    with patch("quant_rd_tool.bark_push.post_bark") as post_bark:
+        evaluate_after_cycle(
+            "j1",
+            last_error="boom",
+            last_cycle_summary=None,
+            status="error",
+        )
+        assert post_bark.called
+        assert post_bark.call_args.kwargs.get("group") == "schedule"
+
+
+def test_bark_disabled_skips_push(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    save_alert_rules(
+        on_cycle_error=True,
+        cooldown_minutes=0,
+        bark={"enabled": False, "device_key": "abc123"},
+    )
+    with patch("quant_rd_tool.bark_push.post_bark") as post_bark:
+        evaluate_after_cycle(
+            "j1",
+            last_error="boom",
+            last_cycle_summary=None,
+            status="error",
+        )
+        assert not post_bark.called
+
+
+def test_save_bark_requires_key_when_enabled(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        "quant_rd_tool.schedule_alerts._bark_from_env",
+        lambda: {"device_key": "", "server": ""},
+    )
+    with pytest.raises(ValueError, match="device_key"):
+        save_alert_rules(bark={"enabled": True, "device_key": ""})
+
+
+def test_send_test_bark(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    with patch("quant_rd_tool.bark_push.post_bark", return_value={"code": 200}) as post:
+        result = send_test_bark({"enabled": True, "device_key": "key99"})
+        assert result == {"code": 200}
+        assert post.called
+
+
+def test_send_test_bark_requires_device_key(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        "quant_rd_tool.schedule_alerts._bark_from_env",
+        lambda: {"device_key": "", "server": ""},
+    )
+    with pytest.raises(ValueError, match="Device Key"):
+        send_test_bark({"enabled": False, "device_key": ""})
+
+
+def test_send_test_bark_without_enabled_flag(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    with patch("quant_rd_tool.bark_push.post_bark", return_value={"code": 200}) as post:
+        send_test_bark({"device_key": "key-only"})
+        assert post.called
+
+
+def test_bark_device_key_from_env(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        "quant_rd_tool.schedule_alerts._bark_from_env",
+        lambda: {"device_key": "env-secret-key", "server": ""},
+    )
+    save_alert_rules(bark={"enabled": True})
+    rules = get_alert_rules()
+    assert rules["bark"]["device_key"] == ""
+    assert rules["bark"]["device_key_from_env"] is True
+    assert rules["bark"]["device_key_configured"] is True
+
+    with patch("quant_rd_tool.bark_push.post_bark", return_value={"code": 200}) as post:
+        send_test_bark({})
+        assert post.call_args[0][0] == "env-secret-key"
+
+
 def test_schedule_alerts_http_routes(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        "quant_rd_tool.schedule_alerts._bark_from_env",
+        lambda: {"device_key": "", "server": ""},
+    )
     from fastapi.testclient import TestClient
 
     from quant_rd_tool.main import app
@@ -82,3 +237,21 @@ def test_schedule_alerts_http_routes(tmp_path, monkeypatch):
     ):
         r = client.get(path)
         assert r.status_code == 200, f"{path}: {r.text}"
+
+    r = client.post("/api/v1/crypto/schedules/alerts/test-bark", json={})
+    assert r.status_code == 400
+
+    with patch("quant_rd_tool.bark_push.post_bark", return_value={"code": 200}):
+        r = client.post(
+            "/api/v1/crypto/schedules/alerts/test-bark",
+            json={"bark": {"enabled": True, "device_key": "abc"}},
+        )
+        assert r.status_code == 200, r.text
+        rules = get_alert_rules()
+        assert rules["bark"]["device_key"] == "abc"
+
+        r2 = client.post(
+            "/api/v1/crypto/schedules/alerts/test-bark?device_key=querykey",
+            json={},
+        )
+        assert r2.status_code == 200, r2.text

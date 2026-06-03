@@ -215,6 +215,10 @@ HTTP（单次执行，不注册任务）：
 - `POST /api/v1/crypto/perp-bot/run` — `{"base":"BTC","timeframe":"5m","dry_run":true}`
 - `POST /api/v1/crypto/perp-portfolio/run` — `{"symbols":["BTC","ETH"],"dry_run":true,"signal_only":false}`
 - `GET /api/v1/crypto/ops/summary` — 调度 + 永续状态 + 遥测摘要（Web **Crypto 运营** 看板）
+- `GET /api/v1/crypto/var/symbol` — 单标的 VaR/CVaR：历史 + 参数法 + 蒙特卡洛（GBM / Student-t，`mc_n_sims` / `mc_seed`）对照
+- `GET /api/v1/crypto/var/portfolio` — 组合 VaR：持仓边际贡献、相关性矩阵、占权益比例（需 API Key）
+- `GET /api/v1/crypto/var/symbol/history` — 滚动 VaR 序列（含实际收益与突破标记）
+- Web 侧栏：**风险 VaR**（`/crypto-var`）；**Crypto 行情** / **Crypto 运营** 页含 VaR 摘要卡片
 - `GET /api/v1/crypto/options/volatility-scan` — Binance 期权 ATM IV 扫描（分位 / 24h 变化 / 横向排名 + 研究性建议）
 - `GET /api/v1/crypto/options/strike-probability?base=BTC&n=5` — ATM±N 行权价：qlib+GBM 模型概率 vs IV 隐含概率（到期 ITM + 触达）
 - `GET /api/v1/crypto/options/volatility-scan/history?symbol=BTC` — 本地 IV 历史（`data/crypto/options_iv/`）
@@ -230,6 +234,8 @@ HTTP（单次执行，不注册任务）：
 - `GET /api/v1/crypto/schedules/alerts/log` — 告警 JSONL 历史
 - `POST /api/v1/crypto/schedules/alerts/check-stale` — 手动检测长时间未跑完的 running 任务
 - **按标的/信号自定义规则**：见 [docs/schedule-alert-custom-rules.md](docs/schedule-alert-custom-rules.md) · `GET .../schedules/alerts/rules/format`
+- **VaR 调度告警**：`schedule_alerts.var` 启用周期 VaR 计算；`on_symbol_var_breach` / 自定义规则 `var_pct` 等字段触发告警
+- **调度告警推送**：`schedule_alerts.webhook_on_alert`（Crypto 运营 Webhook）与 Bark（`.env` 的 `BARK_DEVICE_KEY` 或 `schedule_alerts.bark`）；`POST .../schedules/alerts/test-bark` 测试
 
 **C+ P0（专业轨）**：
 

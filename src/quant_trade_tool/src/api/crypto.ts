@@ -106,7 +106,32 @@ export const cryptoApi = {
       stale_minutes: number;
       cooldown_minutes: number;
       custom_rules?: Record<string, unknown>[];
+      var?: Record<string, unknown>;
+      webhook_on_alert?: boolean;
+      on_cycle_complete?: boolean;
+      bark?: {
+        enabled?: boolean;
+        device_key?: string;
+        server?: string;
+        device_key_from_env?: boolean;
+        device_key_configured?: boolean;
+      };
     }>("/crypto/schedules/alerts/rules"),
+
+  scheduleAlertsTestBark: (body: {
+    bark: { enabled?: boolean; device_key?: string; server?: string };
+  }) => {
+    const key = (body.bark.device_key || "").trim();
+    const params = new URLSearchParams();
+    if (key) params.set("device_key", key);
+    const srv = body.bark.server?.trim();
+    if (srv) params.set("server", srv);
+    const qs = params.toString();
+    return http.post<{ status: string; result?: Record<string, unknown> }>(
+      qs ? `/crypto/schedules/alerts/test-bark?${qs}` : "/crypto/schedules/alerts/test-bark",
+      { bark: body.bark },
+    );
+  },
 
   scheduleAlertsRulesFormat: () =>
     http.get<{ doc?: string; example_rules: Record<string, unknown>[] }>(
@@ -121,6 +146,10 @@ export const cryptoApi = {
     stale_minutes?: number;
     cooldown_minutes?: number;
     custom_rules?: Record<string, unknown>[];
+    var?: Record<string, unknown>;
+    bark?: { enabled?: boolean; device_key?: string; server?: string };
+    webhook_on_alert?: boolean;
+    on_cycle_complete?: boolean;
   }) => http.post("/crypto/schedules/alerts/rules", body),
 
   scheduleAlertsLog: (limit = 50) =>
@@ -275,6 +304,37 @@ export const cryptoApi = {
     http.get<StrikeProbabilityReport>("/crypto/options/strike-probability", {
       params: { base, n, expiry, ...ctx },
     }),
+
+  varSymbol: (params?: {
+    symbol?: string;
+    notional_usdt?: number;
+    timeframe?: string;
+    lookback_bars?: number;
+    horizon_days?: number;
+    confidence?: string;
+    mc_n_sims?: number;
+    mc_seed?: number;
+  }) => http.get<SymbolVarReport>("/crypto/var/symbol", { params }),
+
+  varPortfolio: (params?: {
+    testnet?: boolean;
+    timeframe?: string;
+    lookback_bars?: number;
+    horizon_days?: number;
+    confidence?: string;
+    mc_n_sims?: number;
+    mc_seed?: number;
+  }) => http.get<PortfolioVarReport>("/crypto/var/portfolio", { params }),
+
+  varSymbolHistory: (params?: {
+    symbol?: string;
+    window?: number;
+    confidence?: number;
+    timeframe?: string;
+    lookback_bars?: number;
+    horizon_days?: number;
+    notional_usdt?: number;
+  }) => http.get<SymbolVarHistory>("/crypto/var/symbol/history", { params }),
 };
 
 export interface OptionsVolConfig {
@@ -366,6 +426,144 @@ export interface StrikePurchaseSummary {
   avoid_count?: number;
   best_strike?: number | null;
   best_contract?: string | null;
+}
+
+export interface VarBacktest {
+  observations: number;
+  violations: number;
+  expected_violation_rate: number;
+  actual_violation_rate: number;
+  violation_ratio?: number | null;
+  worst_day_return: number;
+  max_exceedance_pct: number;
+  backtest_ok?: boolean;
+}
+
+export interface MonteCarloVarLeg {
+  var_pct: number;
+  cvar_pct: number;
+  var_usdt?: number;
+  cvar_usdt?: number;
+  df?: number;
+  label?: string;
+}
+
+export interface MonteCarloVarBlock {
+  n_simulations: number;
+  seed: number;
+  horizon_days: number;
+  gbm: MonteCarloVarLeg;
+  student_t: MonteCarloVarLeg;
+}
+
+export interface VarMetric {
+  var_pct: number;
+  cvar_pct: number;
+  var_usdt: number;
+  cvar_usdt: number;
+  parametric_var_pct?: number | null;
+  parametric_var_usdt?: number | null;
+  method_spread_pct?: number | null;
+  monte_carlo?: MonteCarloVarBlock | null;
+  backtest?: VarBacktest;
+}
+
+export interface ReturnStats {
+  mean_daily_return?: number;
+  daily_volatility?: number;
+  annualized_volatility?: number;
+  skewness?: number | null;
+  excess_kurtosis?: number | null;
+  worst_day_return?: number;
+  best_day_return?: number;
+}
+
+export interface ReturnHistogramBin {
+  bin_low: number;
+  bin_high: number;
+  count: number;
+}
+
+export interface StressScenario {
+  shock_pct: number;
+  loss_pct: number;
+  loss_usdt: number;
+}
+
+export interface VarNarrative {
+  headline: string;
+  bullets: string[];
+  disclaimer: string;
+}
+
+export interface SymbolVarReport {
+  symbol: string;
+  method: string;
+  params: {
+    lookback_bars: number;
+    horizon_days: number;
+    confidence_levels: number[];
+    timeframe: string;
+  };
+  notional_usdt: number;
+  latest_price: number;
+  observations: number;
+  return_stats?: ReturnStats;
+  return_histogram?: ReturnHistogramBin[];
+  stress_scenarios?: StressScenario[];
+  narrative?: VarNarrative;
+  metrics: Record<string, VarMetric>;
+}
+
+export interface PortfolioVarPosition {
+  base: string;
+  side: string;
+  symbol: string;
+  contracts: number;
+  notional_usdt: number;
+  signed_notional_usdt: number;
+  weight?: number;
+  standalone_var_usdt?: number;
+  var_contribution_usdt?: number;
+  var_contribution_pct?: number;
+}
+
+export interface PortfolioVarReport {
+  enabled: boolean;
+  error?: string;
+  message?: string;
+  method?: string;
+  params?: Record<string, unknown>;
+  positions: PortfolioVarPosition[];
+  gross_exposure_usdt?: number;
+  net_exposure_usdt?: number;
+  account_equity_usdt?: number | null;
+  var_pct_of_equity?: number | null;
+  diversification_ratio?: number | null;
+  observations?: number;
+  return_stats?: ReturnStats;
+  correlation?: { symbols: string[]; matrix: (number | null)[][] };
+  stress_scenarios?: StressScenario[];
+  narrative?: VarNarrative;
+  metrics: Record<string, VarMetric> | null;
+}
+
+export interface VarHistoryPoint {
+  date: string;
+  var_pct: number;
+  var_usdt: number;
+  actual_return?: number;
+  breach?: boolean;
+}
+
+export interface SymbolVarHistory {
+  symbol: string;
+  confidence: number;
+  window: number;
+  lookback_bars: number;
+  notional_usdt: number;
+  breach_count?: number;
+  series: VarHistoryPoint[];
 }
 
 export interface StrikeProbabilityReport {

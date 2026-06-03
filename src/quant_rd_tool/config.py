@@ -37,6 +37,12 @@ class Settings(BaseSettings):
     binance_api_base: str | None = Field(default=None, validation_alias="BINANCE_API_BASE")
     http_proxy: str | None = Field(default=None, validation_alias="HTTP_PROXY")
     https_proxy: str | None = Field(default=None, validation_alias="HTTPS_PROXY")
+    bark_device_key: str | None = Field(default=None, validation_alias="BARK_DEVICE_KEY")
+    bark_server: str | None = Field(
+        default=None,
+        validation_alias="BARK_SERVER",
+        description="Bark API root, default https://api.day.app",
+    )
 
 
 settings = Settings()

@@ -18,7 +18,17 @@ const alertRules = reactive({
   consecutive_failures: 3,
   stale_minutes: 0,
   cooldown_minutes: 15,
+  webhook_on_alert: true,
+  on_cycle_complete: true,
 });
+const bark = reactive({
+  enabled: false,
+  device_key: "",
+  server: "https://api.day.app",
+  device_key_from_env: false,
+  device_key_configured: false,
+});
+const barkTesting = ref(false);
 const alertLog = ref<Record<string, unknown>[]>([]);
 const rulesSaving = ref(false);
 const customRulesJson = ref("[]");
@@ -83,6 +93,17 @@ async function loadAlertRules() {
   try {
     const { data } = await cryptoApi.scheduleAlertsRulesGet();
     Object.assign(alertRules, data);
+    const b = data.bark || {};
+    bark.enabled = b.enabled === true || b.enabled === "true" || b.enabled === 1;
+    bark.device_key_from_env = Boolean(b.device_key_from_env);
+    bark.device_key_configured = Boolean(b.device_key_configured);
+    bark.device_key = bark.device_key_from_env ? "" : String(b.device_key || "");
+    bark.server = String(b.server || "https://api.day.app");
+    if (!bark.device_key_configured && (bark.device_key || bark.device_key_from_env)) {
+      bark.device_key_configured = true;
+    }
+    alertRules.webhook_on_alert = data.webhook_on_alert !== false;
+    alertRules.on_cycle_complete = data.on_cycle_complete !== false;
     customRulesJson.value = JSON.stringify(data.custom_rules || [], null, 2);
   } catch {
     /* optional */
@@ -115,7 +136,12 @@ async function saveAlertRules() {
   }
   rulesSaving.value = true;
   try {
-    await cryptoApi.scheduleAlertsRulesSave({ ...alertRules, custom_rules });
+    await cryptoApi.scheduleAlertsRulesSave({
+      ...alertRules,
+      custom_rules,
+      bark: barkPayload(),
+      webhook_on_alert: alertRules.webhook_on_alert,
+    });
     ElMessage.success("告警规则已保存");
     await loadAlertLog();
   } catch (e) {
@@ -131,6 +157,37 @@ async function loadAlertLog() {
     alertLog.value = [...data.items].reverse();
   } catch {
     alertLog.value = [];
+  }
+}
+
+function barkPayload() {
+  const payload: {
+    enabled: boolean;
+    server: string;
+    device_key?: string;
+  } = {
+    enabled: Boolean(bark.enabled),
+    server: String(bark.server || "https://api.day.app").trim() || "https://api.day.app",
+  };
+  const key = String(bark.device_key || "").trim();
+  if (key) payload.device_key = key;
+  return payload;
+}
+
+async function testBark() {
+  const payload = barkPayload();
+  if (!bark.device_key_configured && !payload.device_key) {
+    ElMessage.warning("请在 .env 设置 BARK_DEVICE_KEY，或填写 Device Key");
+    return;
+  }
+  barkTesting.value = true;
+  try {
+    await cryptoApi.scheduleAlertsTestBark({ bark: payload });
+    ElMessage.success("Bark 测试推送已发送（配置已自动保存）");
+  } catch (e) {
+    ElMessage.error(extractError(e));
+  } finally {
+    barkTesting.value = false;
   }
 }
 
@@ -236,7 +293,47 @@ onMounted(async () => {
             <el-button type="primary" :loading="rulesSaving" @click="saveAlertRules">保存规则</el-button>
             <el-button @click="checkStale">检测卡住</el-button>
           </el-form>
-          <p class="hint">Webhook 使用「Crypto 运营」中的 URL；调度失败走错误告警通道。</p>
+          <el-divider content-position="left">手机推送</el-divider>
+          <el-form label-width="140px" size="small">
+            <el-form-item label="周期完成推送">
+              <el-switch v-model="alertRules.on_cycle_complete" :disabled="!bark.enabled || !bark.device_key_configured" />
+              <span class="hint">每轮分析成功跑完后推送到 Bark（需开启下方 Bark 推送）</span>
+            </el-form-item>
+            <el-form-item label="Bark 推送">
+              <el-switch
+                v-model="bark.enabled"
+                :active-value="true"
+                :inactive-value="false"
+                :disabled="!bark.device_key_configured"
+              />
+              <span v-if="bark.device_key_configured" class="hint">开启后，定时分析告警推送到手机</span>
+              <span v-else class="hint">请先在 .env 配置 BARK_DEVICE_KEY，或在下方填写 Key</span>
+            </el-form-item>
+            <el-form-item v-if="bark.device_key_from_env" label="Device Key">
+              <span class="hint">已从 <code>.env</code> 读取 <code>BARK_DEVICE_KEY</code>（不在页面展示）</span>
+            </el-form-item>
+            <el-form-item v-else label="Device Key">
+              <el-input
+                v-model="bark.device_key"
+                placeholder="Bark App 中的 Key，或写入 .env 的 BARK_DEVICE_KEY"
+                show-password
+                style="max-width: 420px"
+                @input="bark.device_key_configured = Boolean(bark.device_key.trim())"
+              />
+            </el-form-item>
+            <el-form-item label="服务器">
+              <el-input v-model="bark.server" placeholder="https://api.day.app" style="max-width: 420px" />
+              <span class="hint">自建 Bark 可改域名</span>
+            </el-form-item>
+            <el-form-item label=" ">
+              <el-button :loading="barkTesting" @click="testBark">测试 Bark</el-button>
+              <span class="hint">测试成功会自动保存；Key 优先使用 .env</span>
+            </el-form-item>
+            <el-form-item label="Webhook 推送">
+              <el-switch v-model="alertRules.webhook_on_alert" />
+              <span class="hint">使用「Crypto 运营」里配置的 Webhook URL</span>
+            </el-form-item>
+          </el-form>
 
           <el-collapse class="mt">
             <el-collapse-item title="自定义规则：条件格式说明" name="format">
@@ -247,9 +344,11 @@ onMounted(async () => {
                   <li><strong>logic</strong>：<code>and</code>（默认）或 <code>or</code> — 组合 conditions</li>
                   <li><strong>symbol_scope</strong>：<code>any_symbol</code>（任一标的命中）或 <code>all_symbols</code>（全部标的都命中）</li>
                   <li><strong>job_ids</strong>：空 = 全部任务；否则只监听指定调度 id</li>
-                  <li><strong>message</strong>：占位符 <code>{job_id} {symbol} {stance} {action} {new_bars}</code></li>
+                  <li><strong>message</strong>：占位符含 <code>{var_pct} {var_usdt}</code> 等</li>
+                  <li><strong>VaR 字段</strong>：<code>var_pct</code> / <code>var_usdt</code> / <code>var_99_pct</code> — 需在保存的 JSON 根对象加 <code>var.enabled: true</code>（见文档）</li>
+                  <li><strong>内置 VaR 超限</strong>：<code>var.on_symbol_var_breach</code> + <code>max_var_pct</code>（如 0.05）</li>
                 </ul>
-                <p class="hint">完整说明见项目文档 <code>docs/schedule-alert-custom-rules.md</code> · API <code>GET .../alerts/rules/format</code></p>
+                <p class="hint">完整说明见 <code>docs/schedule-alert-custom-rules.md</code> · API <code>GET .../alerts/rules/format</code></p>
               </div>
             </el-collapse-item>
           </el-collapse>

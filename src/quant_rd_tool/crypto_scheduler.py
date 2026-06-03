@@ -63,6 +63,13 @@ def run_scheduled_cycle(
                 with_options_vol=with_options_vol,
             )
             report["sync"] = meta
+            try:
+                from quant_rd_tool.crypto_var_schedule import build_var_cycle_fields, var_cycle_needed
+
+                if var_cycle_needed():
+                    report.update(build_var_cycle_fields(sym))
+            except Exception as ve:
+                logger.warning("VaR enrichment skipped for %s: %s", sym, ve)
             if save_snapshot:
                 _save_scheduler_snapshot(report, data_dir=data_dir, timeframe=timeframe)
             results.append(report)

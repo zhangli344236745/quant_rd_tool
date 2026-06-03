@@ -1,6 +1,7 @@
+import json
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from quant_rd_tool.binance_bot import BinanceBot, BotConfig
@@ -308,6 +309,10 @@ class ScheduleAlertRulesRequest(BaseModel):
     stale_minutes: int | None = Field(None, ge=0, le=1440)
     cooldown_minutes: int | None = Field(None, ge=1, le=1440)
     custom_rules: list[dict[str, Any]] | None = None
+    var: dict[str, Any] | None = None
+    bark: dict[str, Any] | None = None
+    webhook_on_alert: bool | None = None
+    on_cycle_complete: bool | None = None
 
 
 @router.get("/schedules/alerts/rules")
@@ -360,7 +365,29 @@ def schedule_alerts_rules_format() -> dict[str, Any]:
                 ],
                 "message": "[{job_id}] {symbol} IV {iv_alert_level} 分位{iv_percentile}%",
             },
+            {
+                "id": "btc-var-high",
+                "name": "BTC VaR 超 5%",
+                "enabled": True,
+                "conditions": [
+                    {"field": "symbol", "op": "eq", "value": "BTC"},
+                    {"field": "var_pct", "op": "gte", "value": 0.05},
+                ],
+                "message": "[{job_id}] {symbol} VaR {var_pct} (≈{var_usdt} USDT)",
+            },
         ],
+        "example_var_config": {
+            "enabled": True,
+            "on_symbol_var_breach": True,
+            "on_portfolio_var_breach": False,
+            "max_var_pct": 0.05,
+            "max_portfolio_var_pct_of_equity": 0.10,
+            "confidence": 0.99,
+            "notional_usdt": 10000,
+            "lookback_bars": 252,
+            "horizon_days": 1,
+            "mc_n_sims": 3000,
+        },
     }
 
 
@@ -377,9 +404,81 @@ def schedule_alerts_rules_save(req: ScheduleAlertRulesRequest) -> dict[str, Any]
             stale_minutes=req.stale_minutes,
             cooldown_minutes=req.cooldown_minutes,
             custom_rules=req.custom_rules,
+            var=req.var,
+            bark=req.bark,
+            webhook_on_alert=req.webhook_on_alert,
+            on_cycle_complete=req.on_cycle_complete,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@router.post("/schedules/alerts/test-bark")
+async def schedule_alerts_test_bark(
+    request: Request,
+    device_key: str | None = Query(None, description="Bark Device Key（与 JSON body 二选一）"),
+    server: str | None = Query(None, description="Bark API 根地址"),
+) -> dict[str, Any]:
+    """Test Bark push. Body or query: ``device_key`` required."""
+    from quant_rd_tool.bark_push import DEFAULT_BARK_SERVER
+    from quant_rd_tool.schedule_alerts import (
+        _bark_from_env,
+        _coerce_bool,
+        _normalize_bark_config,
+        save_alert_rules,
+        send_test_bark,
+    )
+
+    raw: dict[str, Any] = {}
+    body_bytes = await request.body()
+    if body_bytes:
+        try:
+            parsed = json.loads(body_bytes)
+            if isinstance(parsed, dict):
+                raw = parsed
+        except json.JSONDecodeError:
+            pass
+
+    bark_in: dict[str, Any] | None = None
+    if isinstance(raw.get("bark"), dict):
+        bark_in = dict(raw["bark"])
+    elif str(raw.get("device_key") or "").strip():
+        bark_in = dict(raw)
+
+    q_key = str(device_key or "").strip()
+    if not bark_in and q_key:
+        bark_in = {
+            "device_key": q_key,
+            "server": str(server or DEFAULT_BARK_SERVER).strip() or DEFAULT_BARK_SERVER,
+            "enabled": True,
+        }
+    elif isinstance(bark_in, dict) and q_key and not str(bark_in.get("device_key") or "").strip():
+        bark_in["device_key"] = q_key
+    if isinstance(bark_in, dict) and server and not str(bark_in.get("server") or "").strip():
+        bark_in["server"] = str(server).strip()
+
+    env_key = _bark_from_env()["device_key"]
+    merged = _normalize_bark_config(bark_in if isinstance(bark_in, dict) else {})
+    if not merged["device_key"] and not env_key:
+        raise HTTPException(
+            status_code=400,
+            detail="请在 .env 设置 BARK_DEVICE_KEY，或在页面填写 Device Key",
+        )
+
+    try:
+        result = send_test_bark(bark_in if isinstance(bark_in, dict) else {})
+        to_save: dict[str, Any] = dict(bark_in) if isinstance(bark_in, dict) else {}
+        if not _coerce_bool(to_save.get("enabled"), default=False):
+            to_save["enabled"] = True
+        try:
+            save_alert_rules(bark=to_save)
+        except ValueError as save_err:
+            return {"status": "ok", "result": result, "save_warning": str(save_err)}
+        return {"status": "ok", "result": result}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
 
 
 @router.get("/schedules/alerts/log")
@@ -730,6 +829,88 @@ def crypto_perp_reconcile_protection(
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+@router.get("/var/symbol")
+def crypto_var_symbol(
+    symbol: str = "BTC",
+    notional_usdt: float = 0.0,
+    timeframe: str = "1d",
+    lookback_bars: int = 252,
+    horizon_days: int = 1,
+    confidence: str = "0.95,0.99",
+    mc_n_sims: int = 10_000,
+    mc_seed: int = 42,
+) -> dict[str, Any]:
+    from quant_rd_tool.crypto_var import build_symbol_var_report, parse_confidence_levels
+
+    levels = parse_confidence_levels(confidence)
+    try:
+        return build_symbol_var_report(
+            symbol=symbol,
+            notional_usdt=notional_usdt,
+            timeframe=timeframe,
+            lookback_bars=min(lookback_bars, 2000),
+            horizon_days=horizon_days,
+            confidence_levels=levels,
+            mc_n_sims=mc_n_sims,
+            mc_seed=mc_seed,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@router.get("/var/portfolio")
+def crypto_var_portfolio(
+    testnet: bool = False,
+    timeframe: str = "1d",
+    lookback_bars: int = 252,
+    horizon_days: int = 1,
+    confidence: str = "0.95,0.99",
+    mc_n_sims: int = 10_000,
+    mc_seed: int = 42,
+) -> dict[str, Any]:
+    from quant_rd_tool.crypto_var import build_portfolio_var_report, parse_confidence_levels
+
+    levels = parse_confidence_levels(confidence)
+    try:
+        return build_portfolio_var_report(
+            testnet=testnet,
+            timeframe=timeframe,
+            lookback_bars=min(lookback_bars, 2000),
+            horizon_days=horizon_days,
+            confidence_levels=levels,
+            mc_n_sims=mc_n_sims,
+            mc_seed=mc_seed,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@router.get("/var/symbol/history")
+def crypto_var_symbol_history(
+    symbol: str = "BTC",
+    window: int = 60,
+    confidence: float = 0.99,
+    timeframe: str = "1d",
+    lookback_bars: int = 252,
+    horizon_days: int = 1,
+    notional_usdt: float = 0.0,
+) -> dict[str, Any]:
+    from quant_rd_tool.crypto_var import build_symbol_var_history
+
+    try:
+        return build_symbol_var_history(
+            symbol=symbol,
+            window=min(window, 500),
+            confidence=confidence,
+            timeframe=timeframe,
+            lookback_bars=min(lookback_bars, 2000),
+            horizon_days=horizon_days,
+            notional_usdt=notional_usdt,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 class OptionsVolConfigBody(BaseModel):

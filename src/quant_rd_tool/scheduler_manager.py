@@ -381,19 +381,35 @@ def _summarize_results(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
         opt = r.get("options_vol") if isinstance(r.get("options_vol"), dict) else {}
         advice = opt.get("advice") if isinstance(opt.get("advice"), dict) else {}
-        summary.append(
-            {
-                "symbol": normalize_symbol(pair),
-                "pair": pair,
-                "stance": sig.get("stance"),
-                "action": sig.get("action"),
-                "new_bars": sync.get("new_bars", 0),
-                "iv_alert_level": opt.get("alert_level") if opt.get("enabled") else None,
-                "options_stance": advice.get("stance"),
-                "iv_percentile": opt.get("iv_percentile"),
-                "iv_change_24h_pct": opt.get("iv_change_24h_pct"),
-            }
-        )
+        entry: dict[str, Any] = {
+            "symbol": normalize_symbol(pair),
+            "pair": pair,
+            "stance": sig.get("stance"),
+            "action": sig.get("action"),
+            "new_bars": sync.get("new_bars", 0),
+            "iv_alert_level": opt.get("alert_level") if opt.get("enabled") else None,
+            "options_stance": advice.get("stance"),
+            "iv_percentile": opt.get("iv_percentile"),
+            "iv_change_24h_pct": opt.get("iv_change_24h_pct"),
+        }
+        for key in (
+            "var_enabled",
+            "var_error",
+            "var_pct",
+            "var_usdt",
+            "cvar_pct",
+            "cvar_usdt",
+            "var_95_pct",
+            "var_99_pct",
+            "var_95_usdt",
+            "var_99_usdt",
+            "parametric_var_pct",
+            "mc_gbm_var_pct",
+            "mc_t_var_pct",
+        ):
+            if r.get(key) is not None:
+                entry[key] = r.get(key)
+        summary.append(entry)
     return summary
 
 

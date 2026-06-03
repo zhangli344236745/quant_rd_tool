@@ -30,6 +30,15 @@ Supported **fields** (case-insensitive names):
 | options_stance | options_stance | string | 期权建议立场，如 ``波动溢价偏高`` |
 | iv_percentile | iv_pct | number | IV 历史分位 0–100 |
 | iv_change_24h_pct | iv_change_24h | number | 24h IV 变化百分比 |
+| var_pct | | number | 主置信度 VaR 损失占比（需 ``schedule_alerts.var.enabled``） |
+| var_usdt | | number | 主置信度 VaR USDT |
+| cvar_pct | | number | CVaR 损失占比 |
+| cvar_usdt | | number | CVaR USDT |
+| var_95_pct | | number | 95% 历史 VaR 占比 |
+| var_99_pct | | number | 99% 历史 VaR 占比 |
+| parametric_var_pct | | number | 参数法 VaR 占比 |
+| mc_gbm_var_pct | | number | 蒙特卡洛 GBM VaR 占比 |
+| mc_t_var_pct | | number | 蒙特卡洛 Student-t VaR 占比 |
 
 Supported **ops**:
 
@@ -49,7 +58,9 @@ Supported **ops**:
 
 Rows with ``error`` are skipped for signal rules.
 
-**message** placeholders: ``{job_id}``, ``{symbol}``, ``{pair}``, ``{stance}``, ``{action}``, ``{new_bars}``, ``{iv_alert_level}``, ``{options_stance}``, ``{iv_percentile}``, ``{iv_change_24h_pct}``, ``{rule_id}``, ``{rule_name}``.
+**message** placeholders: ``{job_id}``, ``{symbol}``, ``{pair}``, ``{stance}``, ``{action}``, ``{new_bars}``, ``{iv_alert_level}``, ``{options_stance}``, ``{iv_percentile}``, ``{iv_change_24h_pct}``, ``{var_pct}``, ``{var_usdt}``, ``{cvar_pct}``, ``{var_99_pct}``, ``{rule_id}``, ``{rule_name}``.
+
+VaR 字段在调度周期启用 ``schedule_alerts.var.enabled`` 或自定义规则引用 VaR 字段时自动计算。
 """
 
 from __future__ import annotations
@@ -74,6 +85,17 @@ _FIELD_ALIASES = {
     "iv_pct": "iv_percentile",
     "iv_change_24h_pct": "iv_change_24h_pct",
     "iv_change_24h": "iv_change_24h_pct",
+    "var_pct": "var_pct",
+    "var_usdt": "var_usdt",
+    "cvar_pct": "cvar_pct",
+    "cvar_usdt": "cvar_usdt",
+    "var_95_pct": "var_95_pct",
+    "var_99_pct": "var_99_pct",
+    "var_95_usdt": "var_95_usdt",
+    "var_99_usdt": "var_99_usdt",
+    "parametric_var_pct": "parametric_var_pct",
+    "mc_gbm_var_pct": "mc_gbm_var_pct",
+    "mc_t_var_pct": "mc_t_var_pct",
 }
 
 
@@ -105,6 +127,18 @@ def normalize_row(row: dict[str, Any]) -> dict[str, Any]:
         "iv_change_24h_pct": row.get("iv_change_24h_pct")
         if row.get("iv_change_24h_pct") is not None
         else opt.get("iv_change_24h_pct"),
+        "var_pct": row.get("var_pct"),
+        "var_usdt": row.get("var_usdt"),
+        "cvar_pct": row.get("cvar_pct"),
+        "cvar_usdt": row.get("cvar_usdt"),
+        "var_95_pct": row.get("var_95_pct"),
+        "var_99_pct": row.get("var_99_pct"),
+        "var_95_usdt": row.get("var_95_usdt"),
+        "var_99_usdt": row.get("var_99_usdt"),
+        "parametric_var_pct": row.get("parametric_var_pct"),
+        "mc_gbm_var_pct": row.get("mc_gbm_var_pct"),
+        "mc_t_var_pct": row.get("mc_t_var_pct"),
+        "var_enabled": row.get("var_enabled"),
         "error": row.get("error"),
     }
 
@@ -171,7 +205,22 @@ def _compare(condition: dict[str, Any], row: dict[str, Any]) -> bool:
             return bool(re.search(str(value), s_actual, re.I))
         return False
 
-    if field in ("new_bars", "iv_percentile", "iv_change_24h_pct"):
+    if field in (
+        "new_bars",
+        "iv_percentile",
+        "iv_change_24h_pct",
+        "var_pct",
+        "var_usdt",
+        "cvar_pct",
+        "cvar_usdt",
+        "var_95_pct",
+        "var_99_pct",
+        "var_95_usdt",
+        "var_99_usdt",
+        "parametric_var_pct",
+        "mc_gbm_var_pct",
+        "mc_t_var_pct",
+    ):
         if actual is None or actual == "":
             return False
         try:
@@ -269,6 +318,12 @@ def format_message(template: str, *, job_id: str, row: dict[str, Any], rule: dic
         options_stance=row.get("options_stance", ""),
         iv_percentile=row.get("iv_percentile", ""),
         iv_change_24h_pct=row.get("iv_change_24h_pct", ""),
+        var_pct=row.get("var_pct", ""),
+        var_usdt=row.get("var_usdt", ""),
+        cvar_pct=row.get("cvar_pct", ""),
+        cvar_usdt=row.get("cvar_usdt", ""),
+        var_99_pct=row.get("var_99_pct", ""),
+        var_95_pct=row.get("var_95_pct", ""),
         rule_id=rule.get("id", ""),
         rule_name=rule.get("name", rule.get("id", "")),
     )

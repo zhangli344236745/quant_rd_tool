@@ -41,6 +41,7 @@ const groups: MenuGroup[] = [
     items: [
       { path: "/analyze", icon: "TrendCharts", label: "Crypto 行情" },
       { path: "/crypto-options-vol", icon: "DataAnalysis", label: "期权波动" },
+      { path: "/crypto-var", icon: "Warning", label: "风险 VaR" },
       { path: "/crypto-ops", icon: "Monitor", label: "Crypto 运营" },
       { path: "/spot-bot", icon: "Coin", label: "现货 Bot" },
       { path: "/perp-bot", icon: "Histogram", label: "永续 Bot" },

@@ -40,6 +40,11 @@ const router = createRouter({
           name: "crypto-options-vol",
           component: () => import("@/views/CryptoOptionsVolView.vue"),
         },
+        {
+          path: "crypto-var",
+          name: "crypto-var",
+          component: () => import("@/views/CryptoVarView.vue"),
+        },
         { path: "spot-bot", name: "spot-bot", component: () => import("@/views/SpotBotView.vue") },
         { path: "crypto-ops", name: "crypto-ops", component: () => import("@/views/CryptoOpsView.vue") },
         { path: "perp-bot", name: "perp-bot", component: () => import("@/views/PerpBotView.vue") },

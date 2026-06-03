@@ -2,7 +2,7 @@
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
-import { cryptoApi } from "@/api/crypto";
+import { cryptoApi, type PortfolioVarReport } from "@/api/crypto";
 import { extractError } from "@/api/http";
 
 const router = useRouter();
@@ -54,6 +54,7 @@ const acctSummary = ref<Record<string, unknown> | null>(null);
 const acctTradeBase = ref("ETH");
 const acctTrades = ref<Record<string, unknown>[]>([]);
 const acctDaily = ref<{ day: string; realizedPnl: number; funding: number; fees: number; net: number }[]>([]);
+const portfolioVar = ref<PortfolioVarReport | null>(null);
 
 function decisionTagType(d: string) {
   if (d === "opened" || d === "flipped") return "success";
@@ -231,6 +232,7 @@ async function refreshAll() {
 async function loadAccountPanel() {
   acctLoading.value = true;
   acctError.value = "";
+  portfolioVar.value = null;
   try {
     const [b, t, p] = await Promise.all([
       cryptoApi.perpAccountBalances({ testnet: false }),
@@ -244,12 +246,27 @@ async function loadAccountPanel() {
     if ((b.data as any).error) acctError.value = String((b.data as any).error);
     if ((t.data as any).error && !acctError.value) acctError.value = String((t.data as any).error);
     if ((p.data as any).error && !acctError.value) acctError.value = String((p.data as any).error);
+    if (b.data.enabled) {
+      try {
+        const { data } = await cryptoApi.varPortfolio({
+          testnet: false,
+          confidence: "0.99",
+          lookback_bars: 252,
+          horizon_days: 1,
+        });
+        portfolioVar.value = data;
+      } catch {
+        portfolioVar.value = null;
+      }
+    }
   } catch (e) {
     acctError.value = extractError(e);
   } finally {
     acctLoading.value = false;
   }
 }
+
+const portfolioVar99Usdt = () => portfolioVar.value?.metrics?.["0.99"]?.var_usdt;
 
 async function reloadTrades() {
   try {
@@ -380,23 +397,40 @@ onUnmounted(() => {
       <el-alert v-if="acctError" type="warning" :title="acctError" show-icon class="mb" />
 
       <el-row :gutter="16">
-        <el-col :span="8">
+        <el-col :span="6">
           <div class="stat-label">USDT 总资产</div>
           <div class="stat-val">
             {{ (acctBalances.find((b) => b.asset === "USDT")?.total ?? 0).toFixed(2) }}
           </div>
         </el-col>
-        <el-col :span="8">
+        <el-col :span="6">
           <div class="stat-label">USDT 可用</div>
           <div class="stat-val">
             {{ (acctBalances.find((b) => b.asset === "USDT")?.available ?? 0).toFixed(2) }}
           </div>
         </el-col>
-        <el-col :span="8">
+        <el-col :span="6">
           <div class="stat-label">未实现盈亏（合计）</div>
           <div class="stat-val">
             {{ Number(acctSummary?.totalUnrealizedProfit ?? 0).toFixed(2) }}
           </div>
+        </el-col>
+        <el-col :span="6">
+          <div class="stat-label">组合 1 日 99% VaR</div>
+          <div v-if="portfolioVar?.enabled && portfolioVar.metrics" class="stat-val warn">
+            {{ portfolioVar99Usdt()?.toLocaleString(undefined, { maximumFractionDigits: 2 }) ?? "—" }} USDT
+          </div>
+          <div v-else-if="portfolioVar && !portfolioVar.enabled" class="muted small">
+            {{ portfolioVar.error || "未配置 API" }}
+          </div>
+          <div v-else class="muted small">—</div>
+          <router-link
+            v-if="portfolioVar?.enabled"
+            to="/crypto-var?tab=portfolio"
+            class="var-link"
+          >
+            风险 VaR 详情 →
+          </router-link>
         </el-col>
       </el-row>
 
@@ -604,6 +638,16 @@ onUnmounted(() => {
 }
 .stat-val.warn {
   color: #e6a23c;
+}
+.var-link {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--el-color-primary);
+  text-decoration: none;
+}
+.var-link:hover {
+  text-decoration: underline;
 }
 .state-card {
   border: 1px solid var(--border);
