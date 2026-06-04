@@ -36,6 +36,9 @@ dev = [
     "pytest-asyncio>=0.24.0",
     "ruff>=0.8.0",
 ]
+zipline = [
+    "zipline-reloaded>=3.0.4",
+]
 
 [project.scripts]
 quant-rd = "quant_rd_tool.cli:main"

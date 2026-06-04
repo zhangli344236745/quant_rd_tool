@@ -244,6 +244,7 @@ HTTP（单次执行，不注册任务）：
 - Web 侧栏：**舆论雷达**（`/crypto-news`）；**Crypto 行情分析** 报告含 `news_digest` 摘要卡片
 - 定时任务 `job_type: "news"` — 独立舆论扫描（默认间隔 120 分钟）；高影响条目可走 Bark/Webhook（`schedule_alerts.crypto_news`）
 - 可选 env：`CRYPTO_NEWS_LLM_TOP_N`、`CRYPTO_NEWS_MIN_SCORE`、`CRYPTO_NEWS_WEB_SEARCH_ENABLED`、`CRYPTO_NEWS_SEARCH_MONTHLY_LIMIT`；搜索 Key：`TAVILY_API_KEY` / `SERPAPI_API_KEY`（默认关闭联网搜索；月度用量写入 `data/crypto/news/search_usage.json`，超限自动跳过搜索）
+- **Crypto 策略实验室**（`/crypto-zipline`）— 多周期 K 线（5m/15m/30m/1h/4h/1d）、多策略组合（vote/and/or/weighted）、OHLCV 与回测结果导出；**zipline-reloaded** 在独立 `.venv-zipline`（numpy&lt;2）子进程运行；`GET /api/v1/crypto/zipline/data/export?format=csv|zip`；不参与定时任务/告警
 - **调度告警推送**：`schedule_alerts.webhook_on_alert`（Crypto 运营 Webhook）与 Bark（`.env` 的 `BARK_DEVICE_KEY` 或 `schedule_alerts.bark`）；`POST .../schedules/alerts/test-bark` 测试
 
 **C+ P0（专业轨）**：

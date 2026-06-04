@@ -1,4 +1,20 @@
+import { getApiBase } from "@/config";
 import { http } from "./http";
+
+function _filenameFromDisposition(header: string | undefined, fallback: string): string {
+  if (!header) return fallback;
+  const m = /filename\*?=(?:UTF-8'')?"?([^";\n]+)"?/i.exec(header);
+  return m?.[1]?.trim() || fallback;
+}
+
+function _triggerBlobDownload(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 export interface AnalyzeRequest {
   symbol: string;
@@ -155,6 +171,108 @@ export interface CryptoNewsScanResult {
   items_processed?: number;
   digest?: CryptoNewsDigest;
   errors?: string[];
+}
+
+export interface CryptoZiplineStrategy {
+  id: string;
+  name: string;
+  description: string;
+  default_params: Record<string, number>;
+  min_bars: number;
+}
+
+export interface CryptoZiplineTimeframeOption {
+  id: string;
+  label: string;
+  bar_minutes: number;
+}
+
+export interface CryptoZiplineStatus {
+  timeframes?: CryptoZiplineTimeframeOption[];
+  default_timeframe?: string;
+  combo_modes?: string[];
+  zipline_installed: boolean;
+  zipline_inprocess?: boolean;
+  zipline_venv?: boolean;
+  zipline_venv_path?: string;
+  default_engine?: string;
+  zipline_error?: string | null;
+  engines: string[];
+  symbols: Array<{
+    symbol: string;
+    timeframe?: string;
+    ready: boolean;
+    bars_count: number;
+    last_bar?: string;
+  }>;
+}
+
+export interface CryptoZiplineSyncResult {
+  synced: Record<string, unknown>[];
+  errors: Array<{ symbol: string; error: string }>;
+  timeframe: string;
+}
+
+export interface CryptoZiplineComboLeg {
+  strategy: string;
+  params?: Record<string, number>;
+  weight?: number;
+}
+
+export interface CryptoZiplineBacktestRequest {
+  symbol: string;
+  strategy: string;
+  start: string;
+  end: string;
+  capital_base?: number;
+  strategy_params?: Record<string, number>;
+  lookback_days?: number;
+  sync_first?: boolean;
+  engine?: "auto" | "pandas" | "zipline";
+  force_reingest?: boolean;
+  timeframe?: string;
+  strategy_combo?: CryptoZiplineComboLeg[];
+  combo_mode?: "vote" | "and" | "or" | "weighted";
+}
+
+export interface CryptoZiplineRunSummary {
+  run_id: string;
+  symbol?: string;
+  strategy?: string;
+  engine?: string;
+  total_return?: number;
+  generated_at?: string;
+}
+
+export interface CryptoZiplineBacktestResult {
+  run_id: string;
+  symbol: string;
+  strategy: string;
+  timeframe: string;
+  engine: string;
+  start: string;
+  end: string;
+  capital_base: number;
+  metrics: {
+    total_return: number;
+    sharpe: number;
+    max_drawdown: number;
+    trade_count: number;
+  };
+  final_signal?: {
+    position: string;
+    target_pct: number;
+    bar_time?: string;
+  };
+  trades?: Array<Record<string, unknown>>;
+  equity_curve?: Array<{ time: string; value: number }>;
+  disclaimer?: string;
+  zipline_fallback_reason?: string;
+  bundle?: string;
+  bar_count?: number;
+  ingest_skipped?: boolean;
+  fingerprint?: string;
+  generated_at?: string;
 }
 
 export const cryptoApi = {
@@ -454,6 +572,110 @@ export const cryptoApi = {
 
   newsConfigSave: (body: Partial<CryptoNewsConfig>) =>
     http.post<CryptoNewsConfig>("/crypto/news/config", body),
+
+  ziplineStatus: (data_dir = "data/crypto", symbols?: string, timeframe?: string) =>
+    http.get<CryptoZiplineStatus>("/crypto/zipline/status", {
+      params: { data_dir, symbols, timeframe },
+    }),
+
+  ziplineStrategies: () =>
+    http.get<{ strategies: CryptoZiplineStrategy[] }>("/crypto/zipline/strategies"),
+
+  ziplineSetupVenv: () =>
+    http.post<{ ok: boolean; python?: string; error?: string | null }>("/crypto/zipline/setup-venv"),
+
+  ziplineSync: (body: {
+    symbols: string[];
+    data_dir?: string;
+    backfill_days?: number;
+    timeframe?: string;
+  }) =>
+    http.post<CryptoZiplineSyncResult>("/crypto/zipline/sync", {
+      data_dir: body.data_dir ?? "data/crypto",
+      symbols: body.symbols,
+      backfill_days: body.backfill_days,
+      timeframe: body.timeframe ?? "15m",
+    }),
+
+  ziplineExportDownload: async (params: {
+    symbol: string;
+    timeframe?: string;
+    start?: string;
+    end?: string;
+    format?: "csv" | "zip";
+    run_id?: string;
+    data_dir?: string;
+  }) => {
+    const format = params.format ?? "csv";
+    const res = await http.get("/crypto/zipline/data/export", {
+      params: {
+        symbol: params.symbol,
+        data_dir: params.data_dir ?? "data/crypto",
+        timeframe: params.timeframe ?? "15m",
+        format,
+        start: params.start,
+        end: params.end,
+        run_id: params.run_id,
+      },
+      responseType: "blob",
+    });
+    const blob = res.data as Blob;
+    if (blob.type?.includes("json")) {
+      const text = await blob.text();
+      let msg = text;
+      try {
+        const err = JSON.parse(text) as { detail?: string };
+        if (typeof err.detail === "string") msg = err.detail;
+      } catch {
+        /* keep raw text */
+      }
+      throw new Error(msg);
+    }
+    const fallback = `${params.symbol}_${params.timeframe ?? "15m"}.${format}`;
+    const filename = _filenameFromDisposition(
+      res.headers["content-disposition"] as string | undefined,
+      fallback,
+    );
+    _triggerBlobDownload(blob, filename);
+  },
+
+  /** Direct link (no auth headers); prefer ziplineExportDownload. */
+  ziplineExportUrl: (params: {
+    symbol: string;
+    timeframe?: string;
+    start?: string;
+    end?: string;
+    format?: "csv" | "zip";
+    run_id?: string;
+    data_dir?: string;
+  }) => {
+    const q = new URLSearchParams({
+      symbol: params.symbol,
+      data_dir: params.data_dir ?? "data/crypto",
+      timeframe: params.timeframe ?? "15m",
+      format: params.format ?? "csv",
+    });
+    if (params.start) q.set("start", params.start);
+    if (params.end) q.set("end", params.end);
+    if (params.run_id) q.set("run_id", params.run_id);
+    const apiBase = getApiBase();
+    const prefix = apiBase ? `${apiBase.replace(/\/$/, "")}/api/v1` : "/api/v1";
+    return `${prefix}/crypto/zipline/data/export?${q.toString()}`;
+  },
+
+  ziplineBacktest: (body: CryptoZiplineBacktestRequest) =>
+    http.post<CryptoZiplineBacktestResult>("/crypto/zipline/backtest", {
+      data_dir: "data/crypto",
+      ...body,
+    }),
+
+  ziplineRuns: (data_dir = "data/crypto", limit = 20) =>
+    http.get<{ count: number; runs: CryptoZiplineRunSummary[] }>("/crypto/zipline/runs", {
+      params: { data_dir, limit },
+    }),
+
+  ziplineRun: (run_id: string, data_dir = "data/crypto") =>
+    http.get<CryptoZiplineBacktestResult>("/crypto/zipline/runs/" + run_id, { params: { data_dir } }),
 };
 
 export interface OptionsVolConfig {
