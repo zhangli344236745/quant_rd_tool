@@ -10,6 +10,8 @@ from typing import TypeVar
 import akshare as ak
 import pandas as pd
 
+from quant_rd_tool.stock_codes import to_ak_code, to_market_prefixed_symbol, to_qlib_code
+
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
@@ -28,31 +30,6 @@ _AK_COL_MAP = {
 
 # East Money 接口易限流/断连，请求超时（秒）
 _EM_TIMEOUT = 30
-
-
-def to_qlib_code(symbol: str) -> str:
-    """Convert bare code (600519) or qlib code (SH600519) to qlib instrument id."""
-    s = symbol.strip().upper()
-    if s.startswith(("SH", "SZ")):
-        return s
-    if s.startswith("6"):
-        return f"SH{s}"
-    return f"SZ{s}"
-
-
-def to_ak_code(symbol: str) -> str:
-    """Bare 6-digit code for akshare APIs."""
-    s = symbol.strip().upper()
-    if s.startswith("SH"):
-        return s[2:]
-    if s.startswith("SZ"):
-        return s[2:]
-    return s
-
-
-def to_market_prefixed_symbol(symbol: str) -> str:
-    """sh600519 / sz000001 for Sina & Tencent APIs."""
-    return to_qlib_code(symbol).lower()
 
 
 def _retry(

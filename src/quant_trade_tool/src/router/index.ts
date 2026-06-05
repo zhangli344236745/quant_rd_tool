@@ -30,6 +30,11 @@ const router = createRouter({
           name: "astock-screener",
           component: () => import("@/views/AStockScreenerView.vue"),
         },
+        {
+          path: "stock-zipline",
+          name: "stock-zipline",
+          component: () => import("@/views/StockZiplineLabView.vue"),
+        },
         { path: "tasks", name: "tasks", component: () => import("@/views/TasksView.vue") },
         { path: "stock-analyze", name: "stock-analyze", component: () => import("@/views/StockAnalyzeView.vue") },
         { path: "backtest", name: "backtest", component: () => import("@/views/BacktestView.vue") },

@@ -30,6 +30,7 @@ const groups: MenuGroup[] = [
       { path: "/astocks-reports", icon: "FolderOpened", label: "报告库" },
       { path: "/astocks-screener", icon: "Filter", label: "选股器" },
       { path: "/stock-analyze", icon: "Document", label: "个股分析" },
+      { path: "/stock-zipline", icon: "DataLine", label: "策略实验室" },
       { path: "/backtest", icon: "DataLine", label: "组合回测" },
       { path: "/macro", icon: "MapLocation", label: "宏观面板" },
     ],

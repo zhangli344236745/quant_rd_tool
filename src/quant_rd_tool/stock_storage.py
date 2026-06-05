@@ -9,12 +9,11 @@ from typing import Any
 
 import pandas as pd
 
-from quant_rd_tool import akshare_data as ak_data
-from quant_rd_tool.qlib_dump import QlibDataDumper
+from quant_rd_tool.stock_codes import to_qlib_code
 
 
 def stock_root(data_dir: str | Path, symbol: str) -> Path:
-    code = ak_data.to_qlib_code(symbol)
+    code = to_qlib_code(symbol)
     return Path(data_dir).expanduser() / code
 
 
@@ -53,6 +52,8 @@ def load_csv(path: Path) -> pd.DataFrame:
 
 
 def save_qlib(df: pd.DataFrame, qlib_dir: Path) -> list[str]:
+    from quant_rd_tool.qlib_dump import QlibDataDumper
+
     code = df["symbol"].iloc[0]
     return QlibDataDumper(qlib_dir).dump({code: df})
 

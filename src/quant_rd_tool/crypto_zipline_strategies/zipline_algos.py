@@ -9,11 +9,13 @@ from quant_rd_tool.crypto_zipline_strategies import get_strategy
 from quant_rd_tool.crypto_zipline_strategies.signals import signal_for_strategy
 
 
-def _read_bar(data: Any, asset: Any) -> tuple[float | None, float | None, float | None, Any]:
+def _read_bar(
+    data: Any, asset: Any, *, bar_freq: str = "1m"
+) -> tuple[float | None, float | None, float | None, Any]:
     try:
-        close_h = data.history(asset, "close", 1, "1m")
+        close_h = data.history(asset, "close", 1, bar_freq)
         if close_h is None or len(close_h) == 0:
-            close_h = data.history(asset, "price", 1, "1m")
+            close_h = data.history(asset, "price", 1, bar_freq)
         if close_h is None or len(close_h) == 0:
             return None, None, None, None
         close = float(close_h.iloc[-1])
@@ -21,13 +23,13 @@ def _read_bar(data: Any, asset: Any) -> tuple[float | None, float | None, float 
             return None, None, None, None
         high, low = close, close
         try:
-            h = data.history(asset, "high", 1, "1m")
+            h = data.history(asset, "high", 1, bar_freq)
             if h is not None and len(h):
                 high = float(h.iloc[-1])
         except Exception:
             pass
         try:
-            l = data.history(asset, "low", 1, "1m")
+            l = data.history(asset, "low", 1, bar_freq)
             if l is not None and len(l):
                 low = float(l.iloc[-1])
         except Exception:
@@ -181,6 +183,7 @@ def build_zipline_algo(
     strategy_id: str = "",
     params: dict[str, Any] | None = None,
     combo_spec: dict[str, Any] | None = None,
+    bar_freq: str = "1m",
 ) -> tuple[Callable[..., None], Callable[..., None]]:
     if combo_spec is None and not strategy_id:
         raise ValueError("strategy_id or combo_spec required")
@@ -201,6 +204,7 @@ def build_zipline_algo(
         context.strategy_id = strategy_id
         context.params = merged
         context.combo_spec = combo_spec
+        context.bar_freq = bar_freq
         context.closes = []
         context.highs = []
         context.lows = []
@@ -214,13 +218,15 @@ def build_zipline_algo(
 
         asset = context.asset
         try:
-            vol_hist = data.history(asset, "volume", 1, "1m")
+            bar_freq = getattr(context, "bar_freq", "1m")
+            vol_hist = data.history(asset, "volume", 1, bar_freq)
             if vol_hist is not None and len(vol_hist):
                 context._pending_volume = float(vol_hist.iloc[-1])
         except Exception:
             context._pending_volume = 0.0
 
-        close, high, low, bar_dt = _read_bar(data, asset)
+        bar_freq = getattr(context, "bar_freq", "1m")
+        close, high, low, bar_dt = _read_bar(data, asset, bar_freq=bar_freq)
         if close is None or bar_dt is None:
             return
         max_len = _max_history_len(context)

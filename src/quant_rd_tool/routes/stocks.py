@@ -241,6 +241,183 @@ def stocks_qlib_analyze(
     return _enqueue_qlib(request, code, body)
 
 
+class StockZiplineSyncRequest(BaseModel):
+    symbols: list[str] = Field(default_factory=lambda: ["600519", "000001"])
+    data_dir: str = "data/stocks"
+    backfill_days: int = Field(800, ge=30, le=3000)
+
+
+class StockZiplineComboLeg(BaseModel):
+    strategy: str
+    params: dict[str, Any] | None = None
+    weight: float = Field(1.0, gt=0)
+
+
+class StockZiplineBacktestRequest(BaseModel):
+    symbol: str = "600519"
+    strategy: str = "ma_crossover"
+    start: str = "2024-01-01"
+    end: str = "2026-06-03"
+    capital_base: float = Field(100_000.0, gt=0)
+    data_dir: str = "data/stocks"
+    strategy_params: dict[str, Any] | None = None
+    lookback_days: int = Field(800, ge=30, le=3000)
+    sync_first: bool = False
+    engine: str = Field("auto", pattern="^(auto|pandas|zipline)$")
+    force_reingest: bool = False
+    timeframe: str = "1d"
+    strategy_combo: list[StockZiplineComboLeg] | None = None
+    combo_mode: str = Field("vote", pattern="^(vote|and|or|weighted)$")
+
+
+@router.get("/zipline/status")
+def stock_zipline_status_get(
+    data_dir: str = "data/stocks",
+    symbols: str | None = None,
+    timeframe: str | None = None,
+) -> dict[str, Any]:
+    from quant_rd_tool.stock_zipline_lab import lab_status
+
+    sym_list = [s.strip() for s in symbols.split(",")] if symbols else None
+    return lab_status(data_dir, sym_list, timeframe=timeframe)
+
+
+@router.get("/zipline/strategies")
+def stock_zipline_strategies_get() -> dict[str, Any]:
+    from quant_rd_tool.stock_zipline_lab import get_strategies
+
+    return {"strategies": get_strategies()}
+
+
+@router.post("/zipline/setup-venv")
+def stock_zipline_setup_venv_post() -> dict[str, Any]:
+    from quant_rd_tool.crypto_zipline_env import ensure_zipline_venv, zipline_venv_ready
+
+    try:
+        py = ensure_zipline_venv()
+        ok, err = zipline_venv_ready()
+        return {"ok": ok, "python": str(py), "error": err}
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+@router.post("/zipline/sync")
+def stock_zipline_sync_post(req: StockZiplineSyncRequest) -> dict[str, Any]:
+    from quant_rd_tool.stock_zipline_lab import sync_ohlcv_for_lab
+
+    try:
+        return sync_ohlcv_for_lab(req.symbols, data_dir=req.data_dir, backfill_days=req.backfill_days)
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+@router.post("/zipline/backtest")
+def stock_zipline_backtest_post(req: StockZiplineBacktestRequest) -> dict[str, Any]:
+    from quant_rd_tool.stock_zipline_lab import run_lab_backtest
+
+    combo_legs = None
+    if req.strategy_combo:
+        combo_legs = [leg.model_dump() for leg in req.strategy_combo]
+
+    try:
+        return run_lab_backtest(
+            symbol=req.symbol,
+            data_dir=req.data_dir,
+            strategy_id=req.strategy,
+            start=req.start,
+            end=req.end,
+            capital_base=req.capital_base,
+            strategy_params=req.strategy_params,
+            lookback_days=req.lookback_days,
+            sync_first=req.sync_first,
+            engine=req.engine,
+            force_reingest=req.force_reingest,
+            timeframe=req.timeframe,
+            strategy_combo=combo_legs,
+            combo_mode=req.combo_mode,
+        )
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+@router.get("/zipline/runs")
+def stock_zipline_runs_get(
+    data_dir: str = "data/stocks", limit: int = Query(20, ge=1, le=100)
+) -> dict[str, Any]:
+    from quant_rd_tool.crypto_zipline_storage import list_runs
+
+    items = list_runs(data_dir, limit=limit)
+    return {"count": len(items), "runs": items}
+
+
+@router.get("/zipline/runs/{run_id}")
+def stock_zipline_run_get(run_id: str, data_dir: str = "data/stocks") -> dict[str, Any]:
+    from quant_rd_tool.crypto_zipline_storage import load_run
+
+    run = load_run(data_dir, run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+    return run
+
+
+@router.get("/zipline/data/export")
+def stock_zipline_data_export(
+    symbol: str = Query("600519"),
+    data_dir: str = "data/stocks",
+    timeframe: str = "1d",
+    start: str | None = None,
+    end: str | None = None,
+    lookback_days: int = Query(800, ge=30, le=3000),
+    format: str = Query("csv", pattern="^(csv|zip)$"),
+    run_id: str | None = None,
+) -> Response:
+    from quant_rd_tool.stock_zipline_export import (
+        build_export_zip,
+        export_filename,
+        export_ohlcv_dataframe,
+    )
+
+    try:
+        if format == "zip":
+            content = build_export_zip(
+                symbol,
+                data_dir=data_dir,
+                timeframe=timeframe,
+                start=start,
+                end=end,
+                lookback_days=lookback_days,
+                run_id=run_id,
+            )
+            fname = export_filename(symbol, timeframe, ext="zip")
+            return Response(
+                content=content,
+                media_type="application/zip",
+                headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+            )
+        df = export_ohlcv_dataframe(
+            symbol,
+            data_dir=data_dir,
+            timeframe=timeframe,
+            start=start,
+            end=end,
+            lookback_days=lookback_days,
+        )
+        fname = export_filename(symbol, timeframe, ext="csv")
+        return Response(
+            content=df.to_csv(index=False),
+            media_type="text/csv",
+            headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+        )
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+
 @router.get("/{code}/notices")
 def stocks_notices(
     code: str,

@@ -1,4 +1,123 @@
+import { getApiBase } from "@/config";
 import { http } from "./http";
+
+function _filenameFromDisposition(header: string | undefined, fallback: string): string {
+  if (!header) return fallback;
+  const m = /filename\*?=(?:UTF-8'')?"?([^";\n]+)"?/i.exec(header);
+  return m?.[1]?.trim() || fallback;
+}
+
+function _triggerBlobDownload(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+export interface StockZiplineStrategy {
+  id: string;
+  name: string;
+  description: string;
+  default_params: Record<string, number>;
+  min_bars: number;
+}
+
+export interface StockZiplineTimeframeOption {
+  id: string;
+  label: string;
+  bar_minutes: number;
+}
+
+export interface StockZiplineStatus {
+  market?: string;
+  timeframes?: StockZiplineTimeframeOption[];
+  default_timeframe?: string;
+  combo_modes?: string[];
+  zipline_installed: boolean;
+  zipline_inprocess?: boolean;
+  zipline_venv?: boolean;
+  zipline_venv_path?: string;
+  default_engine?: string;
+  zipline_error?: string | null;
+  engines: string[];
+  symbols: Array<{
+    symbol: string;
+    timeframe?: string;
+    ready: boolean;
+    bars_count: number;
+    last_bar?: string;
+  }>;
+}
+
+export interface StockZiplineSyncResult {
+  synced: Record<string, unknown>[];
+  errors: Array<{ symbol: string; error: string }>;
+  timeframe: string;
+}
+
+export interface StockZiplineComboLeg {
+  strategy: string;
+  params?: Record<string, number>;
+  weight?: number;
+}
+
+export interface StockZiplineBacktestRequest {
+  symbol: string;
+  strategy: string;
+  start: string;
+  end: string;
+  capital_base?: number;
+  strategy_params?: Record<string, number>;
+  lookback_days?: number;
+  sync_first?: boolean;
+  engine?: "auto" | "pandas" | "zipline";
+  force_reingest?: boolean;
+  timeframe?: string;
+  strategy_combo?: StockZiplineComboLeg[];
+  combo_mode?: "vote" | "and" | "or" | "weighted";
+}
+
+export interface StockZiplineRunSummary {
+  run_id: string;
+  symbol?: string;
+  strategy?: string;
+  engine?: string;
+  total_return?: number;
+  generated_at?: string;
+}
+
+export interface StockZiplineBacktestResult {
+  run_id: string;
+  symbol: string;
+  strategy: string;
+  timeframe: string;
+  engine: string;
+  start: string;
+  end: string;
+  capital_base: number;
+  metrics: {
+    total_return: number;
+    sharpe: number;
+    max_drawdown: number;
+    trade_count: number;
+  };
+  final_signal?: {
+    position: string;
+    target_pct: number;
+    bar_time?: string;
+  };
+  trades?: Array<Record<string, unknown>>;
+  equity_curve?: Array<{ time: string; value: number }>;
+  disclaimer?: string;
+  zipline_fallback_reason?: string;
+  bundle?: string;
+  bar_count?: number;
+  ingest_skipped?: boolean;
+  fingerprint?: string;
+  generated_at?: string;
+}
 
 export interface StockListItem {
   code: string;
@@ -181,4 +300,82 @@ export const stocksApi = {
     page?: number;
     page_size?: number;
   }) => http.post<{ total: number; items: Record<string, unknown>[] }>("/stocks/screener", body),
+
+  ziplineStatus: (data_dir = "data/stocks", symbols?: string, timeframe?: string) =>
+    http.get<StockZiplineStatus>("/stocks/zipline/status", {
+      params: { data_dir, symbols, timeframe },
+    }),
+
+  ziplineStrategies: () =>
+    http.get<{ strategies: StockZiplineStrategy[] }>("/stocks/zipline/strategies"),
+
+  ziplineSetupVenv: () =>
+    http.post<{ ok: boolean; python?: string; error?: string | null }>("/stocks/zipline/setup-venv"),
+
+  ziplineSync: (body: { symbols: string[]; data_dir?: string; backfill_days?: number }) =>
+    http.post<StockZiplineSyncResult>("/stocks/zipline/sync", {
+      data_dir: body.data_dir ?? "data/stocks",
+      symbols: body.symbols,
+      backfill_days: body.backfill_days ?? 800,
+    }),
+
+  ziplineExportDownload: async (params: {
+    symbol: string;
+    timeframe?: string;
+    start?: string;
+    end?: string;
+    format?: "csv" | "zip";
+    run_id?: string;
+    data_dir?: string;
+    lookback_days?: number;
+  }) => {
+    const format = params.format ?? "csv";
+    const res = await http.get("/stocks/zipline/data/export", {
+      params: {
+        symbol: params.symbol,
+        data_dir: params.data_dir ?? "data/stocks",
+        timeframe: params.timeframe ?? "1d",
+        format,
+        start: params.start,
+        end: params.end,
+        run_id: params.run_id,
+        lookback_days: params.lookback_days ?? 800,
+      },
+      responseType: "blob",
+    });
+    const blob = res.data as Blob;
+    if (blob.type?.includes("json")) {
+      const text = await blob.text();
+      let msg = text;
+      try {
+        const err = JSON.parse(text) as { detail?: string };
+        if (typeof err.detail === "string") msg = err.detail;
+      } catch {
+        /* keep raw text */
+      }
+      throw new Error(msg);
+    }
+    const fallback = `${params.symbol}_${params.timeframe ?? "1d"}.${format}`;
+    const filename = _filenameFromDisposition(
+      res.headers["content-disposition"] as string | undefined,
+      fallback,
+    );
+    _triggerBlobDownload(blob, filename);
+  },
+
+  ziplineBacktest: (body: StockZiplineBacktestRequest) =>
+    http.post<StockZiplineBacktestResult>("/stocks/zipline/backtest", {
+      data_dir: "data/stocks",
+      lookback_days: 800,
+      timeframe: "1d",
+      ...body,
+    }),
+
+  ziplineRuns: (data_dir = "data/stocks", limit = 20) =>
+    http.get<{ count: number; runs: StockZiplineRunSummary[] }>("/stocks/zipline/runs", {
+      params: { data_dir, limit },
+    }),
+
+  ziplineRun: (run_id: string, data_dir = "data/stocks") =>
+    http.get<StockZiplineBacktestResult>("/stocks/zipline/runs/" + run_id, { params: { data_dir } }),
 };
