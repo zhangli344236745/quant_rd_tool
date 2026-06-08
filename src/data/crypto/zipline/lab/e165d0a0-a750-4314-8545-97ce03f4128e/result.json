@@ -1,0 +1,75 @@
+{
+  "run_id": "e165d0a0-a750-4314-8545-97ce03f4128e",
+  "symbol": "ETH",
+  "strategy": "combo:ma_crossover+momentum_rsi",
+  "timeframe": "15m",
+  "start": "2026-01-01",
+  "end": "2026-06-03",
+  "capital_base": 100000.0,
+  "generated_at": "2026-06-04T05:34:53.300421+00:00",
+  "engine": "zipline",
+  "metrics": {
+    "total_return": -0.186923,
+    "sharpe": -1.2076,
+    "max_drawdown": -0.233792,
+    "trade_count": 512
+  },
+  "final_signal": {
+    "position": "flat",
+    "target_pct": 0.0,
+    "bar_time": "2026-06-03 20:00:00+00:00"
+  },
+  "strategy_params": {
+    "mode": "and",
+    "legs": [
+      {
+        "strategy": "ma_crossover",
+        "params": {
+          "fast": 10,
+          "slow": 30
+        },
+        "weight": 1.0
+      },
+      {
+        "strategy": "momentum_rsi",
+        "params": {
+          "period": 14,
+          "oversold": 30,
+          "overbought": 70
+        },
+        "weight": 1.0
+      }
+    ]
+  },
+  "disclaimer": "回测结果仅供参考，不构成投资建议。",
+  "bundle": "crypto_ccxt_15m",
+  "asset": "CRYPTO_ETH",
+  "bar_minutes": 15,
+  "bar_count": 8533,
+  "backtest_start": "2026-03-07 00:00:00",
+  "backtest_end": "2026-06-03 00:00:00",
+  "ingest_skipped": false,
+  "fingerprint": "7b18df3038f8520d415a96e7",
+  "bars": 8533,
+  "combo_mode": "and",
+  "combo_legs": [
+    {
+      "strategy": "ma_crossover",
+      "params": {
+        "fast": 10,
+        "slow": 30
+      },
+      "weight": 1.0
+    },
+    {
+      "strategy": "momentum_rsi",
+      "params": {
+        "period": 14,
+        "oversold": 30,
+        "overbought": 70
+      },
+      "weight": 1.0
+    }
+  ],
+  "trade_count": 512
+}

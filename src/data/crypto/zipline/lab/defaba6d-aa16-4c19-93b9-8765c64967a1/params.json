@@ -1,0 +1,13 @@
+{
+  "symbol": "BTC",
+  "strategy": "ichimoku_cloud",
+  "timeframe": "15m",
+  "start": "2026-01-01",
+  "end": "2026-06-03",
+  "capital_base": 100000.0,
+  "engine": "zipline",
+  "strategy_params": {
+    "tenkan": 9,
+    "kijun": 26
+  }
+}

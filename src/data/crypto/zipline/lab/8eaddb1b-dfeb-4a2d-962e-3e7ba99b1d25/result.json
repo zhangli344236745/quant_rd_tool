@@ -1,0 +1,37 @@
+{
+  "run_id": "8eaddb1b-dfeb-4a2d-962e-3e7ba99b1d25",
+  "symbol": "BTC",
+  "strategy": "ma_crossover",
+  "timeframe": "15m",
+  "start": "2026-01-01",
+  "end": "2026-06-03",
+  "capital_base": 100000.0,
+  "generated_at": "2026-06-04T05:29:51.489330+00:00",
+  "engine": "zipline",
+  "metrics": {
+    "total_return": -0.220377,
+    "sharpe": -2.3722,
+    "max_drawdown": -0.230568,
+    "trade_count": 801
+  },
+  "final_signal": {
+    "position": "flat",
+    "target_pct": 0.0,
+    "bar_time": "2026-06-03 20:00:00+00:00"
+  },
+  "strategy_params": {
+    "fast": 10,
+    "slow": 30
+  },
+  "disclaimer": "回测结果仅供参考，不构成投资建议。",
+  "bundle": "crypto_ccxt_15m",
+  "asset": "CRYPTO_BTC",
+  "bar_minutes": 15,
+  "bar_count": 8597,
+  "backtest_start": "2026-03-06 00:00:00",
+  "backtest_end": "2026-06-03 00:00:00",
+  "ingest_skipped": false,
+  "fingerprint": "af7fa258a49f15f3b54e3efd",
+  "bars": 8597,
+  "trade_count": 801
+}

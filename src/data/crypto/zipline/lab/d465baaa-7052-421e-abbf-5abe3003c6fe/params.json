@@ -1,0 +1,17 @@
+{
+  "symbol": "ETH",
+  "strategy": "stoch_rsi",
+  "timeframe": "15m",
+  "start": "2026-01-01",
+  "end": "2026-06-03",
+  "capital_base": 100000.0,
+  "engine": "zipline",
+  "strategy_params": {
+    "rsi_period": 14,
+    "stoch_period": 14,
+    "k_smooth": 3,
+    "d_smooth": 3,
+    "oversold": 20,
+    "overbought": 80
+  }
+}

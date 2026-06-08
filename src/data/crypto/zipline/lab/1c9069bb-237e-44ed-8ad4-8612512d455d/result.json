@@ -1,0 +1,79 @@
+{
+  "run_id": "1c9069bb-237e-44ed-8ad4-8612512d455d",
+  "symbol": "ETH",
+  "strategy": "combo:supertrend_sized+golden_cross",
+  "timeframe": "15m",
+  "start": "2026-01-01",
+  "end": "2026-06-03",
+  "capital_base": 100000.0,
+  "generated_at": "2026-06-04T06:34:57.756645+00:00",
+  "engine": "zipline",
+  "metrics": {
+    "total_return": -0.078151,
+    "sharpe": -0.6577,
+    "max_drawdown": -0.097037,
+    "trade_count": 58
+  },
+  "final_signal": {
+    "position": "flat",
+    "target_pct": 0.0,
+    "bar_time": "2026-06-03 20:00:00+00:00"
+  },
+  "strategy_params": {
+    "mode": "vote",
+    "legs": [
+      {
+        "strategy": "supertrend_sized",
+        "params": {
+          "atr_len": 10,
+          "factor": 3.0,
+          "max_position": 0.5,
+          "min_position": 0.15,
+          "dist_atr": 2.0
+        },
+        "weight": 1.0
+      },
+      {
+        "strategy": "golden_cross",
+        "params": {
+          "fast": 50,
+          "slow": 200
+        },
+        "weight": 1.0
+      }
+    ]
+  },
+  "disclaimer": "回测结果仅供参考，不构成投资建议。",
+  "bundle": "crypto_ccxt_15m",
+  "asset": "CRYPTO_ETH",
+  "bar_minutes": 15,
+  "bar_count": 8533,
+  "backtest_start": "2026-03-07 00:00:00",
+  "backtest_end": "2026-06-03 00:00:00",
+  "ingest_skipped": true,
+  "fingerprint": "7b18df3038f8520d415a96e7",
+  "bars": 8533,
+  "combo_mode": "vote",
+  "combo_legs": [
+    {
+      "strategy": "supertrend_sized",
+      "params": {
+        "atr_len": 10,
+        "factor": 3.0,
+        "max_position": 0.5,
+        "min_position": 0.15,
+        "dist_atr": 2.0
+      },
+      "weight": 1.0
+    },
+    {
+      "strategy": "golden_cross",
+      "params": {
+        "fast": 50,
+        "slow": 200
+      },
+      "weight": 1.0
+    }
+  ],
+  "trade_count": 58
+}

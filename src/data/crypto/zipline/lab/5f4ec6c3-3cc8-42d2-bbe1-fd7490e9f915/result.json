@@ -1,0 +1,81 @@
+{
+  "run_id": "5f4ec6c3-3cc8-42d2-bbe1-fd7490e9f915",
+  "symbol": "ETH",
+  "strategy": "combo:golden_cross+stoch_rsi",
+  "timeframe": "5m",
+  "start": "2026-01-01",
+  "end": "2026-06-03",
+  "capital_base": 100000.0,
+  "generated_at": "2026-06-04T07:19:54.373907+00:00",
+  "engine": "zipline",
+  "metrics": {
+    "total_return": -0.00903,
+    "sharpe": 0.0,
+    "max_drawdown": 0.0,
+    "trade_count": 2
+  },
+  "final_signal": {
+    "position": "flat",
+    "target_pct": 0.0,
+    "bar_time": "2026-06-03 20:00:00+00:00"
+  },
+  "strategy_params": {
+    "mode": "vote",
+    "legs": [
+      {
+        "strategy": "golden_cross",
+        "params": {
+          "fast": 50,
+          "slow": 200
+        },
+        "weight": 1.0
+      },
+      {
+        "strategy": "stoch_rsi",
+        "params": {
+          "rsi_period": 14,
+          "stoch_period": 14,
+          "k_smooth": 3,
+          "d_smooth": 3,
+          "oversold": 20,
+          "overbought": 80
+        },
+        "weight": 1.0
+      }
+    ]
+  },
+  "disclaimer": "回测结果仅供参考，不构成投资建议。",
+  "bundle": "crypto_ccxt_5m",
+  "asset": "CRYPTO_ETH",
+  "bar_minutes": 5,
+  "bar_count": 472,
+  "backtest_start": "2026-06-02 00:00:00",
+  "backtest_end": "2026-06-03 00:00:00",
+  "ingest_skipped": false,
+  "fingerprint": "230521a63a3abf1bc9cb7b37",
+  "bars": 472,
+  "combo_mode": "vote",
+  "combo_legs": [
+    {
+      "strategy": "golden_cross",
+      "params": {
+        "fast": 50,
+        "slow": 200
+      },
+      "weight": 1.0
+    },
+    {
+      "strategy": "stoch_rsi",
+      "params": {
+        "rsi_period": 14,
+        "stoch_period": 14,
+        "k_smooth": 3,
+        "d_smooth": 3,
+        "oversold": 20,
+        "overbought": 80
+      },
+      "weight": 1.0
+    }
+  ],
+  "trade_count": 2
+}

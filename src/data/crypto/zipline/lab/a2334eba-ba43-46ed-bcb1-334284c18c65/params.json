@@ -1,0 +1,12 @@
+{
+  "symbol": "BTC",
+  "strategy": "donchian_breakout",
+  "timeframe": "15m",
+  "start": "2026-01-01",
+  "end": "2026-06-03",
+  "capital_base": 1000.0,
+  "engine": "zipline",
+  "strategy_params": {
+    "channel": 20
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "symbol": "BTC",
+  "strategy": "momentum_rsi",
+  "timeframe": "15m",
+  "start": "2026-01-01",
+  "end": "2026-06-03",
+  "capital_base": 1000.0,
+  "engine": "zipline",
+  "strategy_params": {
+    "period": 14,
+    "oversold": 30,
+    "overbought": 70
+  }
+}

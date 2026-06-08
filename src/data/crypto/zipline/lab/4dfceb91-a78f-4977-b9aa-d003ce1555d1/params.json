@@ -1,0 +1,53 @@
+{
+  "symbol": "ETH",
+  "strategy": "combo:supertrend_sized+golden_cross+volume_breakout+stoch_rsi",
+  "timeframe": "15m",
+  "start": "2026-01-01",
+  "end": "2026-06-03",
+  "capital_base": 100000.0,
+  "engine": "zipline",
+  "strategy_params": {
+    "mode": "vote",
+    "legs": [
+      {
+        "strategy": "supertrend_sized",
+        "params": {
+          "atr_len": 10,
+          "factor": 3.0,
+          "max_position": 0.5,
+          "min_position": 0.15,
+          "dist_atr": 2.0
+        },
+        "weight": 1.0
+      },
+      {
+        "strategy": "golden_cross",
+        "params": {
+          "fast": 50,
+          "slow": 200
+        },
+        "weight": 1.0
+      },
+      {
+        "strategy": "volume_breakout",
+        "params": {
+          "lookback": 20,
+          "vol_mult": 1.5
+        },
+        "weight": 1.0
+      },
+      {
+        "strategy": "stoch_rsi",
+        "params": {
+          "rsi_period": 14,
+          "stoch_period": 14,
+          "k_smooth": 3,
+          "d_smooth": 3,
+          "oversold": 20,
+          "overbought": 80
+        },
+        "weight": 1.0
+      }
+    ]
+  }
+}

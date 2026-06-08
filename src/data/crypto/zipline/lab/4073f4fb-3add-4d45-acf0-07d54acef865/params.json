@@ -1,0 +1,31 @@
+{
+  "symbol": "BTC",
+  "strategy": "combo:ma_crossover+momentum_rsi",
+  "timeframe": "15m",
+  "start": "2026-01-01",
+  "end": "2026-06-03",
+  "capital_base": 100000.0,
+  "engine": "zipline",
+  "strategy_params": {
+    "mode": "and",
+    "legs": [
+      {
+        "strategy": "ma_crossover",
+        "params": {
+          "fast": 10,
+          "slow": 30
+        },
+        "weight": 1.0
+      },
+      {
+        "strategy": "momentum_rsi",
+        "params": {
+          "period": 14,
+          "oversold": 30,
+          "overbought": 70
+        },
+        "weight": 1.0
+      }
+    ]
+  }
+}

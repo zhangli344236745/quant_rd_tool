@@ -1,0 +1,37 @@
+{
+  "run_id": "246e1fba-26f8-418b-a5c9-25279d07bf00",
+  "symbol": "ETH",
+  "strategy": "golden_cross",
+  "timeframe": "15m",
+  "start": "2026-01-01",
+  "end": "2026-06-03",
+  "capital_base": 100000.0,
+  "generated_at": "2026-06-04T06:33:18.674937+00:00",
+  "engine": "zipline",
+  "metrics": {
+    "total_return": -0.008641,
+    "sharpe": -0.0293,
+    "max_drawdown": -0.107199,
+    "trade_count": 8
+  },
+  "final_signal": {
+    "position": "flat",
+    "target_pct": 0.0,
+    "bar_time": "2026-06-03 20:00:00+00:00"
+  },
+  "strategy_params": {
+    "fast": 50,
+    "slow": 200
+  },
+  "disclaimer": "回测结果仅供参考，不构成投资建议。",
+  "bundle": "crypto_ccxt_15m",
+  "asset": "CRYPTO_ETH",
+  "bar_minutes": 15,
+  "bar_count": 8533,
+  "backtest_start": "2026-03-07 00:00:00",
+  "backtest_end": "2026-06-03 00:00:00",
+  "ingest_skipped": true,
+  "fingerprint": "7b18df3038f8520d415a96e7",
+  "bars": 8533,
+  "trade_count": 8
+}
