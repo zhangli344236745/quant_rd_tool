@@ -1,0 +1,540 @@
+{
+  "symbol": "CRYPTO_BTC",
+  "pair": "BTC/USDT",
+  "timeframe": "5m",
+  "period": {
+    "start": "2026-06-05 15:35:00",
+    "end": "2026-06-08 10:10:00",
+    "bars": 800
+  },
+  "data_paths": {
+    "root": "/Users/worldunion/projects/pythonprojects/claudedemo/quant_rd_tool/data/crypto/CRYPTO_BTC",
+    "csv": "/Users/worldunion/projects/pythonprojects/claudedemo/quant_rd_tool/data/crypto/CRYPTO_BTC/ohlcv_5m.csv",
+    "qlib": "/Users/worldunion/projects/pythonprojects/claudedemo/quant_rd_tool/data/crypto/CRYPTO_BTC/qlib_5m"
+  },
+  "analysis": {
+    "symbol": "CRYPTO_BTC",
+    "period": {
+      "start": "2026-06-05",
+      "end": "2026-06-08",
+      "bars": 800
+    },
+    "price": {
+      "latest_close": 63100.0,
+      "period_high": 63817.99,
+      "period_low": 59207.42,
+      "pct_from_high": -0.011251
+    },
+    "returns": {
+      "1d": 0.001334,
+      "5d": 0.000349,
+      "20d": -0.005453,
+      "60d": 0.01849
+    },
+    "risk": {
+      "annualized_return": 0.002263,
+      "annualized_volatility": 0.002417,
+      "sharpe_ratio": 0.060692,
+      "max_drawdown": -0.063246
+    },
+    "technical": {
+      "ma_alignment": "震荡",
+      "close_vs_sma20": -0.002285,
+      "rsi_14": 48.56,
+      "rsi_zone": "中性",
+      "macd_trend": "MACD 空头",
+      "bollinger_zone": "中轨附近"
+    }
+  },
+  "technical_signal": {
+    "stance": "中性",
+    "action": "hold",
+    "score": -1,
+    "confidence": 0.25,
+    "reasons": [
+      "均线：震荡",
+      "RSI=48.56（中性）",
+      "MACD：MACD 空头",
+      "近20日涨跌：-0.55%",
+      "综合得分 -1"
+    ]
+  },
+  "ml_analysis": {
+    "enabled": false,
+    "skipped": true,
+    "reason": "样本不足（800 条 K 线），qlib 训练建议至少 2000 根（5m）。请增大 --backfill-days 或等待定时任务累积。"
+  },
+  "combined_signal": {
+    "stance": "中性",
+    "action": "hold",
+    "score": -1,
+    "confidence": 0.2,
+    "technical": {
+      "stance": "中性",
+      "action": "hold"
+    },
+    "ml": {
+      "stance": null,
+      "signal": null,
+      "predicted_return": null
+    },
+    "agreement": "仅技术面",
+    "reasons": [
+      "均线：震荡",
+      "RSI=48.56（中性）",
+      "MACD：MACD 空头",
+      "近20日涨跌：-0.55%",
+      "综合得分 -1"
+    ]
+  },
+  "signal": {
+    "stance": "中性",
+    "action": "hold",
+    "score": -1,
+    "confidence": 0.2,
+    "technical": {
+      "stance": "中性",
+      "action": "hold"
+    },
+    "ml": {
+      "stance": null,
+      "signal": null,
+      "predicted_return": null
+    },
+    "agreement": "仅技术面",
+    "reasons": [
+      "均线：震荡",
+      "RSI=48.56（中性）",
+      "MACD：MACD 空头",
+      "近20日涨跌：-0.55%",
+      "综合得分 -1"
+    ]
+  },
+  "narrative": {
+    "stance": "中性",
+    "action": "hold",
+    "summary": "CRYPTO_BTC 最新价 63100.0，研判 **中性**（建议操作：hold），信号置信度约 20%。 现货与期权波动均未给出强方向，宜轻仓或观望。",
+    "observations": [
+      "均线：震荡",
+      "RSI=48.56（中性）",
+      "MACD：MACD 空头",
+      "近20日涨跌：-0.55%",
+      "综合得分 -1",
+      "[期权] 近月 ATM 隐含波动率约 51.5%。",
+      "[期权] IV 历史分位约 33.33%。",
+      "[期权] 24h IV 变化约 -0.2%。",
+      "[期权] 横向波动排名 #2/4（含 BTC/ETH/SOL/BNB 等配置标的）。",
+      "[期权建议] BTC 期权波动未达告警阈值，可维持常规仓位管理。"
+    ],
+    "advice": "建议观望或维持现有仓位，等待趋势明朗；详见下方「投资方向说明」。",
+    "investment_brief": {
+      "sections": [
+        {
+          "title": "结论：「中性」在说什么",
+          "paragraphs": [
+            "综合研判为 **中性**（操作建议：hold），置信度约 20%。多空证据均不充分或相互抵消，宜观望或维持仓位，等待结构明朗。",
+            "技术面 中性，机器学习 未参与，二者 **仅技术面**。"
+          ]
+        },
+        {
+          "title": "价格结构",
+          "paragraphs": [
+            "现价约 **63,100.00**，样本区间高/低 **63,817.99 / 59,207.42**。",
+            "距区间高点约 **-1.1%**。",
+            "价格位于区间中上部，偏强整理或高位回落后的中段。",
+            "样本内最大回撤约 **-6.3%**，波动需纳入仓位管理。"
+          ]
+        },
+        {
+          "title": "多维度拆解",
+          "bullets": [
+            "**趋势（均线）**：震荡。 无明确顺势做多依据。",
+            "**动能（MACD）**：MACD 空头，短期卖压仍在，不宜仅凭小幅下跌抄底。",
+            "**RSI**：48.56（中性）。",
+            "**布林带**：中轨附近。",
+            "**短期收益**（近 5/20/60 根 K 线）：0.03% / -0.55% / 1.85%。",
+            "**机器学习**：未启用（样本不足（800 条 K 线），qlib 训练建议至少 2000 根（5m）。请增大 --backfill-days 或等待定时任务累积。）。"
+          ]
+        },
+        {
+          "title": "期权波动率（Binance）",
+          "bullets": [
+            "近月 ATM IV 约 **51.5%**。",
+            "IV 历史分位 **33.33%**（告警 normal）。",
+            "24h IV 变化 **-0.2%**。",
+            "参考合约：`BTC-260619-63000-C`。",
+            "配置标的横向波动排名 **#2/4**。",
+            "现货与期权波动均未给出强方向，宜轻仓或观望。",
+            "BTC：中性。 IV 分位 33.33%，24h -0.2%。",
+            "BTC 期权波动未达告警阈值，可维持常规仓位管理。",
+            "**买 Call 摘要**：相对更可关注 60000.0 Call：概率与方向尚可、IV 未极端，可小仓评估买方 Call（设止损/限仓）。",
+            "K=60000.0：可考虑买入 — 概率与方向尚可、IV 未极端，可小仓评估买方 Call（设止损/限仓）。",
+            "K=61000.0：可考虑买入 — 概率与方向尚可、IV 未极端，可小仓评估买方 Call（设止损/限仓）。",
+            "K=62000.0：可考虑买入 — 概率与方向尚可、IV 未极端，可小仓评估买方 Call（设止损/限仓）。",
+            "K=63000.0：可考虑买入 — 概率与方向尚可、IV 未极端，可小仓评估买方 Call（设止损/限仓）。",
+            "K=64000.0：观望 — 信号混合，宜等待更好入场或改用价差降低权利金。"
+          ]
+        },
+        {
+          "title": "按持仓场景的操作倾向",
+          "scenarios": [
+            {
+              "role": "已有多单",
+              "text": "持有但不加仓；止损可设在区间下沿或成本下方固定比例；加仓需 MACD 转多、RSI 回升至 50 上方并站稳均线。"
+            },
+            {
+              "role": "空仓",
+              "text": "不追空、不急于抄底；可等待放量突破均线 + MACD 金叉，或缩量回踩支撑二次确认。"
+            },
+            {
+              "role": "短线/波段",
+              "text": "更适合区间内小仓位高抛低吸，而非重仓赌单边；现价若近布林下轨，偏多等反弹至均线压力再减，而非重仓赌 V 反。"
+            }
+          ]
+        },
+        {
+          "title": "何时会改变方向判断",
+          "upgrades": [
+            {
+              "condition": "均线转多头 + MACD 多头 + RSI 回升至 50 上方",
+              "bias": "偏多 → 可考虑分批建多"
+            },
+            {
+              "condition": "均线空头 + MACD 空头 + RSI 超买",
+              "bias": "偏空 → 减仓或不做多"
+            },
+            {
+              "condition": "放量跌破区间下沿",
+              "bias": "偏空 → 止损/降风险优先"
+            },
+            {
+              "condition": "ML 测试集 IC 持续为正且信号偏多",
+              "bias": "增强看多（需持续验证，不可单根 K 线决策）"
+            }
+          ]
+        }
+      ],
+      "one_liner": "BTC/USDT：中性（hold）— 价 63,100，震荡，MACD 空头；详见多维拆解。",
+      "markdown": "## 投资方向说明（详细）\n\n> 数据周期：**5m**；时间均为**北京时间**；「近 N 根」指 K 线根数，非自然日。\n\n### 结论：「中性」在说什么\n\n综合研判为 **中性**（操作建议：hold），置信度约 20%。多空证据均不充分或相互抵消，宜观望或维持仓位，等待结构明朗。\n\n技术面 中性，机器学习 未参与，二者 **仅技术面**。\n\n\n### 价格结构\n\n现价约 **63,100.00**，样本区间高/低 **63,817.99 / 59,207.42**。\n\n距区间高点约 **-1.1%**。\n\n价格位于区间中上部，偏强整理或高位回落后的中段。\n\n样本内最大回撤约 **-6.3%**，波动需纳入仓位管理。\n\n\n### 多维度拆解\n\n- **趋势（均线）**：震荡。 无明确顺势做多依据。\n- **动能（MACD）**：MACD 空头，短期卖压仍在，不宜仅凭小幅下跌抄底。\n- **RSI**：48.56（中性）。\n- **布林带**：中轨附近。\n- **短期收益**（近 5/20/60 根 K 线）：0.03% / -0.55% / 1.85%。\n- **机器学习**：未启用（样本不足（800 条 K 线），qlib 训练建议至少 2000 根（5m）。请增大 --backfill-days 或等待定时任务累积。）。\n\n### 期权波动率（Binance）\n\n- 近月 ATM IV 约 **51.5%**。\n- IV 历史分位 **33.33%**（告警 normal）。\n- 24h IV 变化 **-0.2%**。\n- 参考合约：`BTC-260619-63000-C`。\n- 配置标的横向波动排名 **#2/4**。\n- 现货与期权波动均未给出强方向，宜轻仓或观望。\n- BTC：中性。 IV 分位 33.33%，24h -0.2%。\n- BTC 期权波动未达告警阈值，可维持常规仓位管理。\n- **买 Call 摘要**：相对更可关注 60000.0 Call：概率与方向尚可、IV 未极端，可小仓评估买方 Call（设止损/限仓）。\n- K=60000.0：可考虑买入 — 概率与方向尚可、IV 未极端，可小仓评估买方 Call（设止损/限仓）。\n- K=61000.0：可考虑买入 — 概率与方向尚可、IV 未极端，可小仓评估买方 Call（设止损/限仓）。\n- K=62000.0：可考虑买入 — 概率与方向尚可、IV 未极端，可小仓评估买方 Call（设止损/限仓）。\n- K=63000.0：可考虑买入 — 概率与方向尚可、IV 未极端，可小仓评估买方 Call（设止损/限仓）。\n- K=64000.0：观望 — 信号混合，宜等待更好入场或改用价差降低权利金。\n\n### 按持仓场景的操作倾向\n\n- **已有多单**：持有但不加仓；止损可设在区间下沿或成本下方固定比例；加仓需 MACD 转多、RSI 回升至 50 上方并站稳均线。\n- **空仓**：不追空、不急于抄底；可等待放量突破均线 + MACD 金叉，或缩量回踩支撑二次确认。\n- **短线/波段**：更适合区间内小仓位高抛低吸，而非重仓赌单边；现价若近布林下轨，偏多等反弹至均线压力再减，而非重仓赌 V 反。\n\n### 何时会改变方向判断\n\n- 若 均线转多头 + MACD 多头 + RSI 回升至 50 上方 → 偏多 → 可考虑分批建多\n- 若 均线空头 + MACD 空头 + RSI 超买 → 偏空 → 减仓或不做多\n- 若 放量跌破区间下沿 → 偏空 → 止损/降风险优先\n- 若 ML 测试集 IC 持续为正且信号偏多 → 增强看多（需持续验证，不可单根 K 线决策）\n\n### 一句话\n\nBTC/USDT：中性（hold）— 价 63,100，震荡，MACD 空头；详见多维拆解。\n"
+    },
+    "risks": [
+      "加密货币波动极大，杠杆与合约风险更高。",
+      "短周期（如 5m）信号变化快，需执行纪律，不宜重仓赌方向。",
+      "机器学习在单标的短周期上可能接近随机，勿单独作为开仓依据。",
+      "自动交易可能因滑点、限频、API 故障导致偏离预期。",
+      "不构成投资建议；实盘前请用测试网或 dry-run 验证。",
+      "期权波动与方向可能背离；卖方策略存在尾部风险。",
+      "行权价建议仅综合概率差、现货方向与 IV 环境，未计手续费、滑点与流动性；不构成投资建议。"
+    ],
+    "disclaimer": "仅供量化研究学习，不构成投资建议。"
+  },
+  "generated_at": "2026-06-08T02:12:34.026720+00:00",
+  "generated_at_beijing": "2026-06-08 10:12:34",
+  "options_vol": {
+    "enabled": true,
+    "base": "BTC",
+    "scan_item": {
+      "base": "BTC",
+      "ts": "2026-06-08T02:12:27.357423+00:00",
+      "atm_iv": 0.515,
+      "underlying_price": 63088.6391,
+      "contract": "BTC-260619-63000-C",
+      "expiry": "2026-06-19T00:00:00+00:00",
+      "dte": 10.91,
+      "iv_percentile": 33.33,
+      "iv_change_24h_pct": -0.19,
+      "alert_level": "normal",
+      "alerts": [],
+      "cold_start": false,
+      "composite_score": 0.1666,
+      "rank": 2
+    },
+    "advice": {
+      "base": "BTC",
+      "stance": "中性",
+      "summary": "BTC：中性。 IV 分位 33.33%，24h -0.2%。",
+      "actions": [
+        "BTC 期权波动未达告警阈值，可维持常规仓位管理。"
+      ],
+      "risks": [
+        "以下为基于隐含波动率规则的研究性提示，不构成投资建议。期权交易风险极高，请自行评估并控制仓位。"
+      ],
+      "reasons": [
+        "IV 历史分位约 33.33%（近月 ATM mark IV 0.515）。",
+        "24 小时 IV 变化约 -0.2%。",
+        "横向波动综合排名 #2。"
+      ],
+      "confidence": 0.45
+    },
+    "alert_level": "normal",
+    "iv_percentile": 33.33,
+    "iv_change_24h_pct": -0.19,
+    "atm_iv": 0.515,
+    "contract": "BTC-260619-63000-C",
+    "cold_start": false,
+    "peer_rank": 2,
+    "peer_count": 4,
+    "hottest_peer": "BTC",
+    "scanned_at": "2026-06-08T02:12:27.442516+00:00",
+    "cross_view": {
+      "alignment": "补充",
+      "summary": "现货与期权波动均未给出强方向，宜轻仓或观望。",
+      "notes": [
+        "近月 ATM 隐含波动率约 51.5%。",
+        "IV 历史分位约 33.33%。",
+        "24h IV 变化约 -0.2%。",
+        "横向波动排名 #2/4（含 BTC/ETH/SOL/BNB 等配置标的）。"
+      ],
+      "options_stance": "中性",
+      "spot_stance": "中性",
+      "spot_action": "hold"
+    },
+    "strike_ladder": {
+      "base": "BTC",
+      "spot": 63089.0035,
+      "expiry": "2026-06-19T00:00:00+00:00",
+      "dte": 10.91,
+      "n": 3,
+      "model": {
+        "enabled": true,
+        "sigma_ann": 0.218781,
+        "mu_ann": 0.156744,
+        "qlib": {
+          "enabled": true,
+          "signal": "中性",
+          "predicted_return": 0.000622,
+          "mu_ann": 0.15674400000000002
+        },
+        "assumptions": "GBM; realized vol + qlib drift; physical approx for model leg"
+      },
+      "rows": [
+        {
+          "strike": 60000.0,
+          "side": "C",
+          "symbol": "BTC-260619-60000-C",
+          "moneyness_pct": -4.9,
+          "mark_iv": 0.564,
+          "model": {
+            "expiry_itm_call": 0.924,
+            "touch_call": 1.0
+          },
+          "implied": {
+            "expiry_itm_call": 0.6794,
+            "touch_call": null
+          },
+          "edge_expiry": 0.2445,
+          "purchase": {
+            "verdict": "可考虑买入",
+            "summary": "概率与方向尚可、IV 未极端，可小仓评估买方 Call（设止损/限仓）。",
+            "reasons": [
+              "模型到期 ITM 概率高于隐含约 24.4pp，定价偏保守。",
+              "模型估计到期 ITM 概率约 92%。",
+              "现货方向中性，买 Call 需依赖波动或突破。"
+            ],
+            "strike": 60000.0,
+            "symbol": "BTC-260619-60000-C"
+          }
+        },
+        {
+          "strike": 61000.0,
+          "side": "C",
+          "symbol": "BTC-260619-61000-C",
+          "moneyness_pct": -3.31,
+          "mark_iv": 0.547,
+          "model": {
+            "expiry_itm_call": 0.8402,
+            "touch_call": 1.0
+          },
+          "implied": {
+            "expiry_itm_call": 0.6213,
+            "touch_call": null
+          },
+          "edge_expiry": 0.2189,
+          "purchase": {
+            "verdict": "可考虑买入",
+            "summary": "概率与方向尚可、IV 未极端，可小仓评估买方 Call（设止损/限仓）。",
+            "reasons": [
+              "模型到期 ITM 概率高于隐含约 21.9pp，定价偏保守。",
+              "模型估计到期 ITM 概率约 84%。",
+              "现货方向中性，买 Call 需依赖波动或突破。"
+            ],
+            "strike": 61000.0,
+            "symbol": "BTC-260619-61000-C"
+          }
+        },
+        {
+          "strike": 62000.0,
+          "side": "C",
+          "symbol": "BTC-260619-62000-C",
+          "moneyness_pct": -1.73,
+          "mark_iv": 0.531,
+          "model": {
+            "expiry_itm_call": 0.7141,
+            "touch_call": 1.0
+          },
+          "implied": {
+            "expiry_itm_call": 0.5572,
+            "touch_call": null
+          },
+          "edge_expiry": 0.1569,
+          "purchase": {
+            "verdict": "可考虑买入",
+            "summary": "概率与方向尚可、IV 未极端，可小仓评估买方 Call（设止损/限仓）。",
+            "reasons": [
+              "模型到期 ITM 概率高于隐含约 15.7pp，定价偏保守。",
+              "模型估计到期 ITM 概率约 71%。",
+              "现货方向中性，买 Call 需依赖波动或突破。"
+            ],
+            "strike": 62000.0,
+            "symbol": "BTC-260619-62000-C"
+          }
+        },
+        {
+          "strike": 63000.0,
+          "side": "C",
+          "symbol": "BTC-260619-63000-C",
+          "moneyness_pct": -0.14,
+          "mark_iv": 0.515,
+          "model": {
+            "expiry_itm_call": 0.5566,
+            "touch_call": 1.0
+          },
+          "implied": {
+            "expiry_itm_call": 0.4886,
+            "touch_call": null
+          },
+          "edge_expiry": 0.068,
+          "purchase": {
+            "verdict": "可考虑买入",
+            "summary": "概率与方向尚可、IV 未极端，可小仓评估买方 Call（设止损/限仓）。",
+            "reasons": [
+              "接近 ATM，Delta 与 Gamma 暴露适中。",
+              "模型到期 ITM 概率高于隐含约 6.8pp，定价偏保守。",
+              "模型估计到期 ITM 概率约 56%。",
+              "现货方向中性，买 Call 需依赖波动或突破。"
+            ],
+            "strike": 63000.0,
+            "symbol": "BTC-260619-63000-C"
+          }
+        },
+        {
+          "strike": 64000.0,
+          "side": "C",
+          "symbol": "BTC-260619-64000-C",
+          "moneyness_pct": 1.44,
+          "mark_iv": 0.502,
+          "model": {
+            "expiry_itm_call": 0.392,
+            "touch_call": 0.7322
+          },
+          "implied": {
+            "expiry_itm_call": 0.4174,
+            "touch_call": null
+          },
+          "edge_expiry": -0.0254,
+          "purchase": {
+            "verdict": "观望",
+            "summary": "信号混合，宜等待更好入场或改用价差降低权利金。",
+            "reasons": [
+              "接近 ATM，Delta 与 Gamma 暴露适中。",
+              "现货方向中性，买 Call 需依赖波动或突破。"
+            ],
+            "strike": 64000.0,
+            "symbol": "BTC-260619-64000-C"
+          }
+        },
+        {
+          "strike": 65000.0,
+          "side": "C",
+          "symbol": "BTC-260619-65000-C",
+          "moneyness_pct": 3.03,
+          "mark_iv": 0.491,
+          "model": {
+            "expiry_itm_call": 0.247,
+            "touch_call": 0.4661
+          },
+          "implied": {
+            "expiry_itm_call": 0.3468,
+            "touch_call": null
+          },
+          "edge_expiry": -0.0998,
+          "purchase": {
+            "verdict": "不建议买入",
+            "summary": "IV 偏贵或概率/方向不支持，优先现货/永续或卖波动结构。",
+            "reasons": [
+              "虚值约 3.0%，需较大涨幅才能实质 ITM。",
+              "隐含概率高于模型约 10.0pp，Call 偏贵。",
+              "模型到期 ITM 仅约 25%，赔率差。",
+              "现货方向中性，买 Call 需依赖波动或突破。"
+            ],
+            "strike": 65000.0,
+            "symbol": "BTC-260619-65000-C"
+          }
+        },
+        {
+          "strike": 66000.0,
+          "side": "C",
+          "symbol": "BTC-260619-66000-C",
+          "moneyness_pct": 4.61,
+          "mark_iv": 0.482,
+          "model": {
+            "expiry_itm_call": 0.1384,
+            "touch_call": 0.2633
+          },
+          "implied": {
+            "expiry_itm_call": 0.28,
+            "touch_call": null
+          },
+          "edge_expiry": -0.1416,
+          "purchase": {
+            "verdict": "不建议买入",
+            "summary": "IV 偏贵或概率/方向不支持，优先现货/永续或卖波动结构。",
+            "reasons": [
+              "虚值约 4.6%，需较大涨幅才能实质 ITM。",
+              "隐含概率高于模型约 14.2pp，Call 偏贵。",
+              "模型到期 ITM 仅约 14%，赔率差。",
+              "现货方向中性，买 Call 需依赖波动或突破。"
+            ],
+            "strike": 66000.0,
+            "symbol": "BTC-260619-66000-C"
+          }
+        }
+      ],
+      "warnings": [],
+      "disclaimer": "研究用途。模型概率（历史波动 + qlib 漂移，GBM）与期权隐含概率（风险中性）口径不同，不构成投资建议。",
+      "purchase_summary": {
+        "headline": "相对更可关注 60000.0 Call：概率与方向尚可、IV 未极端，可小仓评估买方 Call（设止损/限仓）。",
+        "spot_stance": "中性",
+        "iv_alert_level": "normal",
+        "consider_count": 4,
+        "avoid_count": 2,
+        "best_strike": 60000.0,
+        "best_contract": "BTC-260619-60000-C"
+      },
+      "purchase_disclaimer": "行权价建议仅综合概率差、现货方向与 IV 环境，未计手续费、滑点与流动性；不构成投资建议。"
+    }
+  },
+  "report_path": "/Users/worldunion/projects/pythonprojects/claudedemo/quant_rd_tool/data/crypto/CRYPTO_BTC/report.json",
+  "sync": {
+    "symbol": "BTC",
+    "qlib_code": "CRYPTO_BTC",
+    "pair": "BTC/USDT",
+    "timeframe": "5m",
+    "bars_count": 800,
+    "last_timestamp_ms": 1780884600000,
+    "last_date": "2026-06-08 10:10:00",
+    "last_date_beijing": "2026-06-08 10:10:00",
+    "last_date_utc": "2026-06-08 02:10:00",
+    "last_date_local": "2026-06-08 10:10:00",
+    "date_timezone": "Asia/Shanghai",
+    "timezone_note": "CSV 列 date 与 last_date 均为北京时间 (UTC+8)；timestamp 列为 UTC 毫秒",
+    "data_lag_minutes": 2,
+    "last_bar_closed": false,
+    "expected_lag_note": "最后一根 K 线北京时间开盘 2026-06-08 10:10:00，理论收盘 2026-06-08 10:15:00；未收盘（当前正在形成的 K 线）。与当前相差约 2 分钟；超过 5 分钟请重新 sync。",
+    "last_close": 63100.0,
+    "updated_at": "2026-06-08T02:12:33.912964+00:00",
+    "updated_at_beijing": "2026-06-08 10:12:33",
+    "last_sync_action": "incremental",
+    "new_bars": 1
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "crypto_ops": {
+    "kill_switch": false,
+    "webhook_url": "https://example.com/hook",
+    "webhook_on_error": true,
+    "webhook_on_circuit_breaker": true,
+    "updated_at": "2026-06-08T09:38:29.579200+00:00"
+  },
+  "schedule_alerts": {
+    "bark": {
+      "enabled": true,
+      "server": "https://api.day.app",
+      "device_key": "k1"
+    },
+    "updated_at": "2026-06-08T09:38:42.312812+00:00",
+    "consecutive_failures": 2,
+    "stale_minutes": 30,
+    "cooldown_minutes": 0,
+    "on_cycle_error": true,
+    "webhook_on_alert": false,
+    "on_cycle_complete": true,
+    "crypto_news": {
+      "on_high_impact": true,
+      "min_score": 90,
+      "min_llm_confidence": 0.95
+    }
+  }
+}

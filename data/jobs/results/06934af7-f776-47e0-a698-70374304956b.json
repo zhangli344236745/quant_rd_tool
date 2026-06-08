@@ -1,0 +1,311 @@
+{
+  "kind": "crypto_analyze",
+  "symbol": "ETH",
+  "combined_signal": {
+    "stance": "中性",
+    "action": "hold",
+    "score": -1,
+    "confidence": 0.2,
+    "technical": {
+      "stance": "中性",
+      "action": "hold"
+    },
+    "ml": {
+      "stance": null,
+      "signal": null,
+      "predicted_return": null
+    },
+    "agreement": "仅技术面",
+    "reasons": [
+      "均线：震荡",
+      "RSI=52.2（中性）",
+      "MACD：MACD 空头",
+      "近20日涨跌：-0.63%",
+      "综合得分 -1"
+    ]
+  },
+  "options_vol": {
+    "enabled": true,
+    "base": "ETH",
+    "scan_item": {
+      "base": "ETH",
+      "ts": "2026-06-08T02:14:09.748437+00:00",
+      "atm_iv": 0.6419,
+      "underlying_price": 1685.9993,
+      "contract": "ETH-260626-1700-C",
+      "expiry": "2026-06-26T00:00:00+00:00",
+      "dte": 17.91,
+      "iv_percentile": 78.57,
+      "iv_change_24h_pct": 0.0,
+      "alert_level": "normal",
+      "alerts": [],
+      "cold_start": false,
+      "composite_score": 0.3928,
+      "rank": 2
+    },
+    "advice": {
+      "base": "ETH",
+      "stance": "中性",
+      "summary": "ETH：中性。 IV 分位 78.57%，24h +0.0%。",
+      "actions": [
+        "ETH 期权波动未达告警阈值，可维持常规仓位管理。"
+      ],
+      "risks": [
+        "以下为基于隐含波动率规则的研究性提示，不构成投资建议。期权交易风险极高，请自行评估并控制仓位。"
+      ],
+      "reasons": [
+        "IV 历史分位约 78.57%（近月 ATM mark IV 0.6419）。",
+        "24 小时 IV 变化约 +0.0%。",
+        "横向波动综合排名 #2。"
+      ],
+      "confidence": 0.45
+    },
+    "alert_level": "normal",
+    "iv_percentile": 78.57,
+    "iv_change_24h_pct": 0.0,
+    "atm_iv": 0.6419,
+    "contract": "ETH-260626-1700-C",
+    "cold_start": false,
+    "peer_rank": 2,
+    "peer_count": 4,
+    "hottest_peer": "BTC",
+    "scanned_at": "2026-06-08T02:14:10.323714+00:00",
+    "cross_view": {
+      "alignment": "补充",
+      "summary": "现货与期权波动均未给出强方向，宜轻仓或观望。",
+      "notes": [
+        "近月 ATM 隐含波动率约 64.2%。",
+        "IV 历史分位约 78.57%。",
+        "24h IV 变化约 +0.0%。",
+        "横向波动排名 #2/4（含 BTC/ETH/SOL/BNB 等配置标的）。"
+      ],
+      "options_stance": "中性",
+      "spot_stance": "中性",
+      "spot_action": "hold"
+    },
+    "strike_ladder": {
+      "base": "ETH",
+      "spot": 1686.2258,
+      "expiry": "2026-06-26T00:00:00+00:00",
+      "dte": 17.91,
+      "n": 3,
+      "model": {
+        "enabled": true,
+        "sigma_ann": 0.255444,
+        "mu_ann": 0.288288,
+        "qlib": {
+          "enabled": true,
+          "signal": "中性",
+          "predicted_return": 0.001144,
+          "mu_ann": 0.288288
+        },
+        "assumptions": "GBM; realized vol + qlib drift; physical approx for model leg"
+      },
+      "rows": [
+        {
+          "strike": 1550.0,
+          "side": "C",
+          "symbol": "ETH-260626-1550-C",
+          "moneyness_pct": -8.08,
+          "mark_iv": 0.7045,
+          "model": {
+            "expiry_itm_call": 0.9564,
+            "touch_call": 1.0
+          },
+          "implied": {
+            "expiry_itm_call": 0.6779,
+            "touch_call": null
+          },
+          "edge_expiry": 0.2785,
+          "purchase": {
+            "verdict": "可考虑买入",
+            "summary": "概率与方向尚可、IV 未极端，可小仓评估买方 Call（设止损/限仓）。",
+            "reasons": [
+              "模型到期 ITM 概率高于隐含约 27.9pp，定价偏保守。",
+              "模型估计到期 ITM 概率约 96%。",
+              "现货方向中性，买 Call 需依赖波动或突破。"
+            ],
+            "strike": 1550.0,
+            "symbol": "ETH-260626-1550-C"
+          }
+        },
+        {
+          "strike": 1600.0,
+          "side": "C",
+          "symbol": "ETH-260626-1600-C",
+          "moneyness_pct": -5.11,
+          "mark_iv": 0.6796,
+          "model": {
+            "expiry_itm_call": 0.8748,
+            "touch_call": 1.0
+          },
+          "implied": {
+            "expiry_itm_call": 0.6077,
+            "touch_call": null
+          },
+          "edge_expiry": 0.2671,
+          "purchase": {
+            "verdict": "可考虑买入",
+            "summary": "概率与方向尚可、IV 未极端，可小仓评估买方 Call（设止损/限仓）。",
+            "reasons": [
+              "模型到期 ITM 概率高于隐含约 26.7pp，定价偏保守。",
+              "模型估计到期 ITM 概率约 87%。",
+              "现货方向中性，买 Call 需依赖波动或突破。"
+            ],
+            "strike": 1600.0,
+            "symbol": "ETH-260626-1600-C"
+          }
+        },
+        {
+          "strike": 1650.0,
+          "side": "C",
+          "symbol": "ETH-260626-1650-C",
+          "moneyness_pct": -2.15,
+          "mark_iv": 0.6588,
+          "model": {
+            "expiry_itm_call": 0.7276,
+            "touch_call": 1.0
+          },
+          "implied": {
+            "expiry_itm_call": 0.5302,
+            "touch_call": null
+          },
+          "edge_expiry": 0.1973,
+          "purchase": {
+            "verdict": "可考虑买入",
+            "summary": "概率与方向尚可、IV 未极端，可小仓评估买方 Call（设止损/限仓）。",
+            "reasons": [
+              "模型到期 ITM 概率高于隐含约 19.7pp，定价偏保守。",
+              "模型估计到期 ITM 概率约 73%。",
+              "现货方向中性，买 Call 需依赖波动或突破。"
+            ],
+            "strike": 1650.0,
+            "symbol": "ETH-260626-1650-C"
+          }
+        },
+        {
+          "strike": 1700.0,
+          "side": "C",
+          "symbol": "ETH-260626-1700-C",
+          "moneyness_pct": 0.82,
+          "mark_iv": 0.6417,
+          "model": {
+            "expiry_itm_call": 0.5311,
+            "touch_call": 0.912
+          },
+          "implied": {
+            "expiry_itm_call": 0.449,
+            "touch_call": null
+          },
+          "edge_expiry": 0.0821,
+          "purchase": {
+            "verdict": "可考虑买入",
+            "summary": "概率与方向尚可、IV 未极端，可小仓评估买方 Call（设止损/限仓）。",
+            "reasons": [
+              "接近 ATM，Delta 与 Gamma 暴露适中。",
+              "模型到期 ITM 概率高于隐含约 8.2pp，定价偏保守。",
+              "现货方向中性，买 Call 需依赖波动或突破。"
+            ],
+            "strike": 1700.0,
+            "symbol": "ETH-260626-1700-C"
+          }
+        },
+        {
+          "strike": 1750.0,
+          "side": "C",
+          "symbol": "ETH-260626-1750-C",
+          "moneyness_pct": 3.78,
+          "mark_iv": 0.63,
+          "model": {
+            "expiry_itm_call": 0.332,
+            "touch_call": 0.5862
+          },
+          "implied": {
+            "expiry_itm_call": 0.3685,
+            "touch_call": null
+          },
+          "edge_expiry": -0.0365,
+          "purchase": {
+            "verdict": "不建议买入",
+            "summary": "IV 偏贵或概率/方向不支持，优先现货/永续或卖波动结构。",
+            "reasons": [
+              "虚值约 3.8%，需较大涨幅才能实质 ITM。",
+              "现货方向中性，买 Call 需依赖波动或突破。"
+            ],
+            "strike": 1750.0,
+            "symbol": "ETH-260626-1750-C"
+          }
+        },
+        {
+          "strike": 1800.0,
+          "side": "C",
+          "symbol": "ETH-260626-1800-C",
+          "moneyness_pct": 6.75,
+          "mark_iv": 0.6244,
+          "model": {
+            "expiry_itm_call": 0.1756,
+            "touch_call": 0.3165
+          },
+          "implied": {
+            "expiry_itm_call": 0.2942,
+            "touch_call": null
+          },
+          "edge_expiry": -0.1186,
+          "purchase": {
+            "verdict": "不建议买入",
+            "summary": "IV 偏贵或概率/方向不支持，优先现货/永续或卖波动结构。",
+            "reasons": [
+              "虚值约 6.8%，需较大涨幅才能实质 ITM。",
+              "隐含概率高于模型约 11.9pp，Call 偏贵。",
+              "模型到期 ITM 仅约 18%，赔率差。",
+              "现货方向中性，买 Call 需依赖波动或突破。"
+            ],
+            "strike": 1800.0,
+            "symbol": "ETH-260626-1800-C"
+          }
+        },
+        {
+          "strike": 1850.0,
+          "side": "C",
+          "symbol": "ETH-260626-1850-C",
+          "moneyness_pct": 9.71,
+          "mark_iv": 0.6206,
+          "model": {
+            "expiry_itm_call": 0.0783,
+            "touch_call": 0.1434
+          },
+          "implied": {
+            "expiry_itm_call": 0.2287,
+            "touch_call": null
+          },
+          "edge_expiry": -0.1504,
+          "purchase": {
+            "verdict": "不建议买入",
+            "summary": "IV 偏贵或概率/方向不支持，优先现货/永续或卖波动结构。",
+            "reasons": [
+              "深度虚值约 9.7%，到期 ITM 概率偏低，属高杠杆博弈。",
+              "隐含概率高于模型约 15.0pp，Call 偏贵。",
+              "模型到期 ITM 仅约 8%，赔率差。",
+              "现货方向中性，买 Call 需依赖波动或突破。"
+            ],
+            "strike": 1850.0,
+            "symbol": "ETH-260626-1850-C"
+          }
+        }
+      ],
+      "warnings": [],
+      "disclaimer": "研究用途。模型概率（历史波动 + qlib 漂移，GBM）与期权隐含概率（风险中性）口径不同，不构成投资建议。",
+      "purchase_summary": {
+        "headline": "相对更可关注 1550.0 Call：概率与方向尚可、IV 未极端，可小仓评估买方 Call（设止损/限仓）。",
+        "spot_stance": "中性",
+        "iv_alert_level": "normal",
+        "consider_count": 4,
+        "avoid_count": 3,
+        "best_strike": 1550.0,
+        "best_contract": "ETH-260626-1550-C"
+      },
+      "purchase_disclaimer": "行权价建议仅综合概率差、现货方向与 IV 环境，未计手续费、滑点与流动性；不构成投资建议。"
+    }
+  },
+  "report_path": "/Users/worldunion/projects/pythonprojects/claudedemo/quant_rd_tool/data/crypto/CRYPTO_ETH/report.json"
+}

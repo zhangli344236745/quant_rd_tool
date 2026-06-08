@@ -3,6 +3,10 @@
     "btc-5m": {
       "failure_streak": 0,
       "last_alerts": {}
+    },
+    "btc-eth-5m": {
+      "failure_streak": 0,
+      "last_alerts": {}
     }
   }
 }

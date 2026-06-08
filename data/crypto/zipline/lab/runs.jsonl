@@ -1,0 +1,1 @@
+{"run_id": "ed5ffe58-c640-4d51-8da5-7a7db8ab0fd4", "symbol": "BTC", "strategy": "ma_crossover", "engine": "zipline", "start": "2026-01-01", "end": "2026-06-03", "total_return": -0.07221, "generated_at": "2026-06-08T02:11:25.295490+00:00"}
