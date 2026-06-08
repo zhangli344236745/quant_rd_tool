@@ -174,8 +174,14 @@ class JobRunner:
             snap = {
                 "kind": "crypto_analyze",
                 "symbol": sym,
+                "pair": out.get("pair"),
+                "timeframe": out.get("timeframe"),
+                "period": out.get("period"),
                 "combined_signal": signal,
+                "ui_summary": out.get("ui_summary"),
+                "narrative": out.get("narrative"),
                 "options_vol": out.get("options_vol"),
+                "news_digest": out.get("news_digest"),
                 "report_path": out.get("report_path"),
             }
             return save_job_result(job_id, snap), out

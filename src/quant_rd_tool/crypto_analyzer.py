@@ -501,3 +501,85 @@ def build_crypto_narrative(
         "risks": risks,
         "disclaimer": "仅供量化研究学习，不构成投资建议。",
     }
+
+
+def _strip_md(text: str) -> str:
+    return (text or "").replace("**", "").strip()
+
+
+def _fmt_pct_simple(v: Any) -> str:
+    if v is None:
+        return "—"
+    try:
+        return f"{float(v):.2%}"
+    except (TypeError, ValueError):
+        return "—"
+
+
+_ACTION_LABELS = {"buy": "买入", "sell": "卖出", "hold": "观望"}
+
+
+def build_crypto_ui_summary(report: dict[str, Any]) -> dict[str, Any]:
+    """Compact, plain-language summary for API / Web UI."""
+    narrative = report.get("narrative") or {}
+    analysis = report.get("analysis") or {}
+    combined = report.get("combined_signal") or report.get("signal") or {}
+    price = analysis.get("price") or {}
+    tech = analysis.get("technical") or {}
+    returns = analysis.get("returns") or {}
+    risk = analysis.get("risk") or {}
+    brief = narrative.get("investment_brief") or {}
+    action = str(narrative.get("action") or combined.get("action") or "hold")
+
+    price_lines = [
+        f"最新价约 {price.get('latest_close', '—')}",
+        f"样本区间高/低 {price.get('period_high', '—')} / {price.get('period_low', '—')}",
+    ]
+    if price.get("pct_from_high") is not None:
+        price_lines.append(f"距区间高点 {_fmt_pct_simple(price.get('pct_from_high'))}")
+
+    tech_lines = [
+        f"均线排列：{tech.get('ma_alignment', '—')}",
+        f"MACD：{tech.get('macd_trend', '—')}",
+        f"RSI(14)：{tech.get('rsi_14', '—')}（{tech.get('rsi_zone', '—')}）",
+        f"布林带：{tech.get('bollinger_zone', '—')}",
+    ]
+    ret_label = "根 K 线" if str(report.get("timeframe", "1d")) not in ("1d", "day") else "日"
+    tech_lines.append(
+        f"近 5/20 {ret_label}涨跌：{_fmt_pct_simple(returns.get('5d'))} / {_fmt_pct_simple(returns.get('20d'))}"
+    )
+    if risk.get("max_drawdown") is not None:
+        tech_lines.append(f"样本最大回撤 {_fmt_pct_simple(risk.get('max_drawdown'))}")
+
+    ml_block = combined.get("ml") or {}
+    tech_stance = (combined.get("technical") or {}).get("stance") or combined.get("stance")
+    ml_stance = ml_block.get("stance") or "未参与"
+
+    return {
+        "symbol": report.get("symbol") or analysis.get("symbol"),
+        "pair": report.get("pair"),
+        "timeframe": report.get("timeframe"),
+        "period": report.get("period"),
+        "headline": _strip_md(brief.get("one_liner") or narrative.get("summary") or ""),
+        "summary": _strip_md(narrative.get("summary") or ""),
+        "stance": narrative.get("stance") or combined.get("stance"),
+        "action": action,
+        "action_label": _ACTION_LABELS.get(action, action),
+        "advice": narrative.get("advice"),
+        "confidence": combined.get("confidence"),
+        "agreement": combined.get("agreement"),
+        "technical_stance": tech_stance,
+        "ml_stance": ml_stance,
+        "price_snapshot": {
+            "latest": price.get("latest_close"),
+            "period_high": price.get("period_high"),
+            "period_low": price.get("period_low"),
+            "pct_from_high": price.get("pct_from_high"),
+        },
+        "price_lines": price_lines,
+        "technical_lines": tech_lines,
+        "observations": narrative.get("observations") or [],
+        "risks": narrative.get("risks") or [],
+        "brief_sections": brief.get("sections") or [],
+        "disclaimer": narrative.get("disclaimer"),
+    }

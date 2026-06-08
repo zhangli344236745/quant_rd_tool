@@ -3,6 +3,9 @@ import { reactive, ref } from "vue";
 import { cryptoApi, type CryptoNewsDigest, type SymbolVarReport } from "@/api/crypto";
 import { jobsApi } from "@/api/jobs";
 import { useJobSubmit } from "@/composables/useJobSubmit";
+import CryptoAnalysisSummary, {
+  type CryptoUiSummary,
+} from "@/components/CryptoAnalysisSummary.vue";
 import ResultPanel from "@/components/ResultPanel.vue";
 import SignalSummary from "@/components/SignalSummary.vue";
 
@@ -21,6 +24,8 @@ const form = reactive({
 
 const { submit, polling } = useJobSubmit();
 const result = ref<Record<string, unknown> | null>(null);
+const uiSummary = ref<CryptoUiSummary | null>(null);
+const showRaw = ref(false);
 const error = ref("");
 
 async function loadSymbolVarSummary(symbol: string) {
@@ -44,19 +49,16 @@ async function loadSymbolVarSummary(symbol: string) {
 async function run(wait: boolean) {
   error.value = "";
   result.value = null;
+  uiSummary.value = null;
+  showRaw.value = false;
   symbolVar.value = null;
   symbolVarError.value = "";
   try {
     await submit(() => jobsApi.cryptoAnalyze({ ...form }), {
       wait,
       onDone: async (r) => {
-        result.value = {
-          combined_signal: r.combined_signal,
-          options_vol: r.options_vol,
-          news_digest: r.news_digest,
-          narrative: r.narrative,
-          ...r,
-        };
+        uiSummary.value = (r.ui_summary as CryptoUiSummary) || null;
+        result.value = { ...r };
         await loadSymbolVarSummary(form.symbol);
       },
     });
@@ -144,7 +146,11 @@ function optAlertType(level: string) {
         </el-card>
       </el-col>
       <el-col :span="14">
-        <el-card v-if="combined()" shadow="never" class="panel-card">
+        <el-card v-if="uiSummary" shadow="never" class="panel-card">
+          <template #header>分析总结（白话）</template>
+          <CryptoAnalysisSummary :summary="uiSummary" />
+        </el-card>
+        <el-card v-else-if="combined()" shadow="never" class="panel-card">
           <template #header>综合信号</template>
           <SignalSummary :signal="combined()" />
         </el-card>
@@ -255,7 +261,20 @@ function optAlertType(level: string) {
             {{ ((optionsVol()?.strike_ladder as any).purchase_summary).headline }}
           </p>
         </el-card>
-        <ResultPanel :loading="polling" :result="result" :error="error" />
+        <el-card v-if="result && !polling" shadow="never" class="panel-card mt">
+          <template #header>
+            <div class="raw-head">
+              <span>原始数据</span>
+              <el-button link type="primary" @click="showRaw = !showRaw">
+                {{ showRaw ? "收起" : "展开" }}
+              </el-button>
+            </div>
+          </template>
+          <pre v-if="showRaw" class="json-viewer">{{ JSON.stringify(result, null, 2) }}</pre>
+          <p v-else class="muted small">技术人员可展开查看完整 JSON 结果。</p>
+        </el-card>
+        <el-alert v-if="error" type="error" :title="error" show-icon class="mt" />
+        <div v-else-if="polling" v-loading="true" class="loading-box" />
       </el-col>
     </el-row>
   </div>
@@ -298,5 +317,23 @@ function optAlertType(level: string) {
 }
 .mr {
   margin-right: 6px;
+}
+.raw-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.json-viewer {
+  margin: 0;
+  padding: 12px;
+  max-height: 360px;
+  overflow: auto;
+  font-size: 12px;
+  background: var(--el-fill-color-light);
+  border-radius: 6px;
+}
+.loading-box {
+  min-height: 80px;
+  margin-top: 16px;
 }
 </style>

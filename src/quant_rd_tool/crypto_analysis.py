@@ -13,6 +13,7 @@ from quant_rd_tool import ccxt_data as cxt
 from quant_rd_tool.crypto_analyzer import (
     analyze_crypto_ohlcv,
     build_crypto_narrative,
+    build_crypto_ui_summary,
     derive_trading_signal,
 )
 from quant_rd_tool.crypto_ml import (
@@ -129,6 +130,8 @@ def analyze_crypto_from_df(
             data_dir=data_dir,
             with_options_vol=True,
         )
+
+    report["ui_summary"] = build_crypto_ui_summary(report)
 
     (root / "report.json").write_text(
         json.dumps({k: v for k, v in report.items() if k != "markdown"}, ensure_ascii=False, indent=2),
