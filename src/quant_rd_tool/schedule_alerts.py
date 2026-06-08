@@ -9,11 +9,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
 
-from quant_rd_tool.network_settings import load_settings
+from quant_rd_tool.network_settings import load_settings, settings_json_path
 
 logger = logging.getLogger(__name__)
-
-_SETTINGS_PATH = Path("data/settings.json")
 _DEFAULT_LOG = Path("data/crypto/schedule_alert_log.jsonl")
 _DEFAULT_STATE = Path("data/crypto/alert_state.json")
 
@@ -42,7 +40,7 @@ class ScheduleAlertRules:
 
 
 def get_alert_rules() -> dict[str, Any]:
-    data = load_settings(_SETTINGS_PATH)
+    data = load_settings(settings_json_path())
     raw = data.get("schedule_alerts") if isinstance(data.get("schedule_alerts"), dict) else {}
     rules = ScheduleAlertRules(
         enabled=raw.get("enabled", True) is not False,
@@ -180,7 +178,7 @@ def save_alert_rules(
     on_cycle_complete: bool | None = None,
     crypto_news: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    data = load_settings(_SETTINGS_PATH)
+    data = load_settings(settings_json_path())
     raw = dict(data.get("schedule_alerts") or {}) if isinstance(data.get("schedule_alerts"), dict) else {}
     if enabled is not None:
         raw["enabled"] = enabled
@@ -234,8 +232,9 @@ def save_alert_rules(
         raw["crypto_news"] = ent
     raw["updated_at"] = datetime.now(UTC).isoformat()
     data["schedule_alerts"] = raw
-    _SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
-    _SETTINGS_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    path = settings_json_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
     return get_alert_rules()
 
 
@@ -390,7 +389,7 @@ def _deliver_schedule_notifications(
                 group="schedule",
             )
         except Exception:
-            logger.debug("Bark push failed for %s", job_id, exc_info=True)
+            logger.warning("Bark push failed for %s", job_id, exc_info=True)
 
 
 def send_test_bark(bark: dict[str, Any] | None = None) -> dict[str, Any]:

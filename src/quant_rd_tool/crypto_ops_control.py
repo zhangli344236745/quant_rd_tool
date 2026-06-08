@@ -9,19 +9,17 @@ from typing import Any
 
 import httpx
 
-from quant_rd_tool.network_settings import load_settings
+from quant_rd_tool.network_settings import load_settings, settings_json_path
 from quant_rd_tool.perp_telemetry import Notifier, noop_notifier
 
-_SETTINGS_PATH = Path("data/settings.json")
-
-
 def _read_all() -> dict[str, Any]:
-    return load_settings(_SETTINGS_PATH)
+    return load_settings(settings_json_path())
 
 
 def _write_all(data: dict[str, Any]) -> None:
-    _SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
-    _SETTINGS_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    path = settings_json_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def get_crypto_ops() -> dict[str, Any]:
