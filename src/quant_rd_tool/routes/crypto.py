@@ -1399,6 +1399,125 @@ def crypto_options_greeks(
         raise HTTPException(status_code=503, detail=str(e)) from e
 
 
+@router.get("/options/greeks/portfolio")
+def crypto_options_portfolio_greeks(
+    base: str,
+    spot_pct: float = 0.75,
+    options_pct: float = 0.25,
+    overlay_id: str | None = None,
+    strategy_index: int = 0,
+    use_strategy_pack: bool = False,
+    spot_stance: str = "中性",
+    venue: str = "binance",
+    capital: float = 100_000.0,
+    expiry_date: str | None = None,
+    scale_mode: str = "notional",
+    persist: bool = False,
+    data_dir: str = "data/crypto",
+) -> dict[str, Any]:
+    from quant_rd_tool.crypto_options_portfolio_greeks import build_portfolio_greeks_report
+
+    base_u = base.strip().upper()
+    pack = None
+    if use_strategy_pack:
+        from quant_rd_tool.crypto_options_strategies import build_strategy_pack
+        from quant_rd_tool.crypto_options_vol_scan import run_volatility_scan
+
+        scan = run_volatility_scan(symbols=[base_u], persist_snapshot=False)
+        item = next((i for i in scan.get("items") or [] if i.get("base") == base_u), None)
+        if item:
+            pack = build_strategy_pack(scan_item=item, spot_stance=spot_stance)
+
+    mode = scale_mode if scale_mode in ("notional", "margin") else "notional"
+    try:
+        return build_portfolio_greeks_report(
+            base_u,
+            spot_pct=spot_pct,
+            options_pct=options_pct,
+            overlay_id=overlay_id,
+            strategy_pack=pack,
+            strategy_index=strategy_index,
+            venue=venue,  # type: ignore[arg-type]
+            capital=capital,
+            expiry_date=expiry_date,
+            scale_mode=mode,  # type: ignore[arg-type]
+            persist=persist,
+            data_dir=data_dir,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+@router.get("/options/greeks/portfolio/multi")
+def crypto_options_portfolio_greeks_multi(
+    bases: str,
+    weights: str | None = None,
+    spot_pct: float = 0.75,
+    options_pct: float = 0.25,
+    overlay_id: str | None = None,
+    use_strategy_pack: bool = False,
+    spot_stance: str = "中性",
+    venue: str = "binance",
+    capital: float = 100_000.0,
+    scale_mode: str = "notional",
+    persist: bool = False,
+    data_dir: str = "data/crypto",
+) -> dict[str, Any]:
+    from quant_rd_tool.crypto_options_portfolio_greeks import build_multi_from_lists
+
+    base_list = [b.strip().upper() for b in bases.split(",") if b.strip()]
+    if not base_list:
+        raise HTTPException(status_code=400, detail="bases required")
+    w_list = None
+    if weights:
+        try:
+            w_list = [float(x.strip()) for x in weights.split(",") if x.strip()]
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail="invalid weights") from e
+    mode = scale_mode if scale_mode in ("notional", "margin") else "notional"
+    try:
+        return build_multi_from_lists(
+            base_list,
+            weights=w_list,
+            capital=capital,
+            spot_pct=spot_pct,
+            options_pct=options_pct,
+            overlay_id=overlay_id,
+            venue=venue,  # type: ignore[arg-type]
+            scale_mode=mode,  # type: ignore[arg-type]
+            use_strategy_pack=use_strategy_pack,
+            spot_stance=spot_stance,
+            persist=persist,
+            data_dir=data_dir,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+@router.get("/options/greeks/portfolio/history")
+def crypto_options_portfolio_greeks_history(
+    portfolio_id: str | None = None,
+    bases: str | None = None,
+    limit: int = 120,
+    data_dir: str = "data/crypto",
+) -> dict[str, Any]:
+    from quant_rd_tool.crypto_options_portfolio_greeks_history import (
+        load_greeks_history,
+        portfolio_id_from_bases,
+    )
+
+    if portfolio_id:
+        pid = portfolio_id.strip()
+    elif bases:
+        pid = portfolio_id_from_bases([b.strip() for b in bases.split(",") if b.strip()])
+    else:
+        raise HTTPException(status_code=400, detail="portfolio_id or bases required")
+    items = load_greeks_history(pid, data_dir=data_dir, limit=limit)
+    return {"portfolio_id": pid, "count": len(items), "items": items}
+
+
 @router.get("/options/compare/spread-alerts/config")
 def crypto_options_spread_alerts_config_get(data_dir: str = "data/crypto") -> dict[str, Any]:
     from quant_rd_tool.crypto_options_spread_alerts import get_spread_alert_config

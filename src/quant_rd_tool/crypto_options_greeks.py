@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import math
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Literal
+
+from quant_rd_tool.crypto_options_strike_probs import norm_cdf
 
 from quant_rd_tool.crypto_options_compare import (
     _expiry_date_key,
@@ -28,6 +31,51 @@ def _safe_float(val: Any) -> float | None:
         return f
     except (TypeError, ValueError):
         return None
+
+
+def _norm_pdf(x: float) -> float:
+    return math.exp(-0.5 * x * x) / math.sqrt(2.0 * math.pi)
+
+
+def bs_analytical_greeks(
+    spot: float,
+    strike: float,
+    *,
+    iv: float,
+    dte_days: float,
+    opt_type: Literal["C", "P"],
+    risk_free: float = 0.0,
+) -> dict[str, float]:
+    """Black-Scholes Greeks (per 1 underlying coin contract)."""
+    if spot <= 0 or strike <= 0 or iv <= 0 or dte_days <= 0:
+        return {}
+    t = dte_days / 365.0
+    sig_sqrt = iv * math.sqrt(t)
+    if sig_sqrt <= 0:
+        return {}
+    d1 = (math.log(spot / strike) + (risk_free + 0.5 * iv * iv) * t) / sig_sqrt
+    d2 = d1 - sig_sqrt
+    pdf = _norm_pdf(d1)
+    gamma = pdf / (spot * sig_sqrt)
+    vega = spot * pdf * math.sqrt(t)
+    if opt_type == "C":
+        delta = norm_cdf(d1)
+        theta = (
+            -spot * pdf * iv / (2.0 * math.sqrt(t))
+            - risk_free * strike * math.exp(-risk_free * t) * norm_cdf(d2)
+        ) / 365.0
+    else:
+        delta = norm_cdf(d1) - 1.0
+        theta = (
+            -spot * pdf * iv / (2.0 * math.sqrt(t))
+            + risk_free * strike * math.exp(-risk_free * t) * norm_cdf(-d2)
+        ) / 365.0
+    return {
+        "delta": round(delta, 8),
+        "gamma": round(gamma, 10),
+        "theta": round(theta, 6),
+        "vega": round(vega, 6),
+    }
 
 
 def normalize_greeks(raw: dict[str, Any] | None) -> dict[str, Any]:
@@ -189,6 +237,20 @@ def build_greeks_chain(
         )
 
     atm_entry = next((r for r in ladder if r["strike"] == atm_k), ladder[len(ladder) // 2])
+
+    def _contract_index() -> dict[str, dict[str, Any]]:
+        idx: dict[str, dict[str, Any]] = {}
+        for side_key, side_char in (("call", "C"), ("put", "P")):
+            for row in ladder:
+                k = row["strike"]
+                for venue in ("binance", "deribit"):
+                    ent = (row.get(side_key) or {}).get(venue)
+                    if not ent:
+                        continue
+                    key = f"{venue}:{k}:{side_char}"
+                    idx[key] = ent
+        return idx
+
     return {
         "base": base_u,
         "available": True,
@@ -202,7 +264,49 @@ def build_greeks_chain(
         "atm_call": atm_entry.get("call"),
         "atm_put": atm_entry.get("put"),
         "rows": ladder,
+        "contract_index": _contract_index(),
         "common_expiries": common.get("expiries") or [],
         "disclaimer": _DISCLAIMER,
         "scanned_at": datetime.now(UTC).isoformat(),
     }
+
+
+def lookup_contract_greeks(
+    chain: dict[str, Any],
+    *,
+    strike: float,
+    opt_type: str,
+    venue: str = "binance",
+) -> dict[str, Any] | None:
+    """Resolve Greeks for one strike/type from a build_greeks_chain payload."""
+    if not chain.get("available"):
+        return None
+    side = (opt_type or "C").upper()[:1]
+    if side not in ("C", "P"):
+        side = "C"
+    key = f"{venue}:{strike}:{side}"
+    idx = chain.get("contract_index") or {}
+    ent = idx.get(key)
+    if ent:
+        return ent
+    spot = float(chain.get("spot") or 0)
+    iv = None
+    for row in chain.get("rows") or []:
+        if abs(float(row.get("strike") or 0) - float(strike)) > 1e-6:
+            continue
+        leg = (row.get("call") if side == "C" else row.get("put")) or {}
+        ent = leg.get(venue)
+        if ent:
+            iv = ent.get("mark_iv")
+            break
+    if spot <= 0:
+        return None
+    iv_f = float(iv) if iv else 0.5
+    g = bs_analytical_greeks(
+        spot,
+        float(strike),
+        iv=iv_f,
+        dte_days=float(chain.get("dte") or 14),
+        opt_type=side,  # type: ignore[arg-type]
+    )
+    return {"strike": strike, "greeks": g, "mark_iv": iv_f, "synthetic": True}

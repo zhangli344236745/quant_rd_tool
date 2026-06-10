@@ -11,6 +11,7 @@ import {
 } from "@/api/crypto";
 import { extractError } from "@/api/http";
 import EquityCurveChart from "@/components/EquityCurveChart.vue";
+import OptionsPortfolioGreeksPanel from "@/components/options/OptionsPortfolioGreeksPanel.vue";
 
 const dataDir = "data/crypto";
 
@@ -866,6 +867,17 @@ onMounted(async () => {
           class="mt"
         />
         <p class="muted small mt">{{ result.options_backtest.disclaimer }}</p>
+      </el-card>
+      <el-card
+        v-if="result.portfolio_greeks?.available"
+        shadow="never"
+        class="inner-card mt"
+      >
+        <template #header>组合 Greeks 风险</template>
+        <OptionsPortfolioGreeksPanel
+          :report="result.portfolio_greeks"
+          compact
+        />
       </el-card>
       <el-card
         v-if="(result.options_context as any)?.enabled"

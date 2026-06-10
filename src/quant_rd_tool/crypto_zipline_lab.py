@@ -239,6 +239,12 @@ def run_lab_backtest(
             result["options_context"] = opts
         except Exception as e:
             result["options_context"] = {"enabled": False, "error": str(e)}
+
+    if with_options_backtest or with_options_context:
+        from quant_rd_tool.crypto_options_portfolio_greeks import attach_portfolio_greeks_to_result
+
+        attach_portfolio_greeks_to_result(result, symbol=sym, capital=capital_base)
+
     return save_run(data_dir, result)
 
 

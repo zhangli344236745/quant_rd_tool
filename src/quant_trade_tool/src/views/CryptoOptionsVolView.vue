@@ -8,6 +8,8 @@ import {
   type OptionsAlignedCompareResult,
   type OptionsCommonExpiriesResult,
   type OptionsGreeksResult,
+  type OptionsPortfolioGreeksResult,
+  type OptionsPortfolioGreeksHistoryRow,
   type OptionsSpreadAlertConfig,
   type OptionsSpreadAlertLogRow,
   type OptionsSpreadHistoryRow,
@@ -24,6 +26,7 @@ import OptionsLineChart from "@/components/options/OptionsLineChart.vue";
 import IvSkewChart from "@/components/options/IvSkewChart.vue";
 import StrikeProbChart from "@/components/options/StrikeProbChart.vue";
 import DualVenueLineChart from "@/components/options/DualVenueLineChart.vue";
+import OptionsPortfolioGreeksPanel from "@/components/options/OptionsPortfolioGreeksPanel.vue";
 
 const router = useRouter();
 const activeTab = ref("scan");
@@ -59,6 +62,21 @@ const spreadHistoryLoading = ref(false);
 const greeksLoading = ref(false);
 const greeksReport = ref<OptionsGreeksResult | null>(null);
 const greeksSide = ref<"call" | "put">("call");
+
+const portfolioGreeksLoading = ref(false);
+const portfolioGreeksReport = ref<OptionsPortfolioGreeksResult | null>(null);
+const portfolioSpotPct = ref(0.75);
+const portfolioOptionsPct = ref(0.25);
+const portfolioStrategyIndex = ref(0);
+const portfolioUseStrategyPack = ref(true);
+const portfolioOverlayId = ref("");
+const portfolioScaleMode = ref<"notional" | "margin">("margin");
+const portfolioMultiMode = ref(false);
+const portfolioMultiBases = ref<string[]>(["BTC", "ETH"]);
+const portfolioCapital = ref(100_000);
+const greeksHistoryLoading = ref(false);
+const greeksHistory = ref<OptionsPortfolioGreeksHistoryRow[]>([]);
+const greeksHistoryMetric = ref<"delta_usd" | "theta" | "vega">("delta_usd");
 
 const spreadAlertVisible = ref(false);
 const spreadAlertSaving = ref(false);
@@ -271,6 +289,97 @@ async function loadGreeks() {
     greeksReport.value = null;
   } finally {
     greeksLoading.value = false;
+  }
+  await loadPortfolioGreeks();
+}
+
+const scanBases = computed(() => (scan.value?.items || []).map((i) => i.base).filter(Boolean));
+
+const greeksHistoryChartPoints = computed(() => {
+  const key = greeksHistoryMetric.value;
+  return greeksHistory.value
+    .filter((r) => {
+      if (key === "delta_usd") return r.delta_usd != null;
+      return r.net?.[key === "theta" ? "theta" : "vega"] != null;
+    })
+    .map((r) => ({
+      label: r.ts.slice(5, 16).replace("T", " "),
+      value:
+        key === "delta_usd"
+          ? Number(r.delta_usd)
+          : Number(r.net?.[key === "theta" ? "theta" : "vega"]),
+    }));
+});
+
+function portfolioHistoryId() {
+  if (portfolioMultiMode.value && portfolioMultiBases.value.length) {
+    const sorted = [...portfolioMultiBases.value].sort();
+    return sorted.length === 1 ? sorted[0] : `multi:${sorted.join(",")}`;
+  }
+  return selectedBase.value || "BTC";
+}
+
+async function loadGreeksHistory() {
+  const pid = portfolioHistoryId();
+  if (!pid) {
+    greeksHistory.value = [];
+    return;
+  }
+  greeksHistoryLoading.value = true;
+  try {
+    const { data } = await cryptoApi.optionsPortfolioGreeksHistory({
+      portfolio_id: pid,
+      limit: 120,
+    });
+    greeksHistory.value = data.items || [];
+  } catch {
+    greeksHistory.value = [];
+  } finally {
+    greeksHistoryLoading.value = false;
+  }
+}
+
+async function loadPortfolioGreeks() {
+  if (!portfolioMultiMode.value && !selectedBase.value) {
+    portfolioGreeksReport.value = null;
+    return;
+  }
+  if (portfolioMultiMode.value && !portfolioMultiBases.value.length) {
+    portfolioGreeksReport.value = null;
+    return;
+  }
+  portfolioGreeksLoading.value = true;
+  try {
+    const common = {
+      spot_pct: portfolioSpotPct.value,
+      options_pct: portfolioOptionsPct.value,
+      use_strategy_pack: portfolioUseStrategyPack.value,
+      scale_mode: portfolioScaleMode.value,
+      capital: portfolioCapital.value,
+      persist: true,
+    };
+    if (portfolioMultiMode.value) {
+      const { data } = await cryptoApi.optionsPortfolioGreeksMulti({
+        bases: portfolioMultiBases.value.join(","),
+        overlay_id: portfolioUseStrategyPack.value ? undefined : portfolioOverlayId.value || "call_overlay",
+        ...common,
+      });
+      portfolioGreeksReport.value = data;
+    } else {
+      const { data } = await cryptoApi.optionsPortfolioGreeks({
+        base: selectedBase.value,
+        strategy_index: portfolioStrategyIndex.value,
+        overlay_id: portfolioUseStrategyPack.value ? undefined : portfolioOverlayId.value || "call_overlay",
+        expiry_date: alignedExpiryDate.value || undefined,
+        ...common,
+      });
+      portfolioGreeksReport.value = data;
+    }
+    await loadGreeksHistory();
+  } catch {
+    portfolioGreeksReport.value = null;
+  } finally {
+    portfolioGreeksLoading.value = false;
   }
 }
 
@@ -979,6 +1088,128 @@ onMounted(async () => {
               {{ greeksReport.disclaimer }}
             </p>
           </el-card>
+
+          <el-card shadow="never" class="panel-card mt">
+            <template #header>
+              组合 Greeks 风险
+              <el-button
+                size="small"
+                class="ml"
+                :loading="portfolioGreeksLoading"
+                @click="loadPortfolioGreeks"
+              >
+                刷新
+              </el-button>
+            </template>
+            <el-form inline size="small" class="portfolio-form">
+              <el-form-item label="现货%">
+                <el-slider
+                  v-model="portfolioSpotPct"
+                  :min="0"
+                  :max="1"
+                  :step="0.05"
+                  :format-tooltip="(v: number) => (v * 100).toFixed(0) + '%'"
+                  style="width: 140px"
+                  @change="loadPortfolioGreeks"
+                />
+              </el-form-item>
+              <el-form-item label="期权%">
+                <el-slider
+                  v-model="portfolioOptionsPct"
+                  :min="0"
+                  :max="0.5"
+                  :step="0.05"
+                  :format-tooltip="(v: number) => (v * 100).toFixed(0) + '%'"
+                  style="width: 120px"
+                  @change="loadPortfolioGreeks"
+                />
+              </el-form-item>
+              <el-form-item label="缩放">
+                <el-radio-group
+                  v-model="portfolioScaleMode"
+                  size="small"
+                  @change="loadPortfolioGreeks"
+                >
+                  <el-radio-button value="margin">保证金</el-radio-button>
+                  <el-radio-button value="notional">名义</el-radio-button>
+                </el-radio-group>
+              </el-form-item>
+              <el-form-item label="多币种">
+                <el-switch v-model="portfolioMultiMode" @change="loadPortfolioGreeks" />
+              </el-form-item>
+              <el-form-item v-if="portfolioMultiMode" label="组合">
+                <el-checkbox-group
+                  v-model="portfolioMultiBases"
+                  size="small"
+                  @change="loadPortfolioGreeks"
+                >
+                  <el-checkbox
+                    v-for="b in scanBases.length ? scanBases : ['BTC', 'ETH', 'SOL', 'BNB']"
+                    :key="b"
+                    :label="b"
+                  />
+                </el-checkbox-group>
+              </el-form-item>
+              <el-form-item label="策略来源">
+                <el-switch
+                  v-model="portfolioUseStrategyPack"
+                  active-text="strategy_pack"
+                  inactive-text="overlay"
+                  @change="loadPortfolioGreeks"
+                />
+              </el-form-item>
+              <el-form-item v-if="portfolioUseStrategyPack && selectedStrategies().length" label="策略">
+                <el-select
+                  v-model="portfolioStrategyIndex"
+                  style="width: 200px"
+                  @change="loadPortfolioGreeks"
+                >
+                  <el-option
+                    v-for="(s, i) in selectedStrategies()"
+                    :key="i"
+                    :label="s.name"
+                    :value="i"
+                  />
+                </el-select>
+              </el-form-item>
+              <el-form-item v-if="!portfolioUseStrategyPack" label="Overlay">
+                <el-select
+                  v-model="portfolioOverlayId"
+                  style="width: 160px"
+                  placeholder="call_overlay"
+                  @change="loadPortfolioGreeks"
+                >
+                  <el-option label="call_overlay" value="call_overlay" />
+                  <el-option label="put_hedge" value="put_hedge" />
+                  <el-option label="covered_call" value="covered_call" />
+                  <el-option label="short_straddle_iv" value="short_straddle_iv" />
+                  <el-option label="long_straddle" value="long_straddle" />
+                </el-select>
+              </el-form-item>
+            </el-form>
+            <OptionsPortfolioGreeksPanel
+              :report="portfolioGreeksReport"
+              :loading="portfolioGreeksLoading"
+            />
+
+            <div v-loading="greeksHistoryLoading" class="greeks-history mt">
+              <div class="history-head">
+                <span class="muted small">Greeks 历史 · {{ portfolioHistoryId() }}</span>
+                <el-radio-group v-model="greeksHistoryMetric" size="small">
+                  <el-radio-button value="delta_usd">Δ USD</el-radio-button>
+                  <el-radio-button value="theta">Θ</el-radio-button>
+                  <el-radio-button value="vega">V</el-radio-button>
+                </el-radio-group>
+              </div>
+              <OptionsLineChart
+                v-if="greeksHistoryChartPoints.length >= 2"
+                :points="greeksHistoryChartPoints"
+                :height="180"
+                :y-format="(v) => (Math.abs(v) >= 1000 ? (v / 1000).toFixed(1) + 'k' : v.toFixed(0))"
+              />
+              <el-empty v-else description="刷新组合 Greeks 后累积历史曲线" />
+            </div>
+          </el-card>
         </el-tab-pane>
 
         <el-tab-pane label="跨所对比" name="venue">
@@ -1201,6 +1432,23 @@ onMounted(async () => {
 }
 .mb {
   margin-bottom: 12px;
+}
+.portfolio-form {
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.greeks-history {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--el-border-color-lighter);
+}
+.history-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
 }
 .mt {
   margin-top: 16px;

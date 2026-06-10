@@ -1,2 +1,3 @@
 {"base": "ETH", "ts": "2026-06-10T09:02:01.896482+00:00", "expiry_date": "2026-06-26", "dte": 15.62, "atm_strike": 1600.0, "binance_iv": 0.6212, "deribit_iv": 0.6219, "iv_spread_pp": -0.07, "richer_venue": "neutral", "alert_level": "normal"}
 {"base": "ETH", "ts": "2026-06-10T09:20:42.692126+00:00", "expiry_date": "2026-06-26", "dte": 15.61, "atm_strike": 1600.0, "binance_iv": 0.6229, "deribit_iv": 0.624, "iv_spread_pp": -0.11, "richer_venue": "neutral", "alert_level": "normal"}
+{"base": "ETH", "ts": "2026-06-10T09:22:22.561488+00:00", "expiry_date": "2026-06-26", "dte": 15.61, "atm_strike": 1600.0, "binance_iv": 0.6236, "deribit_iv": 0.6248, "iv_spread_pp": -0.12, "richer_venue": "neutral", "alert_level": "normal"}

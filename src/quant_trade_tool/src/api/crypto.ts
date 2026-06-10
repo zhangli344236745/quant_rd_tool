@@ -295,6 +295,7 @@ export interface CryptoZiplineBacktestResult {
   capital_base: number;
   options_context?: Record<string, unknown>;
   options_backtest?: OptionsBacktestBlock;
+  portfolio_greeks?: OptionsPortfolioGreeksResult;
   spot_backtest?: { metrics?: Record<string, number>; equity_curve?: { time: string; value: number }[] };
   options_only_engine?: boolean;
   metrics: {
@@ -610,6 +611,50 @@ export const cryptoApi = {
   optionsGreeks: (base: string, expiry_date?: string, n = 3) =>
     http.get<OptionsGreeksResult>("/crypto/options/greeks", {
       params: { base, expiry_date, n },
+    }),
+
+  optionsPortfolioGreeks: (params: {
+    base: string;
+    spot_pct?: number;
+    options_pct?: number;
+    overlay_id?: string;
+    strategy_index?: number;
+    use_strategy_pack?: boolean;
+    spot_stance?: string;
+    venue?: string;
+    capital?: number;
+    expiry_date?: string;
+    scale_mode?: "notional" | "margin";
+    persist?: boolean;
+  }) =>
+    http.get<OptionsPortfolioGreeksResult>("/crypto/options/greeks/portfolio", {
+      params,
+    }),
+
+  optionsPortfolioGreeksMulti: (params: {
+    bases: string;
+    weights?: string;
+    spot_pct?: number;
+    options_pct?: number;
+    overlay_id?: string;
+    use_strategy_pack?: boolean;
+    spot_stance?: string;
+    venue?: string;
+    capital?: number;
+    scale_mode?: "notional" | "margin";
+    persist?: boolean;
+  }) =>
+    http.get<OptionsPortfolioGreeksResult>("/crypto/options/greeks/portfolio/multi", {
+      params,
+    }),
+
+  optionsPortfolioGreeksHistory: (params: {
+    portfolio_id?: string;
+    bases?: string;
+    limit?: number;
+  }) =>
+    http.get<OptionsPortfolioGreeksHistoryResult>("/crypto/options/greeks/portfolio/history", {
+      params,
     }),
 
   optionsSpreadAlertsConfigGet: () =>
@@ -1092,6 +1137,81 @@ export interface OptionsGreeksResult {
   atm_strike?: number;
   rows?: OptionsGreeksRow[];
   disclaimer?: string;
+}
+
+export interface OptionsPortfolioGreekLeg {
+  label?: string;
+  kind?: string;
+  side?: string;
+  type?: string;
+  strike?: number;
+  weight?: number;
+  contribution?: {
+    delta?: number;
+    gamma?: number;
+    theta?: number;
+    vega?: number;
+  };
+  synthetic?: boolean;
+}
+
+export interface OptionsPortfolioGreeksSummary {
+  net?: { delta?: number; gamma?: number; theta?: number; vega?: number };
+  delta_coins?: number;
+  delta_usd?: number;
+  delta_notional_pct?: number;
+  hedge_coins?: number;
+  margin_used_usd?: number;
+  margin_utilization_pct?: number;
+  gamma_usd_scale_note?: string;
+  scenarios?: {
+    spot_up_5pct_pnl?: number;
+    theta_1d_pnl?: number;
+    iv_up_1pt_pnl?: number;
+  };
+  alerts?: string[];
+  risk_level?: string;
+}
+
+export interface OptionsPortfolioGreeksResult {
+  base?: string;
+  bases?: string[];
+  portfolio_id?: string;
+  multi?: boolean;
+  available: boolean;
+  reason?: string;
+  error?: string;
+  spot?: number;
+  expiry_date?: string;
+  dte?: number;
+  atm_strike?: number;
+  venue?: string;
+  scale_mode?: "notional" | "margin";
+  allocation?: { spot_pct?: number; options_pct?: number; capital?: number };
+  source?: { type?: string; name?: string; id?: string; overlay_id?: string };
+  legs?: OptionsPortfolioGreekLeg[];
+  constituents?: OptionsPortfolioGreeksResult[];
+  summary?: OptionsPortfolioGreeksSummary;
+  disclaimer?: string;
+}
+
+export interface OptionsPortfolioGreeksHistoryRow {
+  ts: string;
+  portfolio_id: string;
+  bases?: string[];
+  scale_mode?: string;
+  capital?: number;
+  margin_used_usd?: number;
+  delta_usd?: number;
+  net?: { delta?: number; gamma?: number; theta?: number; vega?: number };
+  risk_level?: string;
+  constituents?: Array<{ base?: string; weight_pct?: number; delta_usd?: number }>;
+}
+
+export interface OptionsPortfolioGreeksHistoryResult {
+  portfolio_id: string;
+  count: number;
+  items: OptionsPortfolioGreeksHistoryRow[];
 }
 
 export interface OptionsSpreadAlertConfig {
