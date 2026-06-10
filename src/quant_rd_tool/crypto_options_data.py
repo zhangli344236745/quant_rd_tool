@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import time
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -18,6 +19,19 @@ logger = logging.getLogger(__name__)
 DEFAULT_SYMBOLS = ("BTC", "ETH", "SOL", "BNB")
 EAPI_BASE = "https://eapi.binance.com"
 _OPTION_RE = re.compile(r"^(?P<base>[A-Z0-9]+)-(?P<exp>\d{6})-(?P<strike>\d+(?:\.\d+)?)-(?P<side>[CP])$")
+
+_MARK_ROWS_CACHE: tuple[float, list[dict[str, Any]]] | None = None
+_MARK_ROWS_CACHE_TTL = 45.0
+_MARK_ROWS_STALE_TTL = 300.0
+_INDEX_CACHE: dict[str, tuple[float, float]] = {}
+_INDEX_CACHE_TTL = 45.0
+
+
+def clear_options_mark_cache() -> None:
+    """Clear in-memory EAPI mark/index caches (tests)."""
+    global _MARK_ROWS_CACHE
+    _MARK_ROWS_CACHE = None
+    _INDEX_CACHE.clear()
 
 
 def options_iv_dir(data_dir: str | Path = "data/crypto") -> Path:
@@ -40,17 +54,62 @@ def _client() -> httpx.Client:
     return httpx.Client(**kwargs)
 
 
-def fetch_mark_rows(*, client: httpx.Client | None = None) -> list[dict[str, Any]]:
-    """GET /eapi/v1/mark — mark IV per option symbol."""
+def _cached_mark_rows() -> list[dict[str, Any]] | None:
+    global _MARK_ROWS_CACHE
+    if _MARK_ROWS_CACHE is None:
+        return None
+    ts, rows = _MARK_ROWS_CACHE
+    if time.time() - ts <= _MARK_ROWS_CACHE_TTL:
+        return rows
+    return None
+
+
+def _stale_mark_rows() -> list[dict[str, Any]] | None:
+    if _MARK_ROWS_CACHE is None:
+        return None
+    ts, rows = _MARK_ROWS_CACHE
+    if time.time() - ts <= _MARK_ROWS_STALE_TTL:
+        return rows
+    return None
+
+
+def fetch_mark_rows(
+    *,
+    client: httpx.Client | None = None,
+    use_cache: bool = True,
+) -> list[dict[str, Any]]:
+    """GET /eapi/v1/mark — mark IV per option symbol (shared TTL cache)."""
+    global _MARK_ROWS_CACHE
+    if use_cache:
+        cached = _cached_mark_rows()
+        if cached is not None:
+            return cached
+
     own = client is None
     c = client or _client()
+    last_err: Exception | None = None
     try:
-        r = c.get(f"{EAPI_BASE}/eapi/v1/mark")
-        r.raise_for_status()
-        data = r.json()
-        if not isinstance(data, list):
-            raise ValueError(f"unexpected mark payload: {type(data)}")
-        return data
+        for attempt in range(3):
+            try:
+                r = c.get(f"{EAPI_BASE}/eapi/v1/mark")
+                r.raise_for_status()
+                data = r.json()
+                if not isinstance(data, list):
+                    raise ValueError(f"unexpected mark payload: {type(data)}")
+                if use_cache:
+                    _MARK_ROWS_CACHE = (time.time(), data)
+                return data
+            except (httpx.HTTPError, ValueError) as e:
+                last_err = e
+                if attempt < 2:
+                    time.sleep(0.25 * (attempt + 1))
+        stale = _stale_mark_rows() if use_cache else None
+        if stale is not None:
+            logger.warning("eapi mark fetch failed, serving stale cache: %s", last_err)
+            return stale
+        if last_err:
+            raise last_err
+        raise ValueError("eapi mark fetch failed")
     finally:
         if own:
             c.close()
@@ -68,24 +127,47 @@ def fetch_index_price(
     base: str,
     *,
     client: httpx.Client | None = None,
+    use_cache: bool = True,
 ) -> float | None:
     """GET /eapi/v1/index?underlying=BTCUSDT — single underlying index."""
+    base_u = base.strip().upper()
+    now = time.time()
+    if use_cache and base_u in _INDEX_CACHE:
+        ts, px = _INDEX_CACHE[base_u]
+        if now - ts <= _INDEX_CACHE_TTL:
+            return px
+
     own = client is None
     c = client or _client()
+    last_err: Exception | None = None
     try:
-        r = c.get(
-            f"{EAPI_BASE}/eapi/v1/index",
-            params={"underlying": _underlying_param(base)},
-        )
-        r.raise_for_status()
-        data = r.json()
-        if isinstance(data, dict):
-            raw = data.get("indexPrice") or data.get("price")
-            if raw is not None:
-                return float(raw)
-        return None
-    except httpx.HTTPError as e:
-        logger.warning("eapi index failed for %s: %s", base, e)
+        for attempt in range(3):
+            try:
+                r = c.get(
+                    f"{EAPI_BASE}/eapi/v1/index",
+                    params={"underlying": _underlying_param(base_u)},
+                )
+                r.raise_for_status()
+                data = r.json()
+                if isinstance(data, dict):
+                    raw = data.get("indexPrice") or data.get("price")
+                    if raw is not None:
+                        px = float(raw)
+                        if use_cache:
+                            _INDEX_CACHE[base_u] = (time.time(), px)
+                        return px
+                return None
+            except httpx.HTTPError as e:
+                last_err = e
+                if attempt < 2:
+                    time.sleep(0.25 * (attempt + 1))
+        if last_err:
+            logger.warning("eapi index failed for %s: %s", base_u, last_err)
+        if use_cache and base_u in _INDEX_CACHE:
+            ts, px = _INDEX_CACHE[base_u]
+            if time.time() - ts <= _MARK_ROWS_STALE_TTL:
+                logger.warning("eapi index stale for %s", base_u)
+                return px
         return None
     finally:
         if own:

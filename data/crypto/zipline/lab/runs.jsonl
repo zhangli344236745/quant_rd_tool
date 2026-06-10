@@ -5,3 +5,4 @@
 {"run_id": "971c1cb6-4232-4c96-8799-18049d75fee9", "symbol": "BTC", "strategy": "mfi_revert", "engine": "zipline", "start": "2026-01-01", "end": "2026-06-03", "total_return": 0.032519, "generated_at": "2026-06-10T05:04:28.618198+00:00"}
 {"run_id": "43c86cae-5cf6-4dca-957b-ae3b645cf294", "symbol": "BTC", "strategy": "ut_bot", "engine": "zipline", "start": "2026-01-01", "end": "2026-06-03", "total_return": -0.040859, "generated_at": "2026-06-10T05:09:18.945525+00:00"}
 {"run_id": "e5876ecf-8f5c-473e-98b8-7f74c6666a83", "symbol": "BTC", "strategy": "tdi_dynamic", "engine": "zipline", "start": "2026-01-01", "end": "2026-06-03", "total_return": -0.061001, "generated_at": "2026-06-10T05:10:06.375007+00:00"}
+{"run_id": "e05bd0ce-358e-4b8a-8fd3-032e36cdfd5a", "symbol": "BTC", "strategy": "ma_crossover", "engine": "zipline", "start": "2026-01-01", "end": "2026-06-03", "total_return": -0.07221, "generated_at": "2026-06-10T09:52:58.145860+00:00"}
