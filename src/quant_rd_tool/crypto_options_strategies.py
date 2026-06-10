@@ -366,6 +366,36 @@ def build_strategy_pack(
         spot=spot,
         venue_compare=venue_compare,
     )
+    try:
+        spot_f = float(spot) if spot is not None else 0.0
+    except (TypeError, ValueError):
+        spot_f = 0.0
+    dte = 14.0
+    default_iv = 0.5
+    if scan_item:
+        try:
+            dte = float(scan_item.get("dte") or dte)
+        except (TypeError, ValueError):
+            pass
+        try:
+            default_iv = float(scan_item.get("atm_iv") or default_iv)
+        except (TypeError, ValueError):
+            pass
+    if strike_report:
+        try:
+            dte = float(strike_report.get("dte") or dte)
+        except (TypeError, ValueError):
+            pass
+    if spot_f > 0:
+        from quant_rd_tool.crypto_options_strategy_pnl import attach_strategy_pnl
+
+        strategies = attach_strategy_pnl(
+            strategies,
+            spot=spot_f,
+            dte=dte,
+            default_iv=default_iv,
+            strike_report=strike_report,
+        )
     headline = strategies[0]["name"] if strategies else "观望"
     return {
         "headline": headline,

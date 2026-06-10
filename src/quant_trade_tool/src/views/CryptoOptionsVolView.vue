@@ -205,6 +205,17 @@ function pct(v: number | null | undefined) {
   return (v * 100).toFixed(1) + "%";
 }
 
+function usd(v: number | null | undefined) {
+  if (v == null) return "—";
+  return "$" + Math.abs(v).toLocaleString(undefined, { maximumFractionDigits: 0 });
+}
+
+function usdSigned(v: number | null | undefined) {
+  if (v == null) return "—";
+  const sign = v >= 0 ? "+" : "-";
+  return sign + "$" + Math.abs(v).toLocaleString(undefined, { maximumFractionDigits: 0 });
+}
+
 function edgeClass(edge: number | null | undefined) {
   if (edge == null) return "";
   if (edge > 0.05) return "edge-pos";
@@ -1388,10 +1399,76 @@ onMounted(async () => {
                 <span class="muted small">评分 {{ (s.score * 100).toFixed(0) }}</span>
               </div>
               <p class="strategy-rationale">{{ s.rationale }}</p>
+              <div
+                v-if="s.pnl?.per_contract?.available"
+                class="strategy-pnl mt"
+              >
+                <el-row :gutter="8">
+                  <el-col :span="8">
+                    <div class="pnl-chip">
+                      <span class="muted small">净权利金/合约</span>
+                      <strong>{{ usdSigned(s.pnl.per_contract.net_cash_usd) }}</strong>
+                    </div>
+                  </el-col>
+                  <el-col :span="8">
+                    <div class="pnl-chip">
+                      <span class="muted small">最大盈利</span>
+                      <strong class="pos">
+                        {{
+                          s.pnl.per_contract.unlimited_profit
+                            ? "理论无限"
+                            : usd(s.pnl.per_contract.max_profit_usd)
+                        }}
+                      </strong>
+                    </div>
+                  </el-col>
+                  <el-col :span="8">
+                    <div class="pnl-chip">
+                      <span class="muted small">最大亏损</span>
+                      <strong class="neg">
+                        {{
+                          s.pnl.per_contract.unlimited_loss
+                            ? "理论无限"
+                            : usd(s.pnl.per_contract.max_loss_usd)
+                        }}
+                      </strong>
+                    </div>
+                  </el-col>
+                </el-row>
+                <p
+                  v-if="s.pnl.per_contract.breakevens?.length"
+                  class="muted small mt"
+                >
+                  盈亏平衡：{{ s.pnl.per_contract.breakevens.join(" / ") }}
+                </p>
+                <p
+                  v-if="s.pnl.scaled?.available"
+                  class="muted small"
+                >
+                  按 10 万资金 · 期权 5% 预算缩放：
+                  盈 {{ usd(s.pnl.scaled.max_profit_usd) }} /
+                  亏 {{ usd(s.pnl.scaled.max_loss_usd) }}
+                </p>
+                <el-alert
+                  v-if="s.pnl.stop_loss?.primary_rule"
+                  :title="s.pnl.stop_loss.primary_rule"
+                  type="warning"
+                  show-icon
+                  :closable="false"
+                  class="mt"
+                >
+                  <ul v-if="s.pnl.stop_loss.notes?.length" class="stop-notes">
+                    <li v-for="(n, j) in s.pnl.stop_loss.notes" :key="j">{{ n }}</li>
+                  </ul>
+                </el-alert>
+              </div>
               <el-table v-if="s.legs?.length" :data="s.legs" size="small" class="mt">
                 <el-table-column prop="side" label="方向" width="64" />
                 <el-table-column prop="type" label="类型" width="64" />
                 <el-table-column prop="strike" label="行权价" width="100" />
+                <el-table-column label="权利金" width="88">
+                  <template #default="{ row }">{{ usd((row as any).premium_usd) }}</template>
+                </el-table-column>
                 <el-table-column prop="symbol" label="合约" min-width="140" show-overflow-tooltip />
               </el-table>
             </div>
@@ -1521,5 +1598,26 @@ onMounted(async () => {
   font-size: 13px;
   line-height: 1.5;
   color: var(--el-text-color-regular);
+}
+.strategy-pnl {
+  background: var(--el-fill-color-lighter);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+.pnl-chip {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.pnl-chip .pos {
+  color: var(--el-color-success);
+}
+.pnl-chip .neg {
+  color: var(--el-color-danger);
+}
+.stop-notes {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  font-size: 12px;
 }
 </style>

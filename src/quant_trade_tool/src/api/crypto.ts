@@ -844,6 +844,49 @@ export interface OptionsStrategyLeg {
   type: string;
   strike?: number;
   symbol?: string;
+  premium_usd?: number;
+}
+
+export interface OptionsStrategyPnlBlock {
+  per_contract?: {
+    available?: boolean;
+    net_cash_usd?: number;
+    is_debit?: boolean;
+    max_profit_usd?: number | null;
+    max_loss_usd?: number | null;
+    unlimited_profit?: boolean;
+    unlimited_loss?: boolean;
+    breakevens?: number[];
+    reward_risk_ratio?: number | null;
+    margin_required_usd?: number;
+    scenarios?: {
+      spot_up_5pct_pnl_usd?: number;
+      spot_down_5pct_pnl_usd?: number;
+    };
+    pricing_note?: string;
+    reason?: string;
+  };
+  scaled?: {
+    available?: boolean;
+    capital_usd?: number;
+    options_budget_pct?: number;
+    options_budget_usd?: number;
+    scale_factor?: number;
+    net_cash_usd?: number | null;
+    max_profit_usd?: number | null;
+    max_loss_usd?: number | null;
+    margin_required_usd?: number;
+    scenarios?: Record<string, number | null | undefined>;
+    stop_loss_premium_usd?: number | null;
+  };
+  stop_loss?: {
+    primary_rule?: string;
+    premium_stop_usd?: number | null;
+    spot_stop_levels?: number[];
+    time_stop_dte?: number | null;
+    notes?: string[];
+  };
+  disclaimer?: string;
 }
 
 export interface OptionsStrategyHint {
@@ -854,6 +897,7 @@ export interface OptionsStrategyHint {
   risk_level: string;
   score: number;
   base: string;
+  pnl?: OptionsStrategyPnlBlock;
 }
 
 export interface OptionsStrategyPack {

@@ -1,0 +1,72 @@
+{
+  "kind": "crypto_options_vol_scan",
+  "scanned_at": "2026-06-10T10:45:25.871684+00:00",
+  "elevated_bases": [],
+  "items": [
+    {
+      "base": "BTC",
+      "ts": "2026-06-10T10:45:25.781032+00:00",
+      "atm_iv": 0.482,
+      "underlying_price": 61325.647,
+      "contract": "BTC-260626-61000-C",
+      "expiry": "2026-06-26T00:00:00+00:00",
+      "dte": 15.55,
+      "iv_percentile": 25.0,
+      "iv_change_24h_pct": 1.05,
+      "alert_level": "normal",
+      "alerts": [],
+      "cold_start": false,
+      "composite_score": 0.1831,
+      "rank": 3
+    },
+    {
+      "base": "ETH",
+      "ts": "2026-06-10T10:45:25.781032+00:00",
+      "atm_iv": 0.643,
+      "underlying_price": 1626.2933,
+      "contract": "ETH-260619-1625-C",
+      "expiry": "2026-06-19T00:00:00+00:00",
+      "dte": 8.55,
+      "iv_percentile": 70.0,
+      "iv_change_24h_pct": 0.55,
+      "alert_level": "normal",
+      "alerts": [],
+      "cold_start": false,
+      "composite_score": 0.3804,
+      "rank": 1
+    },
+    {
+      "base": "SOL",
+      "ts": "2026-06-10T10:45:25.781032+00:00",
+      "atm_iv": 0.642037,
+      "underlying_price": 63.5382,
+      "contract": "SOL-260626-64-C",
+      "expiry": "2026-06-26T00:00:00+00:00",
+      "dte": 15.55,
+      "iv_percentile": 30.0,
+      "iv_change_24h_pct": -9.04,
+      "alert_level": "normal",
+      "alerts": [],
+      "cold_start": false,
+      "composite_score": 0.15,
+      "rank": 4
+    },
+    {
+      "base": "BNB",
+      "ts": "2026-06-10T10:45:25.781032+00:00",
+      "atm_iv": 0.527111,
+      "underlying_price": 584.5767,
+      "contract": "BNB-260626-580-C",
+      "expiry": "2026-06-26T00:00:00+00:00",
+      "dte": 15.55,
+      "iv_percentile": 20.0,
+      "iv_change_24h_pct": 2.38,
+      "alert_level": "normal",
+      "alerts": [],
+      "cold_start": false,
+      "composite_score": 0.2316,
+      "rank": 2
+    }
+  ],
+  "advice_overview": "当前无显著高波动期权标的。"
+}
