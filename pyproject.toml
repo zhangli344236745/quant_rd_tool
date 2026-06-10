@@ -39,6 +39,9 @@ dev = [
 zipline = [
     "zipline-reloaded>=3.0.4",
 ]
+kb = [
+    "cursor-sdk>=0.1.7",
+]
 
 [project.scripts]
 quant-rd = "quant_rd_tool.cli:main"

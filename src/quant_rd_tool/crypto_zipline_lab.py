@@ -117,6 +117,10 @@ def run_lab_backtest(
     timeframe: str = DEFAULT_TIMEFRAME,
     strategy_combo: list[dict[str, Any]] | None = None,
     combo_mode: str = "vote",
+    with_options_context: bool = False,
+    with_options_backtest: bool = False,
+    options_overlay: str = "auto",
+    options_backtest_params: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     sym = symbol.strip().upper()
     tf = normalize_timeframe(timeframe)
@@ -157,6 +161,84 @@ def run_lab_backtest(
     if combo_spec:
         result["combo_mode"] = combo_spec["mode"]
         result["combo_legs"] = combo_spec["legs"]
+    if with_options_backtest and not (raw.get("options_backtest") or {}).get("enabled"):
+        from quant_rd_tool.crypto_options_backtest import attach_options_overlay_to_result
+        from quant_rd_tool.crypto_zipline_bundle import load_ohlcv_window
+        from quant_rd_tool.crypto_zipline_runner import _prepare_backtest_df, run_pandas_backtest
+
+        try:
+            odf = load_ohlcv_window(
+                sym,
+                data_dir=data_dir,
+                timeframe=tf,
+                lookback_days=lookback_days,
+                range_start=start,
+                range_end=end,
+            )
+            odf = _prepare_backtest_df(
+                odf,
+                strategy_id=strategy_id,
+                start=start,
+                end=end,
+                combo_spec=combo_spec,
+            )
+            curve = result.get("equity_curve") or []
+            needs_targets = not curve or all(pt.get("target") is None for pt in curve)
+            if needs_targets:
+                sig_bt = run_pandas_backtest(
+                    odf,
+                    strategy_id=strategy_id,
+                    strategy_params=strategy_params,
+                    capital_base=capital_base,
+                    combo_spec=combo_spec,
+                    timeframe=tf,
+                    symbol=sym,
+                    data_dir=data_dir,
+                )
+                sig_curve = sig_bt.get("equity_curve") or []
+                for i, pt in enumerate(curve):
+                    if i < len(sig_curve) and sig_curve[i].get("target") is not None:
+                        pt["target"] = sig_curve[i]["target"]
+            attach_options_overlay_to_result(
+                result,
+                symbol=sym,
+                data_dir=data_dir,
+                df=odf,
+                overlay_id=options_overlay,  # type: ignore[arg-type]
+                params=options_backtest_params,
+            )
+        except Exception as e:
+            result["options_backtest"] = {"enabled": False, "error": str(e)}
+
+    if with_options_context:
+        from quant_rd_tool.crypto_options_integration import fetch_options_context
+        from quant_rd_tool.crypto_options_strategies import build_strategy_pack
+
+        try:
+            from quant_rd_tool.crypto_options_strike_probs import build_strike_probability_report
+
+            opts = fetch_options_context(sym, data_dir=data_dir, persist_snapshot=False)
+            if opts.get("enabled"):
+                scan_item = opts.get("scan_item") or {}
+                try:
+                    ladder = build_strike_probability_report(
+                        sym,
+                        n=3,
+                        data_dir=data_dir,
+                        expiry_iso=scan_item.get("expiry"),
+                        with_purchase_advice=False,
+                    )
+                    opts["strike_ladder"] = ladder
+                except Exception:
+                    pass
+                opts["strategy_pack"] = build_strategy_pack(
+                    scan_item=scan_item,
+                    strike_report=opts.get("strike_ladder"),
+                    spot_stance="中性",
+                )
+            result["options_context"] = opts
+        except Exception as e:
+            result["options_context"] = {"enabled": False, "error": str(e)}
     return save_run(data_dir, result)
 
 

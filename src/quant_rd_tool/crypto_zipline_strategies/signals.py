@@ -653,6 +653,8 @@ def vwap_trend_target(
     return 1.0 if closes[-1] > vwap else 0.0
 
 
+from quant_rd_tool.crypto_zipline_strategies import signals_tv_extended as tv_ext
+
 SignalFn = Callable[..., float | None]
 
 SIGNAL_BY_STRATEGY: dict[str, str] = {
@@ -675,6 +677,37 @@ SIGNAL_BY_STRATEGY: dict[str, str] = {
     "bb_squeeze": "bb_squeeze",
     "ichimoku_cloud": "ichimoku_cloud",
     "vwap_trend": "vwap_trend",
+    "hull_ma_trend": "hull_ma_trend",
+    "dema_cross": "dema_cross",
+    "t3_ma_trend": "t3_ma_trend",
+    "alma_trend": "alma_trend",
+    "zero_lag_ema": "zero_lag_ema",
+    "ssl_channel": "ssl_channel",
+    "chandelier_exit": "chandelier_exit",
+    "aroon_trend": "aroon_trend",
+    "linreg_channel": "linreg_channel",
+    "williams_r": "williams_r",
+    "cci_revert": "cci_revert",
+    "tsi_momentum": "tsi_momentum",
+    "ultimate_osc": "ultimate_osc",
+    "wavetrend": "wavetrend",
+    "fisher_transform": "fisher_transform",
+    "connors_rsi": "connors_rsi",
+    "rci_trend": "rci_trend",
+    "coppock_curve": "coppock_curve",
+    "kst_momentum": "kst_momentum",
+    "squeeze_momentum": "squeeze_momentum",
+    "keltner_squeeze": "keltner_squeeze",
+    "atr_breakout": "atr_breakout",
+    "mfi_revert": "mfi_revert",
+    "obv_trend": "obv_trend",
+    "chaikin_mf": "chaikin_mf",
+    "vwap_cross": "vwap_cross",
+    "heikin_ashi_trend": "heikin_ashi_trend",
+    "elder_impulse": "elder_impulse",
+    "tdi_dynamic": "tdi_dynamic",
+    "ut_bot": "ut_bot",
+    "range_filter": "range_filter",
 }
 
 
@@ -686,6 +719,7 @@ def signal_for_strategy(
     *,
     highs: list[float] | None = None,
     lows: list[float] | None = None,
+    opens: list[float] | None = None,
     last_target: float = 0.0,
 ) -> float | None:
     hi = highs if highs is not None else closes
@@ -830,4 +864,68 @@ def signal_for_strategy(
             volumes,
             lookback=int(params.get("lookback", 20)),
         )
+    p = params
+    if strategy_id == "hull_ma_trend":
+        return tv_ext.hull_ma_trend_target(closes, period=int(p.get("period", 55)))
+    if strategy_id == "dema_cross":
+        return tv_ext.dema_cross_target(closes, fast=int(p.get("fast", 12)), slow=int(p.get("slow", 26)))
+    if strategy_id == "t3_ma_trend":
+        return tv_ext.t3_ma_trend_target(closes, period=int(p.get("period", 8)), vfactor=float(p.get("vfactor", 0.7)))
+    if strategy_id == "alma_trend":
+        return tv_ext.alma_trend_target(closes, period=int(p.get("period", 9)), offset=float(p.get("offset", 0.85)), sigma=float(p.get("sigma", 6.0)))
+    if strategy_id == "zero_lag_ema":
+        return tv_ext.zero_lag_ema_target(closes, period=int(p.get("period", 21)))
+    if strategy_id == "ssl_channel":
+        return tv_ext.ssl_channel_target(hi, lo, closes, period=int(p.get("period", 10)))
+    if strategy_id == "chandelier_exit":
+        return tv_ext.chandelier_exit_target(hi, lo, closes, period=int(p.get("period", 22)), mult=float(p.get("mult", 3.0)))
+    if strategy_id == "aroon_trend":
+        return tv_ext.aroon_trend_target(hi, lo, period=int(p.get("period", 25)))
+    if strategy_id == "linreg_channel":
+        return tv_ext.linreg_channel_target(closes, period=int(p.get("period", 20)), mult=float(p.get("mult", 2.0)))
+    if strategy_id == "williams_r":
+        return tv_ext.williams_r_target(hi, lo, closes, period=int(p.get("period", 14)), oversold=float(p.get("oversold", -80)), overbought=float(p.get("overbought", -20)), last_target=last_target)
+    if strategy_id == "cci_revert":
+        return tv_ext.cci_revert_target(hi, lo, closes, period=int(p.get("period", 20)), oversold=float(p.get("oversold", -100)), overbought=float(p.get("overbought", 100)), last_target=last_target)
+    if strategy_id == "tsi_momentum":
+        return tv_ext.tsi_momentum_target(closes, long=int(p.get("long", 25)), short=int(p.get("short", 13)), signal=int(p.get("signal", 7)))
+    if strategy_id == "ultimate_osc":
+        return tv_ext.ultimate_osc_target(hi, lo, closes, period=int(p.get("period", 28)))
+    if strategy_id == "wavetrend":
+        return tv_ext.wavetrend_target(hi, lo, closes, channel_len=int(p.get("channel_len", 10)), avg_len=int(p.get("avg_len", 21)), ob_level=float(p.get("ob_level", 60)), os_level=float(p.get("os_level", -60)), last_target=last_target)
+    if strategy_id == "fisher_transform":
+        return tv_ext.fisher_transform_target(closes, period=int(p.get("period", 10)))
+    if strategy_id == "connors_rsi":
+        return tv_ext.connors_rsi_target(closes, rsi_period=int(p.get("rsi_period", 3)), streak_rsi=int(p.get("streak_rsi", 2)), pct_rank=int(p.get("pct_rank", 100)))
+    if strategy_id == "rci_trend":
+        return tv_ext.rci_trend_target(closes, period=int(p.get("period", 9)), threshold=float(p.get("threshold", 0)))
+    if strategy_id == "coppock_curve":
+        return tv_ext.coppock_curve_target(closes, wma_period=int(p.get("wma_period", 10)), roc1=int(p.get("roc1", 14)), roc2=int(p.get("roc2", 11)))
+    if strategy_id == "kst_momentum":
+        return tv_ext.kst_momentum_target(closes, signal=int(p.get("signal", 9)))
+    if strategy_id == "squeeze_momentum":
+        return tv_ext.squeeze_momentum_target(closes, hi, lo, bb_period=int(p.get("bb_period", 20)), bb_mult=float(p.get("bb_mult", 2.0)), kc_mult=float(p.get("kc_mult", 1.5)))
+    if strategy_id == "keltner_squeeze":
+        return tv_ext.keltner_squeeze_target(closes, hi, lo, period=int(p.get("period", 20)))
+    if strategy_id == "atr_breakout":
+        return tv_ext.atr_breakout_target(closes, hi, lo, period=int(p.get("period", 14)), mult=float(p.get("mult", 2.0)))
+    if strategy_id == "mfi_revert":
+        return tv_ext.mfi_revert_target(hi, lo, closes, volumes, period=int(p.get("period", 14)), oversold=float(p.get("oversold", 20)), overbought=float(p.get("overbought", 80)), last_target=last_target)
+    if strategy_id == "obv_trend":
+        return tv_ext.obv_trend_target(closes, volumes, period=int(p.get("period", 20)))
+    if strategy_id == "chaikin_mf":
+        return tv_ext.chaikin_mf_target(hi, lo, closes, volumes, period=int(p.get("period", 20)))
+    if strategy_id == "vwap_cross":
+        return tv_ext.vwap_cross_target(closes, hi, lo, volumes, lookback=int(p.get("lookback", 20)))
+    if strategy_id == "heikin_ashi_trend":
+        op = opens if opens is not None else [closes[max(0, i - 1)] for i in range(len(closes))]
+        return tv_ext.heikin_ashi_trend_target(op, hi, lo, closes, min_bull=int(p.get("min_bull", 3)))
+    if strategy_id == "elder_impulse":
+        return tv_ext.elder_impulse_target(closes, hi, lo, ema_period=int(p.get("ema_period", 13)))
+    if strategy_id == "tdi_dynamic":
+        return tv_ext.tdi_dynamic_target(closes, rsi_period=int(p.get("rsi_period", 13)), band=int(p.get("band", 34)))
+    if strategy_id == "ut_bot":
+        return tv_ext.ut_bot_target(closes, hi, lo, key=float(p.get("key", 2.0)), atr_period=int(p.get("atr_period", 10)))
+    if strategy_id == "range_filter":
+        return tv_ext.range_filter_target(closes, period=int(p.get("period", 100)), mult=float(p.get("mult", 3.0)))
     return None

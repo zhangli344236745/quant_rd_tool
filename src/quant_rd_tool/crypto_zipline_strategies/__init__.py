@@ -126,6 +126,7 @@ def _run_signal_strategy(
     lows: list[float] = []
     last_target = 0.0
     vols = df["volume"].tolist() if "volume" in df.columns else [0.0] * n
+    opens = df["open"].tolist() if "open" in df.columns else [float(df["close"].iloc[max(0, i - 1)]) for i in range(n)]
     for i in range(n):
         closes.append(float(df["close"].iloc[i]))
         volumes.append(float(vols[i]))
@@ -138,6 +139,7 @@ def _run_signal_strategy(
             params,
             highs=highs,
             lows=lows,
+            opens=opens[: i + 1],
             last_target=last_target,
         )
         if t is not None:
@@ -406,19 +408,222 @@ STRATEGY_REGISTRY: dict[str, dict[str, Any]] = {
 }
 
 
+def _register_tv_from_catalog() -> None:
+    from quant_rd_tool.crypto_zipline_strategies.tv_catalog import NEW_TV_IDS, list_tv_strategies
+
+    for spec in list_tv_strategies():
+        sid = spec["id"]
+        if sid in STRATEGY_REGISTRY:
+            for key in ("category", "source", "tv_ref"):
+                if key in spec:
+                    STRATEGY_REGISTRY[sid][key] = spec[key]
+            continue
+        if sid not in NEW_TV_IDS:
+            continue
+        mb = int(spec["min_bars"])
+        STRATEGY_REGISTRY[sid] = {
+            **spec,
+            "runner": lambda df, p, c, _sid=sid, _mb=mb: _run_signal_strategy(df, _sid, p, c, warmup=_mb + 5),
+        }
+
+
+def _register_ml_strategies() -> None:
+    from quant_rd_tool.crypto_zipline_strategies.tv_catalog import list_ml_strategies
+
+    for spec in list_ml_strategies():
+        sid = spec["id"]
+        STRATEGY_REGISTRY[sid] = {
+            **spec,
+            "runner": _ml_runner_for(sid),
+        }
+
+
+def _ml_runner_for(strategy_id: str) -> StrategyRunner:
+    def runner(df: pd.DataFrame, params: dict[str, Any], capital_base: float) -> dict[str, Any]:
+        from quant_rd_tool.crypto_zipline_ml import run_ml_strategy
+
+        p = dict(params)
+        timeframe = str(p.pop("_timeframe", "15m"))
+        return run_ml_strategy(
+            df, strategy_id=strategy_id, params=p, capital_base=capital_base, timeframe=timeframe
+        )
+
+    runner.__name__ = f"run_{strategy_id}"
+    return runner
+
+
+def _run_opt_auto_pack(
+    df: pd.DataFrame,
+    params: dict[str, Any],
+    capital_base: float,
+) -> dict[str, Any]:
+    from quant_rd_tool.crypto_options_backtest import run_spot_plus_options_strategy
+
+    p = dict(params)
+    symbol = str(p.pop("_symbol", "BTC"))
+    data_dir = str(p.pop("_data_dir", "data/crypto"))
+    signal_strategy = str(p.pop("signal_strategy", "ma_crossover"))
+    overlay_keys = ("options_pct", "dte_days", "iv_percentile_threshold", "wing_pct")
+    overlay_params = {k: p[k] for k in overlay_keys if k in p}
+    signal_params = {k: v for k, v in p.items() if k not in overlay_keys}
+    return run_spot_plus_options_strategy(
+        df,
+        signal_strategy=signal_strategy,
+        signal_params=signal_params,
+        overlay_id="auto",
+        overlay_params=overlay_params,
+        capital_base=capital_base,
+        symbol=symbol,
+        data_dir=data_dir,
+    )
+
+
+def _run_options_combo(
+    df: pd.DataFrame,
+    params: dict[str, Any],
+    capital_base: float,
+    *,
+    overlay_id: str,
+) -> dict[str, Any]:
+    from quant_rd_tool.crypto_options_backtest import run_spot_plus_options_strategy
+
+    p = dict(params)
+    symbol = str(p.pop("_symbol", "BTC"))
+    data_dir = str(p.pop("_data_dir", "data/crypto"))
+    signal_strategy = str(p.pop("signal_strategy", "ma_crossover"))
+    overlay_keys = ("options_pct", "dte_days", "iv_percentile_threshold", "wing_pct")
+    overlay_params = {k: p[k] for k in overlay_keys if k in p}
+    signal_params = {k: v for k, v in p.items() if k not in overlay_keys}
+    return run_spot_plus_options_strategy(
+        df,
+        signal_strategy=signal_strategy,
+        signal_params=signal_params,
+        overlay_id=overlay_id,  # type: ignore[arg-type]
+        overlay_params=overlay_params,
+        capital_base=capital_base,
+        symbol=symbol,
+        data_dir=data_dir,
+    )
+
+
+_OPTIONS_SPECS: list[dict[str, Any]] = [
+    {
+        "id": "opt_auto_pack",
+        "name": "Strategy Pack 自动",
+        "category": "options",
+        "description": "按当前 IV/方向 strategy_pack 自动选择 Call/Put/卖跨/买跨结构",
+        "default_params": {
+            "signal_strategy": "ma_crossover",
+            "fast": 10,
+            "slow": 30,
+            "options_pct": 0.25,
+            "dte_days": 14,
+        },
+        "min_bars": 40,
+        "runner": _run_opt_auto_pack,
+    },
+    {
+        "id": "opt_call_overlay",
+        "name": "Call 叠加",
+        "category": "options",
+        "description": "现货做多信号时配置 ATM Call（BS + IV 历史），组合净值回测",
+        "default_params": {
+            "signal_strategy": "ma_crossover",
+            "fast": 10,
+            "slow": 30,
+            "options_pct": 0.25,
+            "dte_days": 14,
+        },
+        "min_bars": 40,
+    },
+    {
+        "id": "opt_put_hedge",
+        "name": "Put 对冲",
+        "category": "options",
+        "description": "现货持多时买入 OTM Put 对冲下行",
+        "default_params": {
+            "signal_strategy": "ema_trend",
+            "fast": 12,
+            "slow": 26,
+            "options_pct": 0.15,
+            "dte_days": 14,
+            "wing_pct": 0.05,
+        },
+        "min_bars": 35,
+    },
+    {
+        "id": "opt_short_straddle_iv",
+        "name": "高 IV 卖跨",
+        "category": "options",
+        "description": "现货空仓且 IV 分位偏高时模拟卖出 ATM Straddle",
+        "default_params": {
+            "signal_strategy": "momentum_rsi",
+            "period": 14,
+            "oversold": 30,
+            "overbought": 70,
+            "options_pct": 0.3,
+            "dte_days": 7,
+            "iv_percentile_threshold": 80,
+        },
+        "min_bars": 30,
+    },
+    {
+        "id": "opt_covered_call",
+        "name": "备兑看涨",
+        "category": "options",
+        "description": "现货做多 + 卖出 OTM Call（备兑）",
+        "default_params": {
+            "signal_strategy": "supertrend",
+            "atr_len": 10,
+            "factor": 3.0,
+            "options_pct": 0.2,
+            "dte_days": 14,
+            "wing_pct": 0.05,
+        },
+        "min_bars": 30,
+    },
+]
+
+for _spec in _OPTIONS_SPECS:
+    _oid = _spec["id"]
+    if _spec.get("runner"):
+        STRATEGY_REGISTRY[_oid] = dict(_spec)
+        continue
+    _overlay = {
+        "opt_call_overlay": "call_overlay",
+        "opt_put_hedge": "put_hedge",
+        "opt_short_straddle_iv": "short_straddle_iv",
+        "opt_covered_call": "covered_call",
+    }[_oid]
+    STRATEGY_REGISTRY[_oid] = {
+        **_spec,
+        "runner": lambda df, p, c, overlay=_overlay: _run_options_combo(
+            df, p, c, overlay_id=overlay
+        ),
+    }
+
+
+_register_tv_from_catalog()
+_register_ml_strategies()
+
+
 def list_strategies() -> list[dict[str, Any]]:
     out = []
     for spec in STRATEGY_REGISTRY.values():
-        out.append(
-            {
-                "id": spec["id"],
-                "name": spec["name"],
-                "description": spec["description"],
-                "default_params": dict(spec["default_params"]),
-                "min_bars": spec["min_bars"],
-            }
-        )
-    return out
+        row = {
+            "id": spec["id"],
+            "name": spec["name"],
+            "description": spec["description"],
+            "default_params": dict(spec["default_params"]),
+            "min_bars": spec["min_bars"],
+        }
+        for key in ("category", "source", "tv_ref"):
+            if key in spec:
+                row[key] = spec[key]
+        if "source" not in row:
+            row["source"] = "tv"
+        out.append(row)
+    return sorted(out, key=lambda x: (x.get("category", ""), x["name"]))
 
 
 def get_strategy(strategy_id: str) -> dict[str, Any] | None:

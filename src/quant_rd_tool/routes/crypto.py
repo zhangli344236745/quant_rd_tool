@@ -1041,6 +1041,19 @@ class CryptoZiplineBacktestRequest(BaseModel):
     timeframe: str = "15m"
     strategy_combo: list[CryptoZiplineComboLeg] | None = None
     combo_mode: str = Field("vote", pattern="^(vote|and|or|weighted)$")
+    with_options_context: bool = Field(
+        False,
+        description="并入 Binance 期权 IV 与策略建议作为回测上下文（不影响回测逻辑）",
+    )
+    with_options_backtest: bool = Field(
+        False,
+        description="在现货回测上叠加期权腿（BS+IV 历史），输出组合净值",
+    )
+    options_overlay: str = Field(
+        "auto",
+        description="auto（strategy_pack）| call_overlay | put_hedge | short_straddle_iv | covered_call | long_straddle",
+    )
+    options_backtest_params: dict[str, Any] | None = None
 
 
 @router.get("/zipline/status")
@@ -1115,6 +1128,10 @@ def crypto_zipline_backtest_post(req: CryptoZiplineBacktestRequest) -> dict[str,
             timeframe=req.timeframe,
             strategy_combo=combo_legs,
             combo_mode=req.combo_mode,
+            with_options_context=req.with_options_context,
+            with_options_backtest=req.with_options_backtest,
+            options_overlay=req.options_overlay,
+            options_backtest_params=req.options_backtest_params,
         )
     except FileNotFoundError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
@@ -1203,6 +1220,16 @@ class OptionsVolConfigBody(BaseModel):
     iv_change_24h_threshold: float | None = Field(None, ge=1, le=100)
 
 
+class OptionsSpreadAlertConfigBody(BaseModel):
+    enabled: bool | None = None
+    elevated_pp: float | None = Field(None, ge=0.5, le=50)
+    hot_pp: float | None = Field(None, ge=1, le=100)
+    cooldown_minutes: int | None = Field(None, ge=1, le=1440)
+    symbols: list[str] | None = None
+    webhook_on_alert: bool | None = None
+    bark_on_alert: bool | None = None
+
+
 @router.get("/options/volatility-scan")
 def crypto_options_volatility_scan(
     symbols: str | None = None,
@@ -1224,7 +1251,25 @@ def crypto_options_volatility_scan(
     except Exception as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
     advice = build_scan_advice(scan)
-    return {**scan, "advice_pack": advice}
+    from quant_rd_tool.crypto_options_compare import build_venue_compare_scan
+    from quant_rd_tool.crypto_options_strategies import build_strategy_pack
+
+    compare = build_venue_compare_scan(
+        sym_list or scan.get("config", {}).get("symbols"),
+        data_dir=data_dir,
+    )
+    compare_map = {i["base"]: i for i in compare.get("items") or []}
+    for item in scan.get("items") or []:
+        if isinstance(item, dict) and item.get("atm_iv") is not None:
+            base = item.get("base")
+            vc = compare_map.get(base) if base else None
+            if vc:
+                item["venue_compare"] = vc
+            item["strategy_pack"] = build_strategy_pack(
+                scan_item=item,
+                venue_compare=vc,
+            )
+    return {**scan, "advice_pack": advice, "venue_compare_pack": compare}
 
 
 @router.get("/options/volatility-scan/config")
@@ -1262,6 +1307,188 @@ def crypto_options_volatility_history(
     return {"symbol": symbol.upper(), "count": len(items), "items": items}
 
 
+@router.get("/options/compare")
+def crypto_options_venue_compare_scan(
+    symbols: str | None = None,
+    base: str | None = None,
+    data_dir: str = "data/crypto",
+) -> dict[str, Any]:
+    from quant_rd_tool.crypto_options_compare import (
+        build_venue_compare,
+        build_venue_compare_scan,
+    )
+
+    try:
+        if base:
+            return build_venue_compare(base.strip().upper())
+        sym_list = [s.strip() for s in symbols.split(",") if s.strip()] if symbols else None
+        return build_venue_compare_scan(sym_list, data_dir=data_dir)
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+@router.get("/options/compare/term-structure")
+def crypto_options_venue_compare_term_structure(base: str) -> dict[str, Any]:
+    from quant_rd_tool.crypto_options_compare import build_term_structure_compare
+
+    try:
+        return build_term_structure_compare(base.strip().upper())
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+@router.get("/options/compare/common-expiries")
+def crypto_options_common_expiries(base: str, min_dte: int = 7) -> dict[str, Any]:
+    from quant_rd_tool.crypto_options_compare import list_common_expiries
+
+    try:
+        return list_common_expiries(base.strip().upper(), min_dte=min_dte)
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+@router.get("/options/compare/spread-history")
+def crypto_options_spread_history(
+    symbol: str,
+    data_dir: str = "data/crypto",
+    limit: int = 120,
+) -> dict[str, Any]:
+    from quant_rd_tool.crypto_options_spread_history import load_spread_history
+
+    items = load_spread_history(symbol, data_dir=data_dir, limit=min(limit, 500))
+    return {"symbol": symbol.upper(), "count": len(items), "items": items}
+
+
+@router.get("/options/compare/aligned")
+def crypto_options_aligned_compare(
+    base: str,
+    expiry_date: str | None = None,
+    n: int = 5,
+    min_dte: int = 7,
+) -> dict[str, Any]:
+    from quant_rd_tool.crypto_options_compare import build_aligned_expiry_compare
+
+    try:
+        return build_aligned_expiry_compare(
+            base.strip().upper(),
+            expiry_date=expiry_date,
+            n=n,
+            min_dte=min_dte,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+@router.get("/options/greeks")
+def crypto_options_greeks(
+    base: str,
+    expiry_date: str | None = None,
+    n: int = 3,
+    min_dte: int = 7,
+) -> dict[str, Any]:
+    from quant_rd_tool.crypto_options_greeks import build_greeks_chain
+
+    try:
+        return build_greeks_chain(
+            base.strip().upper(),
+            expiry_date=expiry_date,
+            n=n,
+            min_dte=min_dte,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+@router.get("/options/compare/spread-alerts/config")
+def crypto_options_spread_alerts_config_get(data_dir: str = "data/crypto") -> dict[str, Any]:
+    from quant_rd_tool.crypto_options_spread_alerts import get_spread_alert_config
+
+    return get_spread_alert_config(data_dir)
+
+
+@router.post("/options/compare/spread-alerts/config")
+def crypto_options_spread_alerts_config_save(
+    body: OptionsSpreadAlertConfigBody,
+    data_dir: str = "data/crypto",
+) -> dict[str, Any]:
+    from quant_rd_tool.crypto_options_spread_alerts import save_spread_alert_config
+
+    return save_spread_alert_config(
+        data_dir=data_dir,
+        enabled=body.enabled,
+        elevated_pp=body.elevated_pp,
+        hot_pp=body.hot_pp,
+        cooldown_minutes=body.cooldown_minutes,
+        symbols=body.symbols,
+        webhook_on_alert=body.webhook_on_alert,
+        bark_on_alert=body.bark_on_alert,
+    )
+
+
+@router.get("/options/compare/spread-alerts/log")
+def crypto_options_spread_alerts_log(limit: int = 50) -> dict[str, Any]:
+    from quant_rd_tool.crypto_options_spread_alerts import tail_spread_alert_log
+
+    items = tail_spread_alert_log(limit=min(limit, 200))
+    return {"count": len(items), "items": items}
+
+
+@router.post("/options/compare/spread-alerts/test")
+def crypto_options_spread_alerts_test(data_dir: str = "data/crypto") -> dict[str, Any]:
+    from quant_rd_tool.crypto_options_spread_alerts import send_test_spread_alert
+
+    try:
+        return send_test_spread_alert(data_dir=data_dir)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@router.get("/options/expiries")
+def crypto_options_expiries(
+    base: str,
+    min_dte: int = 7,
+) -> dict[str, Any]:
+    from quant_rd_tool.crypto_options_surface import list_expiries
+
+    try:
+        return list_expiries(base, min_dte=min_dte)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+@router.get("/options/term-structure")
+def crypto_options_term_structure(
+    base: str,
+    min_dte: int = 7,
+) -> dict[str, Any]:
+    from quant_rd_tool.crypto_options_surface import build_term_structure
+
+    try:
+        return build_term_structure(base, min_dte=min_dte)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+@router.get("/options/iv-skew")
+def crypto_options_iv_skew(
+    base: str,
+    expiry: str | None = None,
+    min_dte: int = 7,
+) -> dict[str, Any]:
+    from quant_rd_tool.crypto_options_surface import build_iv_skew
+
+    try:
+        return build_iv_skew(base, expiry_iso=expiry, min_dte=min_dte)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+
 @router.get("/options/strike-probability")
 def crypto_options_strike_probability(
     base: str,
@@ -1271,6 +1498,7 @@ def crypto_options_strike_probability(
     spot_stance: str | None = None,
     iv_alert_level: str | None = None,
     iv_percentile: float | None = None,
+    full_chain: bool = False,
 ) -> dict[str, Any]:
     from quant_rd_tool.crypto_options_strike_probs import build_strike_probability_report
 
@@ -1283,6 +1511,7 @@ def crypto_options_strike_probability(
             spot_stance=spot_stance,
             iv_alert_level=iv_alert_level,
             iv_percentile=iv_percentile,
+            full_chain=full_chain,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e

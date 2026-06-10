@@ -33,6 +33,9 @@ def run_pandas_backtest(
     strategy_params: dict[str, Any] | None,
     capital_base: float,
     combo_spec: dict[str, Any] | None = None,
+    timeframe: str = DEFAULT_TIMEFRAME,
+    symbol: str = "BTC",
+    data_dir: str = "data/crypto",
 ) -> dict[str, Any]:
     if combo_spec:
         out = run_combo_pandas(df, combo_spec, capital_base)
@@ -43,6 +46,11 @@ def run_pandas_backtest(
     if not spec:
         raise ValueError(f"Unknown strategy: {strategy_id}")
     params = {**spec["default_params"], **(strategy_params or {})}
+    if spec.get("category") == "options":
+        params["_symbol"] = symbol.strip().upper()
+        params["_data_dir"] = data_dir
+    if strategy_id.startswith("xgb_"):
+        params["_timeframe"] = normalize_timeframe(timeframe)
     min_bars = int(spec.get("min_bars", 20))
     if len(df) < min_bars:
         raise ValueError(f"Need at least {min_bars} bars, got {len(df)}")
@@ -194,7 +202,36 @@ def run_backtest(
             strategy_params=strategy_params,
             capital_base=capital_base,
             combo_spec=combo_spec,
+            timeframe=tf,
+            symbol=symbol,
+            data_dir=data_dir,
         )
+
+    spec = get_strategy(strategy_id)
+    if spec and spec.get("category") == "options":
+        df = load_ohlcv_window(
+            symbol,
+            data_dir=data_dir,
+            timeframe=tf,
+            lookback_days=lookback_days,
+            range_start=start,
+            range_end=end,
+        )
+        df = _prepare_backtest_df(
+            df, strategy_id=strategy_id, start=start, end=end, combo_spec=combo_spec
+        )
+        out = run_pandas_backtest(
+            df,
+            strategy_id=strategy_id,
+            strategy_params=strategy_params,
+            capital_base=capital_base,
+            timeframe=tf,
+            symbol=symbol,
+            data_dir=data_dir,
+        )
+        out["engine"] = "pandas"
+        out["options_only_engine"] = True
+        return out
 
     z_ok, z_err = zipline_installed()
     if engine == "zipline" and not z_ok:
@@ -240,6 +277,9 @@ def run_backtest(
         strategy_params=strategy_params,
         capital_base=capital_base,
         combo_spec=combo_spec,
+        timeframe=tf,
+        symbol=symbol,
+        data_dir=data_dir,
     )
     out["zipline_fallback_reason"] = z_err if not z_ok else "zipline_run_failed"
     return out

@@ -52,9 +52,11 @@ def mount_frontend(app: FastAPI) -> bool:
 
     index_path = dist / "index.html"
 
+    _no_cache = {"Cache-Control": "no-cache"}
+
     @app.get("/", include_in_schema=False)
     def frontend_index() -> FileResponse:
-        return FileResponse(index_path)
+        return FileResponse(index_path, headers=_no_cache)
 
     async def frontend_spa(request: Request) -> FileResponse:
         # Starlette Route passes Request, not path params as kwargs.
@@ -64,7 +66,7 @@ def mount_frontend(app: FastAPI) -> bool:
         candidate = dist / full_path
         if candidate.is_file():
             return FileResponse(candidate)
-        return FileResponse(index_path)
+        return FileResponse(index_path, headers=_no_cache)
 
     app.router.routes.append(
         _SpaFallbackRoute("/{full_path:path}", frontend_spa, methods=["GET"], name="frontend_spa"),

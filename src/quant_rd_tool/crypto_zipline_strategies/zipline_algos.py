@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
+import pandas as pd
+
 from quant_rd_tool.crypto_zipline_combo import combo_min_bars, combo_target_from_context
 from quant_rd_tool.crypto_zipline_strategies import get_strategy
 from quant_rd_tool.crypto_zipline_strategies.signals import signal_for_strategy
@@ -106,7 +108,29 @@ def _setup_commission(context: Any) -> None:
         pass
 
 
+def _bar_dt_to_epoch_ms(bar_dt: Any) -> int:
+    ts = pd.Timestamp(bar_dt)
+    if ts.tzinfo is None:
+        ts = ts.tz_localize("UTC")
+    else:
+        ts = ts.tz_convert("UTC")
+    return int(ts.value // 1_000_000)
+
+
 def _compute_target(context: Any) -> float | None:
+    lookup = getattr(context, "target_lookup", None)
+    bar_dt = getattr(context, "last_bar_dt", None)
+    if lookup is not None and bar_dt is not None:
+        key = _bar_dt_to_epoch_ms(bar_dt)
+        if key in lookup:
+            return float(lookup[key])
+        # fallback: match nearest bar within 1 minute (zipline vs CSV timestamp drift)
+        for delta_ms in (0, -60_000, 60_000, -900_000, 900_000):
+            if key + delta_ms in lookup:
+                return float(lookup[key + delta_ms])
+        last_target = float(getattr(context, "last_target", 0.0) or 0.0)
+        return last_target
+
     closes: list[float] = context.closes
     volumes: list[float] = getattr(context, "volumes", [])
     last_target = float(getattr(context, "last_target", 0.0) or 0.0)
@@ -184,6 +208,7 @@ def build_zipline_algo(
     params: dict[str, Any] | None = None,
     combo_spec: dict[str, Any] | None = None,
     bar_freq: str = "1m",
+    precomputed_targets: dict[int, float] | None = None,
 ) -> tuple[Callable[..., None], Callable[..., None]]:
     if combo_spec is None and not strategy_id:
         raise ValueError("strategy_id or combo_spec required")
@@ -212,6 +237,7 @@ def build_zipline_algo(
         context.last_bar_dt = None
         context.last_target = None
         context._pending_volume = 0.0
+        context.target_lookup = precomputed_targets
 
     def handle_data(context, data):
         from zipline.api import record

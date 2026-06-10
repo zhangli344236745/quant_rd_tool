@@ -323,6 +323,20 @@ def build_investment_brief(
             opt_bullets.append(adv["summary"])
         for a in (adv.get("actions") or [])[:3]:
             opt_bullets.append(a)
+        vc = opt.get("venue_compare") or {}
+        aligned = vc.get("aligned") if isinstance(vc, dict) else None
+        if isinstance(aligned, dict) and aligned.get("available"):
+            ac = aligned.get("comparison") or {}
+            opt_bullets.append(
+                f"**跨所同到期**（{aligned.get('expiry_date')}）："
+                f"Binance vs Deribit IV 差 **{ac.get('iv_spread_pp'):+.1f}pp**"
+                f"（{ac.get('richer_venue')} 偏高）。"
+            )
+            if ac.get("summary"):
+                opt_bullets.append(ac["summary"])
+        sp = opt.get("strategy_pack") or {}
+        if sp.get("headline"):
+            opt_bullets.append(f"**期权策略框架**：{sp['headline']}。")
         ladder = opt.get("strike_ladder") or {}
         if isinstance(ladder, dict) and ladder.get("rows"):
             ps = ladder.get("purchase_summary") or {}
@@ -335,7 +349,7 @@ def build_investment_brief(
                 opt_bullets.append(
                     f"K={r.get('strike')}：{pur.get('verdict')} — {pur.get('summary', '')}"
                 )
-        sections.append({"title": "期权波动率（Binance）", "bullets": opt_bullets})
+        sections.append({"title": "期权波动率（Binance × Deribit）", "bullets": opt_bullets})
     elif opt.get("error"):
         sections.append(
             {

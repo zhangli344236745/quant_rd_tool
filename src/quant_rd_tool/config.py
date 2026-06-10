@@ -45,6 +45,28 @@ class Settings(BaseSettings):
     )
     tavily_api_key: str | None = Field(default=None, validation_alias="TAVILY_API_KEY")
     serpapi_api_key: str | None = Field(default=None, validation_alias="SERPAPI_API_KEY")
+    cursor_api_key: str | None = Field(default=None, validation_alias="CURSOR_API_KEY")
+    kb_cursor_model: str = Field(default="composer-2.5", validation_alias="KB_CURSOR_MODEL")
+    kb_embedding_model: str = Field(
+        default="text-embedding-3-small",
+        validation_alias="KB_EMBEDDING_MODEL",
+    )
+    kb_data_dir: str = Field(default="data/kb", validation_alias="KB_DATA_DIR")
+    kb_fallback_openai: bool = Field(default=False, validation_alias="KB_FALLBACK_OPENAI")
+    kb_cloud_agent_timeout: float = Field(default=180.0, validation_alias="KB_CLOUD_AGENT_TIMEOUT")
+    kb_cursor_api_base: str = Field(
+        default="https://api.cursor.com/v1",
+        validation_alias="KB_CURSOR_API_BASE",
+    )
+    kb_agent_backend: str = Field(
+        default="auto",
+        validation_alias="KB_AGENT_BACKEND",
+        description="auto | sdk | rest — Cursor agent transport for KB chat",
+    )
 
 
 settings = Settings()
+
+
+def project_root() -> Path:
+    return _project_root()

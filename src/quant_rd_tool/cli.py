@@ -247,6 +247,19 @@ def main() -> None:
     cr_opt.add_argument("--data-dir", default="data/crypto")
     cr_opt.add_argument("--no-persist", action="store_true", help="不写入本地 IV 历史")
 
+    cr_opt_cmp = crypto_sub.add_parser(
+        "options-compare",
+        help="Binance × Deribit 跨所 ATM IV 对比（同到期对齐）",
+    )
+    cr_opt_cmp.add_argument(
+        "--symbols",
+        default="BTC,ETH,SOL,BNB",
+        help="逗号分隔标的，如 BTC,ETH",
+    )
+    cr_opt_cmp.add_argument("--base", default=None, help="单标的对比，如 BTC")
+    cr_opt_cmp.add_argument("--data-dir", default="data/crypto")
+    cr_opt_cmp.add_argument("--no-persist", action="store_true", help="不写入价差历史 JSONL")
+
     cr_sched = crypto_sub.add_parser(
         "schedule",
         help="每 N 分钟增量拉取 5m K 线 → qlib → 技术面+ML 投资建议",
@@ -437,6 +450,24 @@ def main() -> None:
                 persist_snapshot=not args.no_persist,
             )
             out = {**scan, "advice_pack": build_scan_advice(scan)}
+            print(json.dumps(out, ensure_ascii=False, indent=2))
+            return
+
+        if args.crypto_cmd == "options-compare":
+            from quant_rd_tool.crypto_options_compare import (
+                build_venue_compare,
+                build_venue_compare_scan,
+            )
+
+            if args.base:
+                out = build_venue_compare(args.base.strip().upper())
+            else:
+                sym_list = [s.strip() for s in args.symbols.split(",") if s.strip()]
+                out = build_venue_compare_scan(
+                    sym_list,
+                    data_dir=args.data_dir,
+                    persist_spread=not args.no_persist,
+                )
             print(json.dumps(out, ensure_ascii=False, indent=2))
             return
 

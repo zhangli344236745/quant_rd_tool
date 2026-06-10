@@ -124,6 +124,116 @@ def _pack(
     }
 
 
+def advise_put_purchase(
+    row: dict[str, Any],
+    *,
+    spot: float,
+    spot_stance: str = "中性",
+    iv_alert_level: str = "normal",
+    iv_percentile: float | None = None,
+) -> dict[str, Any]:
+    """Research hint for buying the listed put at strike K."""
+    strike = float(row.get("strike") or 0)
+    moneyness = float(row.get("moneyness_pct") or 0)
+    model_exp = (row.get("model") or {}).get("expiry_itm_put")
+    impl_exp = (row.get("implied") or {}).get("expiry_itm_put")
+    edge = row.get("edge_expiry_put")
+    if edge is None and model_exp is not None and impl_exp is not None:
+        edge = float(model_exp) - float(impl_exp)
+
+    reasons: list[str] = []
+    score = 0
+    stance = (spot_stance or "中性").strip()
+    alert = (iv_alert_level or "normal").strip().lower()
+    high_iv = alert in ("hot", "elevated") or (iv_percentile is not None and iv_percentile >= 80)
+
+    if stance == "看涨":
+        return _pack_put(
+            "不建议买入",
+            "现货/综合信号偏多，不宜新建买方 Put。",
+            reasons + ["方向与买 Put 不一致"],
+            row,
+        )
+
+    if strike <= 0 or spot <= 0:
+        return _pack_put("观望", "缺少有效行权价或现货价。", reasons, row)
+
+    if moneyness < -8:
+        reasons.append(f"深度虚值 Put（现货高于行权价约 {-moneyness:.1f}%），博弈成本高。")
+        score -= 2
+    elif moneyness < -3:
+        reasons.append(f"虚值 Put 约 {-moneyness:.1f}%，需明显下跌才实质 ITM。")
+        score -= 1
+    elif abs(moneyness) <= 1.5:
+        reasons.append("接近 ATM Put，对下行敏感。")
+        score += 1
+
+    if high_iv:
+        reasons.append(f"IV 偏热（{alert}），Put 权利金偏贵。")
+        score -= 2
+    else:
+        score += 1
+
+    if edge is not None:
+        e = float(edge)
+        if e >= 0.06:
+            reasons.append(f"模型 Put ITM 概率高于隐含约 {e * 100:.1f}pp。")
+            score += 2
+        elif e >= 0.02:
+            score += 1
+        elif e <= -0.06:
+            reasons.append(f"隐含 Put 概率高于模型约 {-e * 100:.1f}pp，Put 偏贵。")
+            score -= 2
+        elif e <= -0.02:
+            score -= 1
+
+    if model_exp is not None:
+        p = float(model_exp)
+        if p >= 0.55 and moneyness >= -2:
+            reasons.append(f"模型估计到期 ITM Put 概率约 {p * 100:.0f}%。")
+            score += 1
+        elif p < 0.25 and moneyness < 0:
+            score -= 1
+
+    if stance == "看跌":
+        reasons.append("现货/综合信号偏空，买 Put 方向一致。")
+        score += 2
+    elif stance == "中性":
+        reasons.append("方向中性，买 Put 需依赖下跌或对冲需求。")
+        score -= 1
+
+    if score >= 3 and not high_iv:
+        verdict: PurchaseVerdict = "可考虑买入"
+        summary = "概率与对冲/方向尚可，可小仓评估买方 Put（设止损/限仓）。"
+    elif score <= -2 or (high_iv and score < 2):
+        verdict = "不建议买入"
+        summary = "IV 偏贵或方向不支持，优先永续/现货对冲或卖 Put 结构。"
+    else:
+        verdict = "观望"
+        summary = "信号混合，宜等待更好入场或改用 Put 价差。"
+
+    return _pack_put(verdict, summary, reasons, row)
+
+
+def _pack_put(
+    verdict: PurchaseVerdict,
+    summary: str,
+    reasons: list[str],
+    row: dict[str, Any],
+) -> dict[str, Any]:
+    sym = row.get("symbol")
+    if sym and str(sym).endswith("-C"):
+        sym = str(sym).replace("-C", "-P")
+    return {
+        "verdict": verdict,
+        "summary": summary,
+        "reasons": reasons,
+        "strike": row.get("strike"),
+        "symbol": sym,
+        "side": "put",
+    }
+
+
 def enrich_strike_report_with_advice(
     report: dict[str, Any],
     *,
@@ -138,14 +248,21 @@ def enrich_strike_report_with_advice(
     for row in rows:
         if not isinstance(row, dict):
             continue
-        advice = advise_call_purchase(
+        call_advice = advise_call_purchase(
             row,
             spot=spot,
             spot_stance=spot_stance,
             iv_alert_level=iv_alert_level,
             iv_percentile=iv_percentile,
         )
-        enriched.append({**row, "purchase": advice})
+        put_advice = advise_put_purchase(
+            row,
+            spot=spot,
+            spot_stance=spot_stance,
+            iv_alert_level=iv_alert_level,
+            iv_percentile=iv_percentile,
+        )
+        enriched.append({**row, "purchase": call_advice, "purchase_put": put_advice})
 
     report["rows"] = enriched
     report["purchase_summary"] = summarize_purchase_advice(

@@ -30,7 +30,7 @@ def run_bar_backtest(
         price = float(row["close"])
         if i < warmup or pd.isna(row.get(target_col)):
             equity = cash + shares * price
-            equity_curve.append(_equity_point(row, equity))
+            equity_curve.append(_equity_point(row, equity, target=prev_target))
             continue
 
         target = float(row[target_col])
@@ -54,7 +54,7 @@ def run_bar_backtest(
             )
         prev_target = target
         equity = cash + shares * price
-        equity_curve.append(_equity_point(row, equity))
+        equity_curve.append(_equity_point(row, equity, target=target))
 
     equities = [p["value"] for p in equity_curve]
     metrics = _metrics(equities, capital_base, len(trades))
@@ -87,8 +87,11 @@ def _bar_time(row: pd.Series) -> str:
     return ""
 
 
-def _equity_point(row: pd.Series, value: float) -> dict[str, Any]:
-    return {"time": _bar_time(row), "value": round(float(value), 2)}
+def _equity_point(row: pd.Series, value: float, *, target: float | None = None) -> dict[str, Any]:
+    pt: dict[str, Any] = {"time": _bar_time(row), "value": round(float(value), 2)}
+    if target is not None:
+        pt["target"] = round(float(target), 4)
+    return pt
 
 
 def _metrics(equities: list[float], capital_base: float, trade_count: int) -> dict[str, Any]:

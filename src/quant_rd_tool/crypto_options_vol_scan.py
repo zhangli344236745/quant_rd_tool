@@ -314,9 +314,21 @@ def run_options_iv_maintenance(
     clear_vol_scan_cache(str(data_dir or _DEFAULT_CONFIG["data_dir"]))
     advice = build_scan_advice(scan)
     hot = [i for i in scan.get("items") or [] if i.get("alert_level") in ("hot", "elevated")]
+    venue_compare_pack = None
+    try:
+        from quant_rd_tool.crypto_options_compare import build_venue_compare_scan
+
+        venue_compare_pack = build_venue_compare_scan(
+            [i.get("base") for i in scan.get("items") or [] if i.get("base")],
+            data_dir=str(data_dir or _DEFAULT_CONFIG["data_dir"]),
+            persist_spread=True,
+        )
+    except Exception:
+        pass
     return {
         **scan,
         "advice_pack": advice,
         "elevated_count": len(hot),
         "elevated_bases": [i.get("base") for i in hot],
+        "venue_compare_pack": venue_compare_pack,
     }

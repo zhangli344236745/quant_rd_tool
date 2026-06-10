@@ -69,6 +69,12 @@ const router = createRouter({
           component: () => import("@/views/PerpPortfolioView.vue"),
         },
         { path: "schedules", name: "schedules", component: () => import("@/views/SchedulesView.vue") },
+        {
+          path: "finance-kb",
+          name: "finance-kb",
+          meta: { title: "金融知识库" },
+          component: () => import("@/views/FinanceKnowledgeView.vue"),
+        },
         { path: "settings", name: "settings", component: () => import("@/views/SettingsView.vue") },
       ],
     },

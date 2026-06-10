@@ -13,7 +13,7 @@ def test_zipline_strategies_route():
     r = client.get("/api/v1/crypto/zipline/strategies")
     assert r.status_code == 200, r.text
     body = r.json()
-    assert len(body.get("strategies", [])) >= 2
+    assert len(body.get("strategies", [])) >= 53
 
 
 def test_zipline_status_route():

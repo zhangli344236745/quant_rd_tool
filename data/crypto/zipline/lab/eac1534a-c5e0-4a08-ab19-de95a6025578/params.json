@@ -1,0 +1,12 @@
+{
+  "symbol": "BTC",
+  "strategy": "chaikin_mf",
+  "timeframe": "15m",
+  "start": "2026-01-01",
+  "end": "2026-06-03",
+  "capital_base": 100000.0,
+  "engine": "zipline",
+  "strategy_params": {
+    "period": 20
+  }
+}

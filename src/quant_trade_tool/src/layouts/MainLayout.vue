@@ -18,6 +18,7 @@ type MenuGroup = { key: string; icon: string; label: string; items: MenuItem[] }
 const rootMenus: MenuItem[] = [
   { path: "/", icon: "Odometer", label: "概览" },
   { path: "/tasks", icon: "List", label: "任务中心" },
+  { path: "/finance-kb", icon: "ChatDotRound", label: "金融知识库" },
 ];
 
 const groups: MenuGroup[] = [

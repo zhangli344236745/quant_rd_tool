@@ -177,8 +177,11 @@ export interface CryptoZiplineStrategy {
   id: string;
   name: string;
   description: string;
-  default_params: Record<string, number>;
+  default_params: Record<string, number | string>;
   min_bars: number;
+  category?: string;
+  source?: "tv" | "ml";
+  tv_ref?: string;
 }
 
 export interface CryptoZiplineTimeframeOption {
@@ -233,6 +236,43 @@ export interface CryptoZiplineBacktestRequest {
   timeframe?: string;
   strategy_combo?: CryptoZiplineComboLeg[];
   combo_mode?: "vote" | "and" | "or" | "weighted";
+  with_options_context?: boolean;
+  with_options_backtest?: boolean;
+  options_overlay?:
+    | "auto"
+    | "call_overlay"
+    | "put_hedge"
+    | "short_straddle_iv"
+    | "covered_call"
+    | "long_straddle";
+  options_backtest_params?: Record<string, number>;
+}
+
+export interface StrategyPackSelection {
+  overlay_id?: string | null;
+  strategy_kind?: string;
+  strategy_name?: string;
+  headline?: string;
+  rationale?: string;
+  score?: number;
+  skip_reason?: string;
+  fallback?: boolean;
+  reason?: string;
+  alternates?: { kind?: string; name?: string; overlay?: string | null }[];
+}
+
+export interface OptionsBacktestBlock {
+  enabled?: boolean;
+  overlay_id?: string;
+  strategy_pack_selection?: StrategyPackSelection;
+  metrics?: Record<string, number>;
+  combined_metrics?: Record<string, number>;
+  equity_curve?: { time: string; value: number }[];
+  combined_equity_curve?: { time: string; value: number }[];
+  trades?: Record<string, unknown>[];
+  iv_snapshots_used?: number;
+  error?: string;
+  disclaimer?: string;
 }
 
 export interface CryptoZiplineRunSummary {
@@ -253,6 +293,10 @@ export interface CryptoZiplineBacktestResult {
   start: string;
   end: string;
   capital_base: number;
+  options_context?: Record<string, unknown>;
+  options_backtest?: OptionsBacktestBlock;
+  spot_backtest?: { metrics?: Record<string, number>; equity_curve?: { time: string; value: number }[] };
+  options_only_engine?: boolean;
   metrics: {
     total_return: number;
     sharpe: number;
@@ -513,11 +557,75 @@ export const cryptoApi = {
     base: string,
     n = 5,
     expiry?: string,
-    ctx?: { spot_stance?: string; iv_alert_level?: string; iv_percentile?: number },
+    ctx?: {
+      spot_stance?: string;
+      iv_alert_level?: string;
+      iv_percentile?: number;
+      full_chain?: boolean;
+    },
   ) =>
     http.get<StrikeProbabilityReport>("/crypto/options/strike-probability", {
       params: { base, n, expiry, ...ctx },
     }),
+
+  optionsExpiries: (base: string, min_dte = 7) =>
+    http.get<OptionsExpiriesResult>("/crypto/options/expiries", { params: { base, min_dte } }),
+
+  optionsTermStructure: (base: string, min_dte = 7) =>
+    http.get<OptionsTermStructureResult>("/crypto/options/term-structure", {
+      params: { base, min_dte },
+    }),
+
+  optionsIvSkew: (base: string, expiry?: string, min_dte = 7) =>
+    http.get<OptionsIvSkewResult>("/crypto/options/iv-skew", {
+      params: { base, expiry, min_dte },
+    }),
+
+  optionsVenueCompare: (params?: { symbols?: string; base?: string }) =>
+    http.get<OptionsVenueCompareScanResult | OptionsVenueCompareItem>(
+      "/crypto/options/compare",
+      { params },
+    ),
+
+  optionsVenueCompareTermStructure: (base: string) =>
+    http.get<OptionsVenueTermCompareResult>("/crypto/options/compare/term-structure", {
+      params: { base },
+    }),
+
+  optionsCommonExpiries: (base: string, min_dte = 7) =>
+    http.get<OptionsCommonExpiriesResult>("/crypto/options/compare/common-expiries", {
+      params: { base, min_dte },
+    }),
+
+  optionsAlignedCompare: (base: string, expiry_date?: string, n = 5) =>
+    http.get<OptionsAlignedCompareResult>("/crypto/options/compare/aligned", {
+      params: { base, expiry_date, n },
+    }),
+
+  optionsSpreadHistory: (symbol: string, limit = 120) =>
+    http.get<OptionsSpreadHistoryResult>("/crypto/options/compare/spread-history", {
+      params: { symbol, limit },
+    }),
+
+  optionsGreeks: (base: string, expiry_date?: string, n = 3) =>
+    http.get<OptionsGreeksResult>("/crypto/options/greeks", {
+      params: { base, expiry_date, n },
+    }),
+
+  optionsSpreadAlertsConfigGet: () =>
+    http.get<OptionsSpreadAlertConfig>("/crypto/options/compare/spread-alerts/config"),
+
+  optionsSpreadAlertsConfigSave: (body: Partial<OptionsSpreadAlertConfig>) =>
+    http.post<OptionsSpreadAlertConfig>("/crypto/options/compare/spread-alerts/config", body),
+
+  optionsSpreadAlertsLog: (limit = 30) =>
+    http.get<{ count: number; items: OptionsSpreadAlertLogRow[] }>(
+      "/crypto/options/compare/spread-alerts/log",
+      { params: { limit } },
+    ),
+
+  optionsSpreadAlertsTest: () =>
+    http.post<{ status: string; message: string }>("/crypto/options/compare/spread-alerts/test"),
 
   varSymbol: (params?: {
     symbol?: string;
@@ -686,6 +794,29 @@ export interface OptionsVolConfig {
   data_dir: string;
 }
 
+export interface OptionsStrategyLeg {
+  side: string;
+  type: string;
+  strike?: number;
+  symbol?: string;
+}
+
+export interface OptionsStrategyHint {
+  id: string;
+  name: string;
+  rationale: string;
+  legs: OptionsStrategyLeg[];
+  risk_level: string;
+  score: number;
+  base: string;
+}
+
+export interface OptionsStrategyPack {
+  headline: string;
+  strategies: OptionsStrategyHint[];
+  disclaimer: string;
+}
+
 export interface OptionsVolItem {
   base: string;
   ts?: string;
@@ -703,6 +834,7 @@ export interface OptionsVolItem {
   underlying_price?: number;
   strike?: number;
   error?: string;
+  strategy_pack?: OptionsStrategyPack;
 }
 
 export interface OptionsAdviceRow {
@@ -724,6 +856,7 @@ export interface OptionsVolScanResult {
     disclaimer: string;
     advice: OptionsAdviceRow[];
   };
+  venue_compare_pack?: OptionsVenueCompareScanResult;
 }
 
 export interface OptionsIvHistoryRow {
@@ -750,13 +883,267 @@ export interface StrikeProbabilityRow {
   model: {
     expiry_itm_call?: number | null;
     touch_call?: number | null;
+    expiry_itm_put?: number | null;
+    touch_put?: number | null;
   };
   implied: {
     expiry_itm_call?: number | null;
     touch_call?: number | null;
+    expiry_itm_put?: number | null;
+    touch_put?: number | null;
   };
   edge_expiry?: number | null;
+  edge_expiry_put?: number | null;
   purchase?: StrikePurchaseAdvice;
+}
+
+export interface OptionsExpiryRow {
+  expiry: string;
+  dte?: number;
+  atm_strike?: number;
+  atm_iv?: number;
+  contract?: string;
+  strike_count?: number;
+}
+
+export interface OptionsExpiriesResult {
+  base: string;
+  spot: number;
+  expiries: OptionsExpiryRow[];
+  default_expiry?: string;
+  disclaimer: string;
+}
+
+export interface OptionsTermStructurePoint {
+  expiry: string;
+  dte?: number;
+  atm_strike?: number;
+  atm_iv?: number;
+  contract?: string;
+}
+
+export interface OptionsTermStructureResult {
+  base: string;
+  spot: number;
+  points: OptionsTermStructurePoint[];
+  slope_note?: string | null;
+  disclaimer: string;
+}
+
+export interface OptionsIvSkewPoint {
+  strike: number;
+  moneyness_pct?: number;
+  call_iv?: number | null;
+  put_iv?: number | null;
+  mark_iv: number;
+}
+
+export interface OptionsIvSkewResult {
+  base: string;
+  spot: number;
+  expiry?: string | null;
+  dte?: number;
+  atm_strike?: number;
+  skew_25d_proxy?: number | null;
+  points: OptionsIvSkewPoint[];
+  warnings: string[];
+  disclaimer: string;
+}
+
+export interface OptionsVenueSnapshot {
+  enabled: boolean;
+  venue?: string;
+  atm_iv?: number;
+  contract?: string;
+  expiry?: string;
+  dte?: number;
+  strike?: number;
+  underlying_price?: number;
+  open_interest?: number;
+  error?: string;
+}
+
+export interface OptionsVenueComparison {
+  available?: boolean;
+  mode?: "aligned_expiry" | "near_month";
+  iv_spread_pp?: number;
+  abs_spread_pp?: number;
+  richer_venue?: string;
+  alert_level?: string;
+  index_spread_pct?: number | null;
+  dte_gap?: number | null;
+  aligned_expiry?: boolean;
+  expiry_date?: string;
+  summary?: string;
+  notes?: string[];
+  near_month_iv_spread_pp?: number;
+  near_month_summary?: string;
+  strike_spread_range_pp?: number;
+}
+
+export interface OptionsCommonExpiryRow {
+  expiry_date: string;
+  binance_expiry?: string;
+  deribit_expiry?: string;
+  dte?: number;
+  binance_atm_iv?: number;
+  deribit_atm_iv?: number;
+  atm_iv_spread_pp?: number | null;
+  common_strikes?: number;
+}
+
+export interface OptionsCommonExpiriesResult {
+  base: string;
+  binance_spot?: number;
+  deribit_spot?: number;
+  expiries: OptionsCommonExpiryRow[];
+  default_expiry_date?: string;
+  disclaimer: string;
+}
+
+export interface OptionsAlignedStrikeRow {
+  strike: number;
+  moneyness_pct?: number | null;
+  binance_iv: number;
+  deribit_iv: number;
+  iv_spread_pp: number;
+  binance_symbol?: string;
+  deribit_symbol?: string;
+}
+
+export interface OptionsAlignedCompareResult {
+  base: string;
+  available: boolean;
+  reason?: string;
+  expiry_date?: string;
+  binance_expiry?: string;
+  deribit_expiry?: string;
+  dte?: number;
+  binance_spot?: number;
+  deribit_spot?: number;
+  atm_strike?: number;
+  atm?: {
+    strike: number;
+    binance_iv: number;
+    deribit_iv: number;
+    iv_spread_pp: number;
+    binance_symbol?: string;
+    deribit_symbol?: string;
+  };
+  comparison?: OptionsVenueComparison;
+  rows?: OptionsAlignedStrikeRow[];
+  common_expiries?: OptionsCommonExpiryRow[];
+  warnings?: string[];
+  disclaimer: string;
+}
+
+export interface OptionsSpreadHistoryRow {
+  base?: string;
+  ts: string;
+  expiry_date?: string;
+  dte?: number;
+  atm_strike?: number;
+  binance_iv?: number;
+  deribit_iv?: number;
+  iv_spread_pp?: number;
+  richer_venue?: string;
+  alert_level?: string;
+}
+
+export interface OptionsSpreadHistoryResult {
+  symbol: string;
+  count: number;
+  items: OptionsSpreadHistoryRow[];
+}
+
+export interface OptionsGreeksVenueLeg {
+  symbol?: string;
+  mark_iv?: number;
+  mark_price?: number;
+  greeks?: {
+    delta?: number;
+    gamma?: number;
+    theta?: number;
+    vega?: number;
+    rho?: number;
+  };
+}
+
+export interface OptionsGreeksRow {
+  strike: number;
+  moneyness_pct?: number;
+  call?: {
+    binance?: OptionsGreeksVenueLeg | null;
+    deribit?: OptionsGreeksVenueLeg | null;
+  };
+  put?: {
+    binance?: OptionsGreeksVenueLeg | null;
+    deribit?: OptionsGreeksVenueLeg | null;
+  };
+}
+
+export interface OptionsGreeksResult {
+  base: string;
+  available: boolean;
+  reason?: string;
+  expiry_date?: string;
+  dte?: number;
+  spot?: number;
+  atm_strike?: number;
+  rows?: OptionsGreeksRow[];
+  disclaimer?: string;
+}
+
+export interface OptionsSpreadAlertConfig {
+  enabled: boolean;
+  elevated_pp: number;
+  hot_pp: number;
+  cooldown_minutes: number;
+  symbols: string[];
+  webhook_on_alert: boolean;
+  bark_on_alert: boolean;
+}
+
+export interface OptionsSpreadAlertLogRow {
+  ts: string;
+  base: string;
+  level: string;
+  message: string;
+  detail?: Record<string, unknown>;
+}
+
+export interface OptionsVenueCompareItem {
+  base: string;
+  binance: OptionsVenueSnapshot;
+  deribit: OptionsVenueSnapshot;
+  comparison: OptionsVenueComparison;
+  aligned?: OptionsAlignedCompareResult;
+  near_month?: OptionsVenueComparison;
+  scanned_at?: string;
+  disclaimer?: string;
+}
+
+export interface OptionsVenueCompareScanResult {
+  scanned_at: string;
+  symbols: string[];
+  items: OptionsVenueCompareItem[];
+  overview: string;
+  disclaimer: string;
+}
+
+export interface OptionsVenueTermCompareResult {
+  base: string;
+  binance: {
+    spot?: number;
+    points: OptionsTermStructurePoint[];
+    slope_note?: string | null;
+    error?: string;
+  };
+  deribit: {
+    spot?: number | null;
+    points: OptionsTermStructurePoint[];
+  };
+  disclaimer: string;
 }
 
 export interface StrikePurchaseSummary {
@@ -926,4 +1313,5 @@ export interface StrikeProbabilityReport {
   disclaimer: string;
   purchase_summary?: StrikePurchaseSummary;
   purchase_disclaimer?: string;
+  strategy_pack?: OptionsStrategyPack;
 }

@@ -1,0 +1,17 @@
+{
+  "symbol": "BTC",
+  "strategy": "macd_rsi_confirm",
+  "timeframe": "15m",
+  "start": "2026-01-01",
+  "end": "2026-06-03",
+  "capital_base": 100000.0,
+  "engine": "zipline",
+  "strategy_params": {
+    "fast": 12,
+    "slow": 26,
+    "signal": 9,
+    "rsi_period": 14,
+    "rsi_floor": 50,
+    "rsi_cap": 70
+  }
+}

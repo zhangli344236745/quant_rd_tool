@@ -260,6 +260,97 @@ function optAlertType(level: string) {
           >
             {{ ((optionsVol()?.strike_ladder as any).purchase_summary).headline }}
           </p>
+          <p
+            v-if="((optionsVol()?.strategy_pack as any)?.headline)"
+            class="purchase-headline small mt"
+          >
+            策略：{{ (optionsVol()?.strategy_pack as any).headline }}
+          </p>
+          <el-descriptions
+            v-if="(optionsVol()?.venue_compare as any)?.aligned?.available"
+            :column="2"
+            size="small"
+            border
+            class="mt venue-mini"
+          >
+            <el-descriptions-item label="跨所到期">
+              {{ (optionsVol()?.venue_compare as any).aligned.expiry_date }}
+            </el-descriptions-item>
+            <el-descriptions-item label="B−D 价差">
+              {{
+                (optionsVol()?.venue_compare as any).comparison?.iv_spread_pp != null
+                  ? (optionsVol()?.venue_compare as any).comparison.iv_spread_pp + "pp"
+                  : "—"
+              }}
+            </el-descriptions-item>
+            <el-descriptions-item label="偏高所">
+              {{ (optionsVol()?.venue_compare as any).comparison?.richer_venue || "—" }}
+            </el-descriptions-item>
+            <el-descriptions-item label="Deribit IV">
+              {{
+                (optionsVol()?.venue_compare as any).deribit?.atm_iv != null
+                  ? (Number((optionsVol()?.venue_compare as any).deribit.atm_iv) * 100).toFixed(1) + "%"
+                  : "—"
+              }}
+            </el-descriptions-item>
+          </el-descriptions>
+          <p
+            v-if="(optionsVol()?.venue_compare as any)?.comparison?.summary"
+            class="muted small mt"
+          >
+            {{ (optionsVol()?.venue_compare as any).comparison.summary }}
+          </p>
+          <el-table
+            v-if="((optionsVol()?.strike_ladder as any)?.rows)?.length"
+            :data="(optionsVol()?.strike_ladder as any).rows"
+            size="small"
+            stripe
+            class="mt ladder-mini"
+            max-height="200"
+          >
+            <el-table-column prop="strike" label="K" width="72" />
+            <el-table-column label="Call 模/隐" min-width="100">
+              <template #default="{ row }">
+                {{
+                  row.model?.expiry_itm_call != null
+                    ? (row.model.expiry_itm_call * 100).toFixed(0) + "%"
+                    : "—"
+                }}
+                /
+                {{
+                  row.implied?.expiry_itm_call != null
+                    ? (row.implied.expiry_itm_call * 100).toFixed(0) + "%"
+                    : "—"
+                }}
+              </template>
+            </el-table-column>
+            <el-table-column label="Put 模/隐" min-width="100">
+              <template #default="{ row }">
+                {{
+                  row.model?.expiry_itm_put != null
+                    ? (row.model.expiry_itm_put * 100).toFixed(0) + "%"
+                    : "—"
+                }}
+                /
+                {{
+                  row.implied?.expiry_itm_put != null
+                    ? (row.implied.expiry_itm_put * 100).toFixed(0) + "%"
+                    : "—"
+                }}
+              </template>
+            </el-table-column>
+            <el-table-column label="Call" width="72">
+              <template #default="{ row }">
+                {{ row.purchase?.verdict || "—" }}
+              </template>
+            </el-table-column>
+            <el-table-column label="Put" width="72">
+              <template #default="{ row }">
+                {{ row.purchase_put?.verdict || "—" }}
+              </template>
+            </el-table-column>
+          </el-table>
+          <router-link to="/crypto-options-vol" class="var-link mt">期权波动详情 →</router-link>
         </el-card>
         <el-card v-if="result && !polling" shadow="never" class="panel-card mt">
           <template #header>

@@ -7,8 +7,11 @@ import pytest
 from quant_rd_tool.crypto_options_strike_probs import (
     build_strike_ladder,
     prob_expiry_itm_call,
+    prob_expiry_itm_put,
     prob_implied_expiry_itm_call,
+    prob_implied_expiry_itm_put,
     prob_touch_call_up,
+    prob_touch_put_down,
 )
 
 
@@ -38,6 +41,28 @@ def test_implied_matches_bs_d2():
     p = prob_implied_expiry_itm_call(spot, strike, iv=iv, dte_days=dte)
     assert p is not None
     assert 0.4 < p < 0.6
+
+
+def test_put_probs_complement_call_at_atm():
+    spot, strike, dte = 100.0, 100.0, 30.0
+    mu, sig = 0.0, 0.5
+    pc = prob_expiry_itm_call(spot, strike, mu_ann=mu, sigma_ann=sig, dte_days=dte)
+    pp = prob_expiry_itm_put(spot, strike, mu_ann=mu, sigma_ann=sig, dte_days=dte)
+    assert pc is not None and pp is not None
+    assert abs(pc + pp - 1.0) < 0.05
+
+
+def test_put_touch_when_strike_above_spot():
+    p = prob_touch_put_down(100.0, 110.0, mu_ann=0.0, sigma_ann=0.5, dte_days=30)
+    assert p == 1.0
+
+
+def test_implied_put_complements_call():
+    spot, strike, iv, dte = 100.0, 100.0, 0.5, 180.0
+    c = prob_implied_expiry_itm_call(spot, strike, iv=iv, dte_days=dte)
+    p = prob_implied_expiry_itm_put(spot, strike, iv=iv, dte_days=dte)
+    assert c is not None and p is not None
+    assert abs(c + p - 1.0) < 1e-6
 
 
 def test_build_strike_ladder_atm_n():

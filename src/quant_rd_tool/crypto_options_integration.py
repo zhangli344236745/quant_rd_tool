@@ -184,6 +184,7 @@ def _attach_strike_ladder_if_configured(
 ) -> None:
     if not options_ctx.get("enabled"):
         return
+    from quant_rd_tool.crypto_options_strategies import build_strategy_pack
     from quant_rd_tool.crypto_options_strike_probs import (
         build_strike_probability_report,
         get_strike_prob_config,
@@ -208,9 +209,43 @@ def _attach_strike_ladder_if_configured(
             with_purchase_advice=True,
         )
         options_ctx["strike_ladder"] = ladder
+        options_ctx["strategy_pack"] = build_strategy_pack(
+            scan_item=options_ctx.get("scan_item"),
+            strike_report=ladder if ladder.get("rows") else None,
+            spot_stance=str(combined.get("stance", "中性")),
+        )
     except Exception as e:
         logger.warning("strike ladder for analyze failed: %s", e)
         options_ctx["strike_ladder"] = {"enabled": False, "error": str(e)}
+
+
+def _attach_venue_compare_if_enabled(
+    options_ctx: dict[str, Any],
+    *,
+    data_dir: str,
+    client: Any = None,
+    spot_stance: str = "中性",
+) -> None:
+    if not options_ctx.get("enabled"):
+        return
+    from quant_rd_tool.crypto_options_compare import build_venue_compare
+    from quant_rd_tool.crypto_options_strategies import build_strategy_pack
+
+    base = str(options_ctx.get("base") or "")
+    if not base:
+        return
+    try:
+        vc = build_venue_compare(base, client=client)
+        options_ctx["venue_compare"] = vc
+        options_ctx["strategy_pack"] = build_strategy_pack(
+            scan_item=options_ctx.get("scan_item"),
+            strike_report=options_ctx.get("strike_ladder"),
+            spot_stance=spot_stance,
+            venue_compare=vc,
+        )
+    except Exception as e:
+        logger.warning("venue compare for analyze failed: %s", e)
+        options_ctx["venue_compare"] = {"enabled": False, "error": str(e)}
 
 
 def attach_options_to_report(
@@ -245,6 +280,12 @@ def attach_options_to_report(
         report=report,
         data_dir=data_dir,
         client=client,
+    )
+    _attach_venue_compare_if_enabled(
+        options_ctx,
+        data_dir=data_dir,
+        client=client,
+        spot_stance=str(combined.get("stance", "中性")),
     )
     report["options_vol"] = options_ctx
 

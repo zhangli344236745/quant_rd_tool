@@ -53,6 +53,10 @@ cd src/quant_trade_tool && npm run dev   # 5173，Vite 代理 /api
 
 详见 [src/quant_trade_tool/README.md](src/quant_trade_tool/README.md)。
 
+### 金融知识库
+
+侧栏 **「金融知识库」**（`/finance-kb`）：自动索引 A 股/Crypto 报告与设计文档，支持上传 MD/TXT/PDF，基于 **Cursor Cloud Agents REST API** + RAG 问答。需 `.env` 中 `CURSOR_API_KEY`；嵌入向量复用 `OPENAI_API_KEY`（可选 `KB_FALLBACK_OPENAI=true`）。
+
 ### A 股公司库（akshare）
 
 Web 控制台 **「A 股公司」**：全市场列表搜索、自选、基本信息（东财 + 巨潮）、管理层变动、新闻与公告、**后台 Qlib 分析任务**与报告回看。

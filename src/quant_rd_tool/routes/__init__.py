@@ -7,6 +7,7 @@ from quant_rd_tool.routes import (
     enterprise,
     factors,
     jobs,
+    knowledge,
     macro,
     meta,
     ml,
@@ -32,3 +33,4 @@ api_router.include_router(stocks.router, prefix="/stocks", tags=["stocks"])
 api_router.include_router(jobs.router, prefix="/jobs", tags=["jobs"])
 api_router.include_router(settings_routes.router, prefix="/settings", tags=["settings"])
 api_router.include_router(rdagent_ops.router, prefix="/rdagent", tags=["rdagent"])
+api_router.include_router(knowledge.router, prefix="/kb", tags=["knowledge"])

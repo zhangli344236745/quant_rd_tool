@@ -150,6 +150,69 @@ def prob_implied_expiry_itm_call(
     return max(0.0, min(1.0, norm_cdf(d2)))
 
 
+def prob_expiry_itm_put(
+    spot: float,
+    strike: float,
+    *,
+    mu_ann: float,
+    sigma_ann: float,
+    dte_days: float,
+) -> float | None:
+    """P(S_T <= K) under GBM with drift mu_ann and vol sigma_ann."""
+    if spot <= 0 or strike <= 0 or sigma_ann <= 0 or dte_days <= 0:
+        return None
+    t = dte_days / 365.0
+    a = mu_ann - 0.5 * sigma_ann**2
+    denom = sigma_ann * math.sqrt(t)
+    if denom <= 0:
+        return None
+    z = (math.log(strike / spot) - a * t) / denom
+    return max(0.0, min(1.0, norm_cdf(z)))
+
+
+def prob_touch_put_down(
+    spot: float,
+    strike: float,
+    *,
+    mu_ann: float,
+    sigma_ann: float,
+    dte_days: float,
+) -> float | None:
+    """P(min_{0<=t<=T} S_t <= K) — downward touch, put-oriented."""
+    if spot <= 0 or strike <= 0 or sigma_ann <= 0 or dte_days <= 0:
+        return None
+    if strike >= spot:
+        return 1.0
+    t = dte_days / 365.0
+    a = mu_ann - 0.5 * sigma_ann**2
+    sig_sqrt_t = sigma_ann * math.sqrt(t)
+    if sig_sqrt_t <= 0:
+        return None
+    ln_ratio = math.log(strike / spot)
+    x = (ln_ratio + a * t) / sig_sqrt_t
+    y = (ln_ratio - a * t) / sig_sqrt_t
+    expo = 2.0 * a * math.log(spot / strike) / (sigma_ann**2)
+    p = norm_cdf(-x) + math.exp(expo) * norm_cdf(-y)
+    return max(0.0, min(1.0, p))
+
+
+def prob_implied_expiry_itm_put(
+    spot: float,
+    strike: float,
+    *,
+    iv: float,
+    dte_days: float,
+    risk_free: float = 0.0,
+) -> float | None:
+    """Risk-neutral P(S_T <= K) = N(-d2), r≈0."""
+    call = prob_implied_expiry_itm_call(
+        spot, strike, iv=iv, dte_days=dte_days, risk_free=risk_free
+    )
+    if call is None:
+        return None
+    return max(0.0, min(1.0, 1.0 - call))
+
+
 def _parse_marks_for_expiry(
     marks: list[dict[str, Any]],
     base: str,
@@ -194,6 +257,7 @@ def build_strike_ladder(
     *,
     expiry: datetime | None = None,
     min_dte: int = 7,
+    full_chain: bool = False,
 ) -> tuple[list[dict[str, Any]], list[str]]:
     """
     Return ATM±n strikes for one expiry (calls preferred for IV).
@@ -216,12 +280,18 @@ def build_strike_ladder(
 
     strikes = sorted(by_strike.keys())
     atm_k = min(strikes, key=lambda k: abs(k - spot))
-    idx = strikes.index(atm_k)
-    lo = max(0, idx - n)
-    hi = min(len(strikes), idx + n + 1)
-    chosen = strikes[lo:hi]
-    if len(chosen) < 2 * n + 1:
-        warnings.append(f"only {len(chosen)} strikes available (requested ATM±{n})")
+    if full_chain:
+        chosen = strikes
+        if len(chosen) > 40:
+            warnings.append(f"full chain truncated to 40 of {len(chosen)} strikes")
+            chosen = strikes[:40]
+    else:
+        idx = strikes.index(atm_k)
+        lo = max(0, idx - n)
+        hi = min(len(strikes), idx + n + 1)
+        chosen = strikes[lo:hi]
+        if len(chosen) < 2 * n + 1:
+            warnings.append(f"only {len(chosen)} strikes available (requested ATM±{n})")
 
     now = datetime.now(UTC)
     dte = (expiry - now).total_seconds() / 86400.0
@@ -298,10 +368,11 @@ def build_strike_probability_report(
     iv_alert_level: str | None = None,
     iv_percentile: float | None = None,
     with_purchase_advice: bool = True,
+    full_chain: bool = False,
 ) -> dict[str, Any]:
     cfg = get_strike_prob_config(data_dir)
     n_eff = int(n if n is not None else cfg["default_n"])
-    cache_key = f"{base.upper()}:{n_eff}:{expiry_iso or ''}:{data_dir}"
+    cache_key = f"{base.upper()}:{n_eff}:{expiry_iso or ''}:{data_dir}:fc={int(full_chain)}"
     ttl = int(cfg.get("cache_seconds") or 0)
     if ttl > 0 and cache_key in _CACHE:
         ts, payload = _CACHE[cache_key]
@@ -338,6 +409,7 @@ def build_strike_probability_report(
         n_eff,
         expiry=expiry_dt,
         min_dte=int(cfg.get("min_dte") or 7),
+        full_chain=full_chain,
     )
     if not ladder:
         return {
@@ -394,10 +466,24 @@ def build_strike_probability_report(
             if model_enabled and sigma_ann
             else None
         )
+        model_put = (
+            prob_expiry_itm_put(spot, strike, mu_ann=mu_ann, sigma_ann=sigma_ann, dte_days=dte)
+            if model_enabled and sigma_ann
+            else None
+        )
+        model_touch_put = (
+            prob_touch_put_down(spot, strike, mu_ann=mu_ann, sigma_ann=sigma_ann, dte_days=dte)
+            if model_enabled and sigma_ann
+            else None
+        )
         impl_exp = prob_implied_expiry_itm_call(spot, strike, iv=iv, dte_days=dte)
+        impl_put = prob_implied_expiry_itm_put(spot, strike, iv=iv, dte_days=dte)
         edge = None
+        edge_put = None
         if model_exp is not None and impl_exp is not None:
             edge = round(model_exp - impl_exp, 4)
+        if model_put is not None and impl_put is not None:
+            edge_put = round(model_put - impl_put, 4)
         out_rows.append(
             {
                 "strike": strike,
@@ -408,12 +494,17 @@ def build_strike_probability_report(
                 "model": {
                     "expiry_itm_call": round(model_exp, 4) if model_exp is not None else None,
                     "touch_call": round(model_touch, 4) if model_touch is not None else None,
+                    "expiry_itm_put": round(model_put, 4) if model_put is not None else None,
+                    "touch_put": round(model_touch_put, 4) if model_touch_put is not None else None,
                 },
                 "implied": {
                     "expiry_itm_call": round(impl_exp, 4) if impl_exp is not None else None,
                     "touch_call": None,
+                    "expiry_itm_put": round(impl_put, 4) if impl_put is not None else None,
+                    "touch_put": None,
                 },
                 "edge_expiry": edge,
+                "edge_expiry_put": edge_put,
             }
         )
 
@@ -440,4 +531,11 @@ def build_strike_probability_report(
             iv_alert_level=iv_alert_level or "normal",
             iv_percentile=iv_percentile,
         )
+
+    from quant_rd_tool.crypto_options_strategies import build_strategy_pack
+
+    payload["strategy_pack"] = build_strategy_pack(
+        strike_report=payload,
+        spot_stance=spot_stance or "中性",
+    )
     return payload

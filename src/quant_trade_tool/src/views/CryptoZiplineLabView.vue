@@ -71,6 +71,16 @@ const form = ref({
   capital_base: 100000,
   sync_first: true,
   force_reingest: false,
+  with_options_context: false,
+  with_options_backtest: false,
+  options_overlay: "auto" as
+    | "auto"
+    | "call_overlay"
+    | "put_hedge"
+    | "short_straddle_iv"
+    | "covered_call"
+    | "long_straddle",
+  options_pct: 0.25,
   engine: "auto" as "auto" | "pandas" | "zipline",
   fast: 10,
   slow: 30,
@@ -96,7 +106,36 @@ const form = ref({
   squeeze_lookback: 120,
   keltner_mult: 1.5,
   ichimoku_kijun: 26,
+  train_bars: 2000,
+  retrain_every: 500,
+  ml_base_strategy: "supertrend",
 });
+
+const CATEGORY_LABELS: Record<string, string> = {
+  options: "期权",
+  trend: "趋势",
+  momentum: "动量",
+  volatility: "波动",
+  volume: "成交量",
+  combo: "组合",
+  ml: "机器学习",
+};
+
+const strategyGroups = computed(() => {
+  const groups: Record<string, CryptoZiplineStrategy[]> = {};
+  for (const s of strategies.value) {
+    const cat = s.category || "other";
+    if (!groups[cat]) groups[cat] = [];
+    groups[cat].push(s);
+  }
+  const order = ["options", "ml", "trend", "momentum", "volatility", "volume", "combo", "other"];
+  return order
+    .filter((cat) => groups[cat]?.length)
+    .map((cat) => ({ label: CATEGORY_LABELS[cat] || cat, items: groups[cat] }));
+});
+
+const isMlStrategy = computed(() => form.value.strategy.startsWith("xgb_"));
+const isOptionsStrategy = computed(() => form.value.strategy.startsWith("opt_"));
 
 const selectedStrategy = computed(() =>
   strategies.value.find((s) => s.id === form.value.strategy),
@@ -189,6 +228,16 @@ function strategyParams(): Record<string, number> {
   }
   if (s === "vwap_trend") {
     return { lookback: form.value.vol_lookback };
+  }
+  if (s === "xgb_alpha158" || s === "xgb_tv_ensemble") {
+    return { train_bars: form.value.train_bars, retrain_every: form.value.retrain_every };
+  }
+  if (s === "xgb_tv_filter") {
+    return {
+      base_strategy: form.value.ml_base_strategy,
+      train_bars: form.value.train_bars,
+      retrain_every: form.value.retrain_every,
+    };
   }
   const spec = selectedStrategy.value;
   if (spec?.default_params) {
@@ -378,6 +427,12 @@ async function runBacktest() {
       sync_first: form.value.sync_first,
       force_reingest: form.value.force_reingest,
       engine: form.value.engine,
+      with_options_context: form.value.with_options_context,
+      with_options_backtest: form.value.with_options_backtest && !isOptionsStrategy.value,
+      options_overlay: form.value.options_overlay,
+      options_backtest_params: form.value.with_options_backtest
+        ? { options_pct: form.value.options_pct }
+        : undefined,
     });
     result.value = data;
     ElMessage.success(`回测完成（${data.engine}）`);
@@ -543,16 +598,40 @@ onMounted(async () => {
           </el-form-item>
         </template>
         <el-form-item v-else label="策略">
-          <el-select v-model="form.strategy" style="width: 200px">
-            <el-option
-              v-for="s in strategies"
-              :key="s.id"
-              :label="s.name"
-              :value="s.id"
-            />
+          <el-select v-model="form.strategy" filterable style="width: 240px">
+            <el-option-group
+              v-for="g in strategyGroups"
+              :key="g.label"
+              :label="g.label"
+            >
+              <el-option
+                v-for="s in g.items"
+                :key="s.id"
+                :label="s.name"
+                :value="s.id"
+              />
+            </el-option-group>
           </el-select>
           <span v-if="selectedStrategy" class="hint">{{ selectedStrategy.description }}</span>
         </el-form-item>
+        <template v-if="!form.use_combo && isMlStrategy">
+          <el-form-item label="训练窗口">
+            <el-input-number v-model="form.train_bars" :min="500" :max="10000" :step="100" />
+          </el-form-item>
+          <el-form-item label="重训间隔">
+            <el-input-number v-model="form.retrain_every" :min="50" :max="2000" :step="50" />
+          </el-form-item>
+          <el-form-item v-if="form.strategy === 'xgb_tv_filter'" label="基础 TV 策略">
+            <el-select v-model="form.ml_base_strategy" filterable style="width: 200px">
+              <el-option
+                v-for="s in strategies.filter((x) => x.source !== 'ml')"
+                :key="s.id"
+                :label="s.name"
+                :value="s.id"
+              />
+            </el-select>
+          </el-form-item>
+        </template>
         <el-form-item
           v-if="
             !form.use_combo &&
@@ -668,6 +747,35 @@ onMounted(async () => {
         <el-form-item v-if="form.engine !== 'pandas'" label="强制重建 bundle">
           <el-switch v-model="form.force_reingest" />
         </el-form-item>
+        <el-form-item label="期权 IV 上下文">
+          <el-switch v-model="form.with_options_context" />
+        </el-form-item>
+        <el-form-item v-if="!isOptionsStrategy" label="期权叠加回测">
+          <el-switch v-model="form.with_options_backtest" />
+        </el-form-item>
+        <el-form-item
+          v-if="form.with_options_backtest && !isOptionsStrategy"
+          label="叠加结构"
+        >
+          <el-select v-model="form.options_overlay" style="width: 200px">
+            <el-option label="自动 (strategy_pack)" value="auto" />
+            <el-option label="Call 叠加" value="call_overlay" />
+            <el-option label="Put 对冲" value="put_hedge" />
+            <el-option label="高 IV 卖跨" value="short_straddle_iv" />
+            <el-option label="备兑看涨" value="covered_call" />
+            <el-option label="买跨 (Straddle)" value="long_straddle" />
+          </el-select>
+          仓位
+          <el-input-number v-model="form.options_pct" :min="0.05" :max="0.5" :step="0.05" />
+        </el-form-item>
+        <el-alert
+          v-if="isOptionsStrategy"
+          type="info"
+          :closable="false"
+          show-icon
+          class="options-strat-hint"
+          title="期权策略使用 Pandas + BS 定价回测（需本地 IV 历史 JSONL）"
+        />
         <el-form-item>
           <el-button type="primary" :loading="running" @click="runBacktest">运行回测</el-button>
         </el-form-item>
@@ -697,6 +805,12 @@ onMounted(async () => {
         </el-tag>
         <el-tag v-if="result.bar_count" type="info">{{ result.bar_count }} bars</el-tag>
         <el-tag v-if="result.ingest_skipped" type="success">bundle 缓存命中</el-tag>
+        <el-tag v-if="(result as any).ml_metrics?.ic != null" type="info">
+          ML IC {{ (result as any).ml_metrics.ic }}
+        </el-tag>
+        <el-tag v-if="(result as any).ml_metrics?.direction_accuracy != null" type="info">
+          方向命中 {{ ((result as any).ml_metrics.direction_accuracy * 100).toFixed(1) }}%
+        </el-tag>
       </div>
       <EquityCurveChart
         v-if="result.equity_curve?.length"
@@ -704,6 +818,81 @@ onMounted(async () => {
         :capital-base="result.capital_base"
         class="mt"
       />
+      <el-alert
+        v-if="result.options_backtest && result.options_backtest.enabled === false && (result.options_backtest as any).reason"
+        type="warning"
+        :title="(result.options_backtest as any).reason || (result.options_backtest as any).skip_reason"
+        show-icon
+        class="mt"
+      />
+      <el-card
+        v-if="result.options_backtest?.enabled"
+        shadow="never"
+        class="inner-card mt"
+      >
+        <template #header>
+          期权回测 · {{ result.options_backtest.overlay_id }}
+          <span
+            v-if="result.options_backtest.strategy_pack_selection?.headline"
+            class="muted small header-meta"
+          >
+            ← {{ result.options_backtest.strategy_pack_selection.headline }}
+          </span>
+        </template>
+        <p
+          v-if="result.options_backtest.strategy_pack_selection?.rationale"
+          class="muted small mb"
+        >
+          {{ result.options_backtest.strategy_pack_selection.rationale }}
+        </p>
+        <div class="metrics">
+          <el-tag type="info">
+            期权腿收益 {{ pct(result.options_backtest.metrics?.total_return) }}
+          </el-tag>
+          <el-tag
+            v-if="result.options_backtest.combined_metrics"
+            type="success"
+          >
+            组合收益 {{ pct(result.options_backtest.combined_metrics.total_return) }}
+          </el-tag>
+          <el-tag v-if="result.options_backtest.iv_snapshots_used" type="info">
+            IV 快照 {{ result.options_backtest.iv_snapshots_used }}
+          </el-tag>
+        </div>
+        <EquityCurveChart
+          v-if="result.options_backtest.combined_equity_curve?.length"
+          :data="result.options_backtest.combined_equity_curve"
+          :capital-base="result.capital_base"
+          class="mt"
+        />
+        <p class="muted small mt">{{ result.options_backtest.disclaimer }}</p>
+      </el-card>
+      <el-card
+        v-if="(result.options_context as any)?.enabled"
+        shadow="never"
+        class="inner-card mt"
+      >
+        <template #header>期权 IV 上下文（不影响回测）</template>
+        <el-tag size="small" class="mb">
+          {{ (result.options_context as any).alert_level }}
+        </el-tag>
+        <p class="muted small">
+          ATM IV
+          {{
+            (result.options_context as any).atm_iv != null
+              ? ((result.options_context as any).atm_iv * 100).toFixed(1) + "%"
+              : "—"
+          }}
+          · 分位 {{ (result.options_context as any).iv_percentile ?? "—" }}
+        </p>
+        <p
+          v-if="((result.options_context as any).strategy_pack as any)?.headline"
+          class="small"
+        >
+          策略：{{ ((result.options_context as any).strategy_pack as any).headline }}
+        </p>
+        <router-link to="/crypto-options-vol" class="var-link">打开期权波动页 →</router-link>
+      </el-card>
       <p class="muted small mt">{{ result.disclaimer }}</p>
       <el-table
         v-if="result.trades?.length"

@@ -83,9 +83,11 @@ def test_list_strategies_includes_new():
         "bb_squeeze",
         "ichimoku_cloud",
         "vwap_trend",
+        "wavetrend",
+        "xgb_alpha158",
     ):
         assert sid in ids
-    assert len(ids) >= 19
+    assert len(ids) >= 53
 
 
 def test_df_fingerprint_stable():

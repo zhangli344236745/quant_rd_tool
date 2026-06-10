@@ -33,12 +33,34 @@ http.interceptors.response.use(
   },
 );
 
+function formatApiDetail(detail: unknown): string | null {
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    const parts = detail
+      .map((item) => {
+        if (item && typeof item === "object" && "msg" in item) {
+          const loc = Array.isArray((item as { loc?: unknown }).loc)
+            ? (item as { loc: unknown[] }).loc.filter((x) => x !== "body").join(".")
+            : "";
+          const msg = String((item as { msg?: unknown }).msg ?? "");
+          return loc ? `${loc}: ${msg}` : msg;
+        }
+        return null;
+      })
+      .filter(Boolean);
+    if (parts.length) return parts.join("; ");
+  }
+  if (detail && typeof detail === "object") return JSON.stringify(detail, null, 2);
+  return null;
+}
+
 export function extractError(err: unknown): string {
   if (axios.isAxiosError(err)) {
     const d = err.response?.data?.detail;
-    if (typeof d === "string") return d;
-    if (d) return JSON.stringify(d, null, 2);
+    const formatted = formatApiDetail(d);
+    if (formatted) return formatted;
     return err.message;
   }
+  if (err instanceof Error) return err.message;
   return String(err);
 }

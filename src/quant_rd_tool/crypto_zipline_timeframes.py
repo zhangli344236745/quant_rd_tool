@@ -36,6 +36,24 @@ def bundle_name_for(timeframe: str) -> str:
     return f"crypto_ccxt_{normalize_timeframe(timeframe)}"
 
 
+ML_WINDOW_SCALE: dict[str, float] = {
+    "5m": 1.0,
+    "15m": 1.0,
+    "30m": 0.75,
+    "1h": 0.25,
+    "4h": 0.1,
+    "1d": 0.05,
+}
+
+
+def ml_window_scale(timeframe: str) -> float:
+    return ML_WINDOW_SCALE[normalize_timeframe(timeframe)]
+
+
+def effective_ml_train_bars(timeframe: str, base: int = 2000) -> int:
+    return max(200, int(base * ml_window_scale(timeframe)))
+
+
 def list_timeframe_options() -> list[dict[str, str | int]]:
     return [
         {"id": tf, "label": tf, "bar_minutes": TIMEFRAME_BAR_MINUTES[tf]}
