@@ -1,0 +1,169 @@
+{
+  "run_id": "903b2aa7-9370-4e1a-b62f-b79c5e0ddcc9",
+  "symbol": "ETH",
+  "pair": "ETH/USDT",
+  "timeframe": "15m",
+  "data_dir": "data/crypto",
+  "template_id": "default-btc-1d",
+  "template_name": "BTC 日线综合",
+  "bars": 800,
+  "period": [
+    "2026-06-03 04:00:00",
+    "2026-06-11 11:45:00"
+  ],
+  "steps": [
+    {
+      "id": "technical",
+      "order": 0,
+      "status": "ok",
+      "output": {
+        "stance": "中性",
+        "action": "hold",
+        "score": 1,
+        "confidence": 0.25,
+        "reasons": [
+          "均线：震荡",
+          "RSI=63.16（中性）",
+          "MACD：MACD 多头",
+          "近20日涨跌：1.96%",
+          "综合得分 1"
+        ]
+      },
+      "summary": "中性 · score 1",
+      "elapsed_s": 0.011
+    },
+    {
+      "id": "qlib_ml",
+      "order": 1,
+      "status": "skipped",
+      "output": {
+        "skipped": true,
+        "reason": "样本不足（800 条 K 线），qlib 训练建议至少 2000 根（15m）。请增大 --backfill-days 或等待定时任务累积。",
+        "stance": "中性",
+        "agreement": "仅技术面",
+        "ml_signal": null,
+        "ml_enabled": false
+      },
+      "summary": "样本不足（800 条 K 线），qlib 训练建议至少 2000 根（15m）。请增大 --backfill-days 或等待定时任务累积。",
+      "elapsed_s": 0.02
+    },
+    {
+      "id": "zipline_strategy",
+      "order": 2,
+      "status": "ok",
+      "output": {
+        "strategy_id": "heikin_ashi_trend",
+        "target_pct": 0.0,
+        "position": "flat",
+        "bullish": false,
+        "metrics": {
+          "total_return": -0.029829,
+          "sharpe": -0.5564,
+          "max_drawdown": -0.072574,
+          "trade_count": 106
+        }
+      },
+      "summary": "heikin_ashi_trend → 仓位 0%",
+      "elapsed_s": 0.247
+    },
+    {
+      "id": "var_symbol",
+      "order": 3,
+      "status": "ok",
+      "output": {
+        "var_99_pct": 0.00810258,
+        "var_99_usdt": 81.0258,
+        "var_ratio": 0.00810258,
+        "headline": "ETH 在 1 日、0.81% 历史 VaR 下，名义 10000.0 USDT 的预估最大损失约 81.0258 USDT。"
+      },
+      "summary": "99% VaR 0.81% · 81.0258 USDT",
+      "elapsed_s": 0.009
+    },
+    {
+      "id": "options_vol",
+      "order": 4,
+      "status": "ok",
+      "output": {
+        "enabled": true,
+        "atm_iv": 0.583,
+        "iv_percentile": 2.33,
+        "cross_summary": "现货与期权波动均未给出强方向，宜轻仓或观望。"
+      },
+      "summary": "ATM IV 58.3%",
+      "elapsed_s": 6.972
+    },
+    {
+      "id": "advice_synth",
+      "order": 5,
+      "status": "ok",
+      "output": {
+        "stance": "中性",
+        "action": "hold",
+        "score": 0,
+        "confidence": 0.0,
+        "suggested_position_pct": 0.15,
+        "risk_level": "低",
+        "var_gate_triggered": false,
+        "signal_agreement": "部分一致",
+        "headline": "ETH Workflow：中性（建议仓位 15%），风险等级 低",
+        "bullets": [
+          "技术面：中性（score 1）",
+          "qlib ML：跳过（未运行）",
+          "策略 heikin_ashi_trend：目标仓位 0%",
+          "99% VaR：0.81%（约 81.0258 USDT）",
+          "期权：现货与期权波动均未给出强方向，宜轻仓或观望。"
+        ],
+        "advice": "观望或维持现有仓位，等待多源信号一致后再行动。",
+        "disclaimer": "研究用途，非投资建议。"
+      },
+      "summary": "ETH Workflow：中性（建议仓位 15%），风险等级 低"
+    }
+  ],
+  "step_timings_s": {
+    "technical": 0.011,
+    "qlib_ml": 0.02,
+    "zipline_strategy": 0.247,
+    "var_symbol": 0.009,
+    "options_vol": 6.972
+  },
+  "advice": {
+    "stance": "中性",
+    "action": "hold",
+    "score": 0,
+    "confidence": 0.0,
+    "suggested_position_pct": 0.15,
+    "risk_level": "低",
+    "var_gate_triggered": false,
+    "signal_agreement": "部分一致",
+    "headline": "ETH Workflow：中性（建议仓位 15%），风险等级 低",
+    "bullets": [
+      "技术面：中性（score 1）",
+      "qlib ML：跳过（未运行）",
+      "策略 heikin_ashi_trend：目标仓位 0%",
+      "99% VaR：0.81%（约 81.0258 USDT）",
+      "期权：现货与期权波动均未给出强方向，宜轻仓或观望。"
+    ],
+    "advice": "观望或维持现有仓位，等待多源信号一致后再行动。",
+    "sources": {
+      "technical": {
+        "stance": "中性",
+        "score": 1
+      },
+      "zipline_strategy": {
+        "strategy_id": "heikin_ashi_trend",
+        "target_pct": 0.0
+      },
+      "var_symbol": {
+        "var_99_pct": 0.00810258,
+        "var_99_usdt": 81.0258
+      },
+      "options_vol": {
+        "cross_summary": "现货与期权波动均未给出强方向，宜轻仓或观望。"
+      }
+    },
+    "markdown": "# Crypto Workflow 投资建议 — ETH\n\n**周期**：15m\n**生成**：2026-06-11 11:48:15\n\n## ETH Workflow：中性（建议仓位 15%），风险等级 低\n\n观望或维持现有仓位，等待多源信号一致后再行动。\n\n### 分步摘要\n\n- 技术面：中性（score 1）\n- qlib ML：跳过（未运行）\n- 策略 heikin_ashi_trend：目标仓位 0%\n- 99% VaR：0.81%（约 81.0258 USDT）\n- 期权：现货与期权波动均未给出强方向，宜轻仓或观望。\n\n### 风险\n\n- VaR 基于历史收益，不保证未来损失上限。\n- 短周期 ML / 策略信号可能快速反转。\n- 不构成投资建议。",
+    "disclaimer": "研究用途，非投资建议。"
+  },
+  "generated_at": "2026-06-11T03:48:15.714663+00:00",
+  "generated_at_beijing": "2026-06-11 11:48:15"
+}

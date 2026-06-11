@@ -314,6 +314,8 @@ def stock_var_symbol(
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
+    except ConnectionError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
 
 
 @router.get("/var/symbol/history")

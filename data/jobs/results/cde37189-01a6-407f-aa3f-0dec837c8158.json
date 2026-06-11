@@ -1,0 +1,76 @@
+{
+  "kind": "crypto_options_vol_scan",
+  "scanned_at": "2026-06-11T09:25:24.643188+00:00",
+  "elevated_bases": [
+    "BNB"
+  ],
+  "items": [
+    {
+      "base": "BTC",
+      "ts": "2026-06-11T09:25:24.556353+00:00",
+      "atm_iv": 0.435,
+      "underlying_price": 62810.9009,
+      "contract": "BTC-260703-63000-C",
+      "expiry": "2026-07-03T00:00:00+00:00",
+      "dte": 21.61,
+      "iv_percentile": 15.69,
+      "iv_change_24h_pct": -9.37,
+      "alert_level": "normal",
+      "alerts": [],
+      "cold_start": false,
+      "composite_score": 0.0784,
+      "rank": 3
+    },
+    {
+      "base": "ETH",
+      "ts": "2026-06-11T09:25:24.556353+00:00",
+      "atm_iv": 0.5739,
+      "underlying_price": 1657.0514,
+      "contract": "ETH-260703-1650-C",
+      "expiry": "2026-07-03T00:00:00+00:00",
+      "dte": 21.61,
+      "iv_percentile": 3.92,
+      "iv_change_24h_pct": -7.88,
+      "alert_level": "normal",
+      "alerts": [],
+      "cold_start": false,
+      "composite_score": 0.0196,
+      "rank": 4
+    },
+    {
+      "base": "SOL",
+      "ts": "2026-06-11T09:25:24.556353+00:00",
+      "atm_iv": 0.603152,
+      "underlying_price": 65.1015,
+      "contract": "SOL-260626-66-C",
+      "expiry": "2026-06-26T00:00:00+00:00",
+      "dte": 14.61,
+      "iv_percentile": 11.76,
+      "iv_change_24h_pct": 3.63,
+      "alert_level": "normal",
+      "alerts": [],
+      "cold_start": false,
+      "composite_score": 0.2525,
+      "rank": 2
+    },
+    {
+      "base": "BNB",
+      "ts": "2026-06-11T09:25:24.556353+00:00",
+      "atm_iv": 0.589993,
+      "underlying_price": 598.908,
+      "contract": "BNB-260626-600-C",
+      "expiry": "2026-06-26T00:00:00+00:00",
+      "dte": 14.61,
+      "iv_percentile": 86.27,
+      "iv_change_24h_pct": -9.23,
+      "alert_level": "elevated",
+      "alerts": [
+        "iv_percentile_high"
+      ],
+      "cold_start": false,
+      "composite_score": 0.4313,
+      "rank": 1
+    }
+  ],
+  "advice_overview": "波动偏高标的：BNB。详见各标的建议。"
+}

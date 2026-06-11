@@ -11,3 +11,4 @@
 {"base": "BTC", "ts": "2026-06-11T09:12:43.014314+00:00", "expiry_date": "2026-07-03", "dte": 21.62, "atm_strike": 63000.0, "binance_iv": 0.435, "deribit_iv": 0.4356, "iv_spread_pp": -0.06, "richer_venue": "neutral", "alert_level": "normal"}
 {"base": "BTC", "ts": "2026-06-11T09:13:11.704598+00:00", "expiry_date": "2026-07-03", "dte": 21.62, "atm_strike": 63000.0, "binance_iv": 0.435, "deribit_iv": 0.4356, "iv_spread_pp": -0.06, "richer_venue": "neutral", "alert_level": "normal"}
 {"base": "BTC", "ts": "2026-06-11T09:15:28.659525+00:00", "expiry_date": "2026-07-03", "dte": 21.61, "atm_strike": 63000.0, "binance_iv": 0.435, "deribit_iv": 0.4356, "iv_spread_pp": -0.06, "richer_venue": "neutral", "alert_level": "normal"}
+{"base": "BTC", "ts": "2026-06-11T09:25:44.743391+00:00", "expiry_date": "2026-07-03", "dte": 21.61, "atm_strike": 63000.0, "binance_iv": 0.435, "deribit_iv": 0.4351, "iv_spread_pp": -0.01, "richer_venue": "neutral", "alert_level": "normal"}

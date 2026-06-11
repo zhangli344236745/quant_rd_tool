@@ -1,0 +1,660 @@
+{
+  "run_id": "282365d5-4d53-4b1e-9123-8fae04096722",
+  "symbol": "BTC",
+  "strategy": "ma_crossover",
+  "timeframe": "15m",
+  "start": "2026-01-01",
+  "end": "2026-06-03",
+  "capital_base": 1000.0,
+  "generated_at": "2026-06-11T05:30:07.469870+00:00",
+  "engine": "zipline",
+  "metrics": {
+    "total_return": 0.0,
+    "sharpe": 0.0,
+    "max_drawdown": 0.0,
+    "trade_count": 0
+  },
+  "final_signal": {
+    "position": "flat",
+    "target_pct": 0.0,
+    "bar_time": "2026-06-03 20:00:00+00:00"
+  },
+  "strategy_params": {
+    "fast": 10,
+    "slow": 30
+  },
+  "disclaimer": "回测结果仅供参考，不构成投资建议。",
+  "bundle": "crypto_ccxt_15m",
+  "asset": "CRYPTO_BTC",
+  "bar_minutes": 15,
+  "bar_count": 18,
+  "backtest_start": "2026-06-03 00:00:00",
+  "backtest_end": "2026-06-03 00:00:00",
+  "ingest_skipped": false,
+  "fingerprint": "76bd6d325e1b46c6373329cf",
+  "bars": 18,
+  "options_context": {
+    "enabled": true,
+    "base": "BTC",
+    "scan_item": {
+      "base": "BTC",
+      "ts": "2026-06-11T05:29:19.859259+00:00",
+      "atm_iv": 0.438,
+      "underlying_price": 62609.7178,
+      "contract": "BTC-260626-63000-C",
+      "expiry": "2026-06-26T00:00:00+00:00",
+      "dte": 14.77,
+      "iv_percentile": 4.55,
+      "iv_change_24h_pct": -8.18,
+      "alert_level": "normal",
+      "alerts": [],
+      "cold_start": false,
+      "composite_score": 0.0227,
+      "rank": 3,
+      "venue_compare": {
+        "base": "BTC",
+        "binance": {
+          "enabled": true,
+          "venue": "binance",
+          "atm_iv": 0.438,
+          "contract": "BTC-260626-63000-C",
+          "expiry": "2026-06-26T00:00:00+00:00",
+          "dte": 14.77,
+          "strike": 63000.0,
+          "underlying_price": 62609.7178,
+          "open_interest": null
+        },
+        "deribit": {
+          "enabled": true,
+          "venue": "deribit",
+          "atm_iv": 0.4391,
+          "contract": "BTC-26JUN26-63000-C",
+          "expiry": "2026-06-26T00:00:00+00:00",
+          "dte": 14.77,
+          "strike": 63000.0,
+          "underlying_price": 62536.39,
+          "open_interest": 292.1
+        },
+        "comparison": {
+          "available": true,
+          "iv_spread_pp": -0.11,
+          "abs_spread_pp": 0.11,
+          "richer_venue": "neutral",
+          "alert_level": "normal",
+          "index_spread_pct": 0.117,
+          "dte_gap": 0.0,
+          "aligned_expiry": true,
+          "summary": "BTC 同到期 2026-06-26 ATM IV 接近（差 -0.1pp）。",
+          "notes": [
+            "DTE：Binance 14.77d · Deribit 14.77d。"
+          ],
+          "mode": "aligned_expiry",
+          "expiry_date": "2026-06-26",
+          "near_month_iv_spread_pp": -0.11,
+          "near_month_summary": "BTC 两所近月 ATM IV 接近（差 -0.1pp）。"
+        },
+        "aligned": {
+          "base": "BTC",
+          "available": true,
+          "expiry_date": "2026-06-26",
+          "binance_expiry": "2026-06-26T00:00:00+00:00",
+          "deribit_expiry": "2026-06-26T00:00:00+00:00",
+          "dte": 14.77,
+          "binance_spot": 62609.71782609,
+          "deribit_spot": 62536.71,
+          "atm_strike": 63000.0,
+          "atm": {
+            "strike": 63000.0,
+            "binance_iv": 0.438,
+            "deribit_iv": 0.4391,
+            "iv_spread_pp": -0.11,
+            "binance_symbol": "BTC-260626-63000-C",
+            "deribit_symbol": "BTC-26JUN26-63000-C"
+          },
+          "comparison": {
+            "iv_spread_pp": -0.11,
+            "abs_spread_pp": 0.11,
+            "richer_venue": "neutral",
+            "alert_level": "normal",
+            "aligned_expiry": true,
+            "summary": "BTC 同到期 2026-06-26 ATM IV 接近（差 -0.1pp）。",
+            "strike_spread_range_pp": 0.42
+          },
+          "rows": [
+            {
+              "strike": 58000.0,
+              "moneyness_pct": -7.36,
+              "binance_iv": 0.503,
+              "deribit_iv": 0.5042,
+              "iv_spread_pp": -0.12,
+              "binance_symbol": "BTC-260626-58000-C",
+              "deribit_symbol": "BTC-26JUN26-58000-C"
+            },
+            {
+              "strike": 59000.0,
+              "moneyness_pct": -5.77,
+              "binance_iv": 0.488,
+              "deribit_iv": 0.4895,
+              "iv_spread_pp": -0.15,
+              "binance_symbol": "BTC-260626-59000-C",
+              "deribit_symbol": "BTC-26JUN26-59000-C"
+            },
+            {
+              "strike": 60000.0,
+              "moneyness_pct": -4.17,
+              "binance_iv": 0.474,
+              "deribit_iv": 0.4752,
+              "iv_spread_pp": -0.12,
+              "binance_symbol": "BTC-260626-60000-C",
+              "deribit_symbol": "BTC-26JUN26-60000-C"
+            },
+            {
+              "strike": 61000.0,
+              "moneyness_pct": -2.57,
+              "binance_iv": 0.461,
+              "deribit_iv": 0.462,
+              "iv_spread_pp": -0.1,
+              "binance_symbol": "BTC-260626-61000-C",
+              "deribit_symbol": "BTC-26JUN26-61000-C"
+            },
+            {
+              "strike": 62000.0,
+              "moneyness_pct": -0.97,
+              "binance_iv": 0.449,
+              "deribit_iv": 0.4495,
+              "iv_spread_pp": -0.05,
+              "binance_symbol": "BTC-260626-62000-C",
+              "deribit_symbol": "BTC-26JUN26-62000-C"
+            },
+            {
+              "strike": 63000.0,
+              "moneyness_pct": 0.62,
+              "binance_iv": 0.438,
+              "deribit_iv": 0.4391,
+              "iv_spread_pp": -0.11,
+              "binance_symbol": "BTC-260626-63000-C",
+              "deribit_symbol": "BTC-26JUN26-63000-C"
+            },
+            {
+              "strike": 64000.0,
+              "moneyness_pct": 2.22,
+              "binance_iv": 0.428,
+              "deribit_iv": 0.4301,
+              "iv_spread_pp": -0.21,
+              "binance_symbol": "BTC-260626-64000-C",
+              "deribit_symbol": "BTC-26JUN26-64000-C"
+            },
+            {
+              "strike": 65000.0,
+              "moneyness_pct": 3.82,
+              "binance_iv": 0.42,
+              "deribit_iv": 0.423,
+              "iv_spread_pp": -0.3,
+              "binance_symbol": "BTC-260626-65000-C",
+              "deribit_symbol": "BTC-26JUN26-65000-C"
+            },
+            {
+              "strike": 66000.0,
+              "moneyness_pct": 5.41,
+              "binance_iv": 0.414,
+              "deribit_iv": 0.4167,
+              "iv_spread_pp": -0.27,
+              "binance_symbol": "BTC-260626-66000-C",
+              "deribit_symbol": "BTC-26JUN26-66000-C"
+            },
+            {
+              "strike": 68000.0,
+              "moneyness_pct": 8.61,
+              "binance_iv": 0.409,
+              "deribit_iv": 0.4137,
+              "iv_spread_pp": -0.47,
+              "binance_symbol": "BTC-260626-68000-C",
+              "deribit_symbol": "BTC-26JUN26-68000-C"
+            },
+            {
+              "strike": 70000.0,
+              "moneyness_pct": 11.8,
+              "binance_iv": 0.413,
+              "deribit_iv": 0.4162,
+              "iv_spread_pp": -0.32,
+              "binance_symbol": "BTC-260626-70000-C",
+              "deribit_symbol": "BTC-26JUN26-70000-C"
+            }
+          ],
+          "common_expiries": [
+            {
+              "expiry_date": "2026-06-19",
+              "binance_expiry": "2026-06-19T00:00:00+00:00",
+              "deribit_expiry": "2026-06-19T00:00:00+00:00",
+              "dte": 7.77,
+              "binance_atm_iv": 0.449,
+              "deribit_atm_iv": 0.4499,
+              "atm_iv_spread_pp": -0.09,
+              "common_strikes": 26
+            },
+            {
+              "expiry_date": "2026-06-26",
+              "binance_expiry": "2026-06-26T00:00:00+00:00",
+              "deribit_expiry": "2026-06-26T00:00:00+00:00",
+              "dte": 14.77,
+              "binance_atm_iv": 0.438,
+              "deribit_atm_iv": 0.4391,
+              "atm_iv_spread_pp": -0.11,
+              "common_strikes": 45
+            },
+            {
+              "expiry_date": "2026-07-31",
+              "binance_expiry": "2026-07-31T00:00:00+00:00",
+              "deribit_expiry": "2026-07-31T00:00:00+00:00",
+              "dte": 49.77,
+              "binance_atm_iv": 0.435,
+              "deribit_atm_iv": 0.4348,
+              "atm_iv_spread_pp": 0.02,
+              "common_strikes": 44
+            },
+            {
+              "expiry_date": "2026-08-28",
+              "binance_expiry": "2026-08-28T00:00:00+00:00",
+              "deribit_expiry": "2026-08-28T00:00:00+00:00",
+              "dte": 77.77,
+              "binance_atm_iv": 0.435,
+              "deribit_atm_iv": 0.4348,
+              "atm_iv_spread_pp": 0.02,
+              "common_strikes": 22
+            },
+            {
+              "expiry_date": "2026-09-25",
+              "binance_expiry": "2026-09-25T00:00:00+00:00",
+              "deribit_expiry": "2026-09-25T00:00:00+00:00",
+              "dte": 105.77,
+              "binance_atm_iv": 0.441,
+              "deribit_atm_iv": 0.4403,
+              "atm_iv_spread_pp": 0.07,
+              "common_strikes": 40
+            },
+            {
+              "expiry_date": "2026-12-25",
+              "binance_expiry": "2026-12-25T00:00:00+00:00",
+              "deribit_expiry": "2026-12-25T00:00:00+00:00",
+              "dte": 196.77,
+              "binance_atm_iv": 0.453,
+              "deribit_atm_iv": 0.4549,
+              "atm_iv_spread_pp": -0.19,
+              "common_strikes": 36
+            },
+            {
+              "expiry_date": "2027-03-26",
+              "binance_expiry": "2027-03-26T00:00:00+00:00",
+              "deribit_expiry": "2027-03-26T00:00:00+00:00",
+              "dte": 287.77,
+              "binance_atm_iv": 0.459,
+              "deribit_atm_iv": 0.4588,
+              "atm_iv_spread_pp": 0.02,
+              "common_strikes": 27
+            }
+          ],
+          "warnings": [],
+          "disclaimer": "跨所 IV 对比基于各交易所 mark IV 与指数价，到期日/合约结构可能不同，仅供研究。"
+        },
+        "near_month": {
+          "available": true,
+          "iv_spread_pp": -0.11,
+          "abs_spread_pp": 0.11,
+          "richer_venue": "neutral",
+          "alert_level": "normal",
+          "index_spread_pct": 0.117,
+          "dte_gap": 0.0,
+          "aligned_expiry": true,
+          "summary": "BTC 两所近月 ATM IV 接近（差 -0.1pp）。",
+          "notes": [
+            "DTE：Binance 14.77d · Deribit 14.77d。"
+          ]
+        },
+        "disclaimer": "跨所 IV 对比基于各交易所 mark IV 与指数价，到期日/合约结构可能不同，仅供研究。",
+        "scanned_at": "2026-06-11T05:29:26.330583+00:00"
+      },
+      "strategy_pack": {
+        "headline": "维持观望",
+        "strategies": [
+          {
+            "id": "wait",
+            "name": "维持观望",
+            "rationale": "BTC 当前 IV 与方向未形成鲜明策略边际，宜轻仓或等待结构明朗。",
+            "legs": [],
+            "risk_level": "低",
+            "score": 0.4,
+            "base": "BTC",
+            "pnl": {
+              "per_contract": {
+                "available": false,
+                "reason": "无期权腿"
+              },
+              "scaled": {
+                "available": false
+              },
+              "stop_loss": {
+                "primary_rule": "观望策略，无期权腿止损线。",
+                "premium_stop_usd": null,
+                "spot_stop_levels": [],
+                "time_stop_dte": null,
+                "notes": []
+              },
+              "disclaimer": "盈亏与止损基于 mark 权利金及简化结构公式，未计手续费、滑点与保证金变动；止损为研究框架，不构成实盘交易指令。"
+            }
+          }
+        ],
+        "disclaimer": "以下为研究性策略框架示意，未计手续费、保证金与流动性；不构成投资建议。"
+      }
+    },
+    "advice": {
+      "base": "BTC",
+      "stance": "中性",
+      "summary": "BTC：中性。 IV 分位 4.55%，24h -8.2%。",
+      "actions": [
+        "BTC 期权波动未达告警阈值，可维持常规仓位管理。"
+      ],
+      "risks": [
+        "以下为基于隐含波动率规则的研究性提示，不构成投资建议。期权交易风险极高，请自行评估并控制仓位。"
+      ],
+      "reasons": [
+        "IV 历史分位约 4.55%（近月 ATM mark IV 0.438）。",
+        "24 小时 IV 变化约 -8.2%。",
+        "横向波动综合排名 #3。"
+      ],
+      "confidence": 0.45
+    },
+    "alert_level": "normal",
+    "iv_percentile": 4.55,
+    "iv_change_24h_pct": -8.18,
+    "atm_iv": 0.438,
+    "contract": "BTC-260626-63000-C",
+    "cold_start": false,
+    "peer_rank": 3,
+    "peer_count": 4,
+    "hottest_peer": "BTC",
+    "scanned_at": "2026-06-11T05:29:19.945729+00:00",
+    "strike_ladder": {
+      "base": "BTC",
+      "spot": 62642.8211,
+      "expiry": "2026-06-26T00:00:00+00:00",
+      "dte": 14.77,
+      "n": 3,
+      "model": {
+        "enabled": true,
+        "sigma_ann": 0.336814,
+        "mu_ann": 0.484092,
+        "qlib": {
+          "enabled": true,
+          "signal": "中性",
+          "predicted_return": 0.001921,
+          "mu_ann": 0.48409199999999997
+        },
+        "assumptions": "GBM; realized vol + qlib drift; physical approx for model leg"
+      },
+      "rows": [
+        {
+          "strike": 60000.0,
+          "side": "C",
+          "symbol": "BTC-260626-60000-C",
+          "moneyness_pct": -4.22,
+          "mark_iv": 0.475,
+          "model": {
+            "expiry_itm_call": 0.8137,
+            "touch_call": 1.0,
+            "expiry_itm_put": 0.1863,
+            "touch_put": 1.0
+          },
+          "implied": {
+            "expiry_itm_call": 0.6566,
+            "touch_call": null,
+            "expiry_itm_put": 0.3434,
+            "touch_put": null
+          },
+          "edge_expiry": 0.157,
+          "edge_expiry_put": -0.157
+        },
+        {
+          "strike": 61000.0,
+          "side": "C",
+          "symbol": "BTC-260626-61000-C",
+          "moneyness_pct": -2.62,
+          "mark_iv": 0.462,
+          "model": {
+            "expiry_itm_call": 0.7413,
+            "touch_call": 1.0,
+            "expiry_itm_put": 0.2587,
+            "touch_put": 1.0
+          },
+          "implied": {
+            "expiry_itm_call": 0.5946,
+            "touch_call": null,
+            "expiry_itm_put": 0.4054,
+            "touch_put": null
+          },
+          "edge_expiry": 0.1467,
+          "edge_expiry_put": -0.1467
+        },
+        {
+          "strike": 62000.0,
+          "side": "C",
+          "symbol": "BTC-260626-62000-C",
+          "moneyness_pct": -1.03,
+          "mark_iv": 0.45,
+          "model": {
+            "expiry_itm_call": 0.6582,
+            "touch_call": 1.0,
+            "expiry_itm_put": 0.3418,
+            "touch_put": 1.0
+          },
+          "implied": {
+            "expiry_itm_call": 0.5274,
+            "touch_call": null,
+            "expiry_itm_put": 0.4726,
+            "touch_put": null
+          },
+          "edge_expiry": 0.1308,
+          "edge_expiry_put": -0.1308
+        },
+        {
+          "strike": 63000.0,
+          "side": "C",
+          "symbol": "BTC-260626-63000-C",
+          "moneyness_pct": 0.57,
+          "mark_iv": 0.439,
+          "model": {
+            "expiry_itm_call": 0.568,
+            "touch_call": 0.9513,
+            "expiry_itm_put": 0.432,
+            "touch_put": 1.0
+          },
+          "implied": {
+            "expiry_itm_call": 0.4568,
+            "touch_call": null,
+            "expiry_itm_put": 0.5432,
+            "touch_put": null
+          },
+          "edge_expiry": 0.1112,
+          "edge_expiry_put": -0.1112
+        },
+        {
+          "strike": 64000.0,
+          "side": "C",
+          "symbol": "BTC-260626-64000-C",
+          "moneyness_pct": 2.17,
+          "mark_iv": 0.429,
+          "model": {
+            "expiry_itm_call": 0.4756,
+            "touch_call": 0.8092,
+            "expiry_itm_put": 0.5244,
+            "touch_put": 1.0
+          },
+          "implied": {
+            "expiry_itm_call": 0.3853,
+            "touch_call": null,
+            "expiry_itm_put": 0.6147,
+            "touch_put": null
+          },
+          "edge_expiry": 0.0903,
+          "edge_expiry_put": -0.0903
+        },
+        {
+          "strike": 65000.0,
+          "side": "C",
+          "symbol": "BTC-260626-65000-C",
+          "moneyness_pct": 3.76,
+          "mark_iv": 0.421,
+          "model": {
+            "expiry_itm_call": 0.3859,
+            "touch_call": 0.6656,
+            "expiry_itm_put": 0.6141,
+            "touch_put": 1.0
+          },
+          "implied": {
+            "expiry_itm_call": 0.3161,
+            "touch_call": null,
+            "expiry_itm_put": 0.6839,
+            "touch_put": null
+          },
+          "edge_expiry": 0.0698,
+          "edge_expiry_put": -0.0698
+        },
+        {
+          "strike": 66000.0,
+          "side": "C",
+          "symbol": "BTC-260626-66000-C",
+          "moneyness_pct": 5.36,
+          "mark_iv": 0.414,
+          "model": {
+            "expiry_itm_call": 0.3032,
+            "touch_call": 0.5292,
+            "expiry_itm_put": 0.6968,
+            "touch_put": 1.0
+          },
+          "implied": {
+            "expiry_itm_call": 0.2519,
+            "touch_call": null,
+            "expiry_itm_put": 0.7481,
+            "touch_put": null
+          },
+          "edge_expiry": 0.0513,
+          "edge_expiry_put": -0.0513
+        }
+      ],
+      "warnings": [],
+      "disclaimer": "研究用途。模型概率（历史波动 + qlib 漂移，GBM）与期权隐含概率（风险中性）口径不同，不构成投资建议。",
+      "strategy_pack": {
+        "headline": "观望",
+        "strategies": [
+          {
+            "id": "wait",
+            "name": "观望",
+            "rationale": "BTC 期权数据不可用，暂不建议新建期权仓位。",
+            "legs": [],
+            "risk_level": "低",
+            "score": 0.0,
+            "base": "BTC",
+            "pnl": {
+              "per_contract": {
+                "available": false,
+                "reason": "无期权腿"
+              },
+              "scaled": {
+                "available": false
+              },
+              "stop_loss": {
+                "primary_rule": "观望策略，无期权腿止损线。",
+                "premium_stop_usd": null,
+                "spot_stop_levels": [],
+                "time_stop_dte": null,
+                "notes": []
+              },
+              "disclaimer": "盈亏与止损基于 mark 权利金及简化结构公式，未计手续费、滑点与保证金变动；止损为研究框架，不构成实盘交易指令。"
+            }
+          }
+        ],
+        "disclaimer": "以下为研究性策略框架示意，未计手续费、保证金与流动性；不构成投资建议。"
+      }
+    },
+    "strategy_pack": {
+      "headline": "维持观望",
+      "strategies": [
+        {
+          "id": "wait",
+          "name": "维持观望",
+          "rationale": "BTC 当前 IV 与方向未形成鲜明策略边际，宜轻仓或等待结构明朗。",
+          "legs": [],
+          "risk_level": "低",
+          "score": 0.4,
+          "base": "BTC",
+          "pnl": {
+            "per_contract": {
+              "available": false,
+              "reason": "无期权腿"
+            },
+            "scaled": {
+              "available": false
+            },
+            "stop_loss": {
+              "primary_rule": "观望策略，无期权腿止损线。",
+              "premium_stop_usd": null,
+              "spot_stop_levels": [],
+              "time_stop_dte": null,
+              "notes": []
+            },
+            "disclaimer": "盈亏与止损基于 mark 权利金及简化结构公式，未计手续费、滑点与保证金变动；止损为研究框架，不构成实盘交易指令。"
+          }
+        }
+      ],
+      "disclaimer": "以下为研究性策略框架示意，未计手续费、保证金与流动性；不构成投资建议。"
+    }
+  },
+  "portfolio_greeks": {
+    "base": "BTC",
+    "bases": [
+      "BTC"
+    ],
+    "portfolio_id": "BTC",
+    "available": true,
+    "multi": false,
+    "spot": 62642.82108696,
+    "expiry_date": "2026-06-26",
+    "dte": 14.77,
+    "atm_strike": 63000.0,
+    "venue": "binance",
+    "scale_mode": "margin",
+    "allocation": {
+      "spot_pct": 0.0,
+      "options_pct": 0.25,
+      "capital": 1000.0
+    },
+    "source": {
+      "type": "strategy_pack",
+      "name": "维持观望",
+      "id": "wait"
+    },
+    "legs": [],
+    "summary": {
+      "net": {
+        "delta": 0.0,
+        "gamma": 0.0,
+        "theta": 0.0,
+        "vega": 0.0
+      },
+      "delta_coins": 0.0,
+      "delta_usd": 0.0,
+      "delta_notional_pct": 0.0,
+      "hedge_coins": -0.0,
+      "margin_used_usd": 250.0,
+      "margin_utilization_pct": 25.0,
+      "scenarios": {
+        "spot_up_5pct_pnl": 0.0,
+        "theta_1d_pnl": 0.0,
+        "iv_up_1pt_pnl": 0.0
+      },
+      "alerts": [],
+      "risk_level": "低"
+    },
+    "disclaimer": "组合 Greeks 按保证金预算缩放：现货按全额、期权按简化保证金模型分配合约数；与交易所实际保证金可能有偏差，不构成投资建议。"
+  },
+  "trade_count": 0
+}

@@ -71,8 +71,18 @@ def _canonical_columns(df: pd.DataFrame) -> pd.DataFrame:
     return df.rename(columns=rename)
 
 
+def _resolve_date_column(df: pd.DataFrame) -> pd.DataFrame:
+    """Normalize vendor columns and ensure a ``date`` column exists."""
+    out = _canonical_columns(df).copy()
+    if "date" in out.columns:
+        return out
+    if isinstance(out.index, pd.DatetimeIndex):
+        return out.reset_index(names="date")
+    raise ValueError(f"行情数据缺少 date 列（现有列: {list(out.columns)}）")
+
+
 def _filter_date_range(df: pd.DataFrame, start_date: str, end_date: str) -> pd.DataFrame:
-    out = df.copy()
+    out = _resolve_date_column(df)
     out["date"] = pd.to_datetime(out["date"])
     start = pd.Timestamp(start_date)
     end = pd.Timestamp(end_date)

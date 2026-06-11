@@ -3,6 +3,25 @@ from unittest.mock import patch
 import pandas as pd
 
 from quant_rd_tool import akshare_stocks as astk
+from quant_rd_tool.akshare_data import _filter_date_range, _normalize_hist
+
+
+def test_filter_date_range_canonicalizes_chinese_columns():
+    df = pd.DataFrame(
+        {
+            "日期": ["2024-01-02", "2024-01-03", "2024-02-01"],
+            "收盘": [10.0, 10.5, 11.0],
+            "开盘": [9.8, 10.1, 10.8],
+            "最高": [10.2, 10.6, 11.2],
+            "最低": [9.7, 10.0, 10.7],
+            "成交量": [1000, 1100, 900],
+        }
+    )
+    filtered = _filter_date_range(df, "2024-01-01", "2024-01-31")
+    normalized = _normalize_hist(filtered, "SZ300750")
+    assert len(normalized) == 2
+    assert "date" in normalized.columns
+    assert normalized["symbol"].iloc[0] == "SZ300750"
 
 
 def test_list_a_stocks_search():

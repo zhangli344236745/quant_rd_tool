@@ -1,0 +1,8 @@
+{"run_id": "1ef4ffde-e9fc-4915-b953-984938516d06", "symbol": "BTC", "timeframe": "1d", "template_id": "default-btc-1d", "stance": "看跌", "risk_level": "低", "generated_at": "2026-06-11T03:34:20.123237+00:00"}
+{"run_id": "15227fab-0136-4458-be83-fc6a84e7f991", "symbol": "BTC", "timeframe": "15m", "template_id": "default-btc-1d", "stance": "看涨", "risk_level": "低", "generated_at": "2026-06-11T03:36:54.907225+00:00"}
+{"run_id": "8867a09a-bdfd-4590-b4f4-1afc506cb7c4", "symbol": "ETH", "timeframe": "15m", "template_id": "default-btc-1d", "stance": "看涨", "risk_level": "低", "generated_at": "2026-06-11T03:38:44.210639+00:00"}
+{"run_id": "f84cc112-58c4-4038-898c-45899dfd39e4", "symbol": "ETH", "timeframe": "15m", "template_id": "default-btc-1d", "stance": "看涨", "risk_level": "低", "generated_at": "2026-06-11T03:44:10.826392+00:00"}
+{"run_id": "903b2aa7-9370-4e1a-b62f-b79c5e0ddcc9", "symbol": "ETH", "timeframe": "15m", "template_id": "default-btc-1d", "stance": "中性", "risk_level": "低", "generated_at": "2026-06-11T03:48:15.714663+00:00"}
+{"run_id": "7a42bf40-bb6f-44af-8602-0858ee3219ea", "symbol": "BTC", "timeframe": "1d", "template_id": "default-btc-1d", "stance": "看跌", "risk_level": "中", "generated_at": "2026-06-11T04:03:06.579410+00:00"}
+{"run_id": "d9ead1f6-a0ea-4556-a3e0-5591d55597aa", "symbol": "ETH", "timeframe": "15m", "template_id": "default-btc-1d", "stance": "看涨", "risk_level": "低", "generated_at": "2026-06-11T04:03:31.667588+00:00"}
+{"run_id": "e81a9e2b-1f57-4fb9-bb28-dedd07d70fd3", "symbol": "ETH", "timeframe": "15m", "template_id": "default-btc-1d", "stance": "看涨", "risk_level": "低", "generated_at": "2026-06-11T08:17:11.711633+00:00"}

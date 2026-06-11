@@ -1,0 +1,222 @@
+{
+  "run_id": "7a42bf40-bb6f-44af-8602-0858ee3219ea",
+  "symbol": "BTC",
+  "pair": "BTC/USDT",
+  "timeframe": "1d",
+  "data_dir": "data/crypto",
+  "template_id": "default-btc-1d",
+  "template_name": "BTC 日线综合",
+  "bars": 800,
+  "period": [
+    "2024-04-03",
+    "2026-06-11"
+  ],
+  "steps": [
+    {
+      "id": "technical",
+      "order": 0,
+      "status": "ok",
+      "output": {
+        "stance": "看跌",
+        "action": "sell",
+        "score": -3,
+        "confidence": 0.75,
+        "reasons": [
+          "均线：空头排列",
+          "RSI=29.07（超卖）",
+          "MACD：MACD 空头",
+          "近20日涨跌：-17.07%",
+          "综合得分 -3"
+        ]
+      },
+      "summary": "看跌 · score -3",
+      "elapsed_s": 0.016
+    },
+    {
+      "id": "qlib_ml",
+      "order": 1,
+      "status": "ok",
+      "output": {
+        "skipped": false,
+        "reason": null,
+        "stance": "看跌",
+        "agreement": "分歧",
+        "ml_signal": "中性",
+        "ml_enabled": true
+      },
+      "summary": "看跌 · 分歧",
+      "elapsed_s": 0.817
+    },
+    {
+      "id": "zipline_strategy",
+      "order": 2,
+      "status": "ok",
+      "output": {
+        "strategy_id": "heikin_ashi_trend",
+        "target_pct": 0.0,
+        "position": "flat",
+        "bullish": false,
+        "metrics": {
+          "total_return": -0.049857,
+          "sharpe": 0.0195,
+          "max_drawdown": -0.218865,
+          "trade_count": 118
+        }
+      },
+      "summary": "heikin_ashi_trend → 仓位 0%",
+      "elapsed_s": 0.255
+    },
+    {
+      "id": "var_symbol",
+      "order": 3,
+      "status": "ok",
+      "output": {
+        "var_99_pct": 0.06529333,
+        "var_99_usdt": 652.9333,
+        "var_ratio": 0.06529333,
+        "headline": "BTC 在 1 日、6.53% 历史 VaR 下，名义 10000.0 USDT 的预估最大损失约 652.9333 USDT。"
+      },
+      "summary": "99% VaR 6.53% · 652.9333 USDT",
+      "elapsed_s": 0.01
+    },
+    {
+      "id": "options_vol",
+      "order": 4,
+      "status": "ok",
+      "output": {
+        "enabled": true,
+        "atm_iv": 0.442,
+        "iv_percentile": 2.33,
+        "cross_summary": "技术面偏空但 IV 未显著抬升：可关注反弹至压力位的减仓机会。"
+      },
+      "summary": "ATM IV 44.2%",
+      "elapsed_s": 6.651
+    },
+    {
+      "id": "advice_synth",
+      "order": 5,
+      "status": "ok",
+      "output": {
+        "stance": "看跌",
+        "action": "sell",
+        "score": -4,
+        "confidence": 0.8,
+        "suggested_position_pct": 0.0,
+        "risk_level": "中",
+        "var_gate_triggered": false,
+        "signal_agreement": "部分一致",
+        "headline": "BTC Workflow：看跌（建议仓位 0%），风险等级 中",
+        "bullets": [
+          "技术面：看跌（score -3）",
+          "qlib ML：看跌（与技术面 分歧）",
+          "策略 heikin_ashi_trend：目标仓位 0%",
+          "99% VaR：6.53%（约 652.9333 USDT）",
+          "期权：技术面偏空但 IV 未显著抬升：可关注反弹至压力位的减仓机会。",
+          "IV 价位参考（期权 IV 44.2%，14.83 日预期波动约 8.9%）：参考买 81352.72，止损 86096.72（+5.8%），止盈 74236.71（-8.8%）"
+        ],
+        "advice": "建议减仓或观望，避免逆势加仓。",
+        "price_guidance": {
+          "available": true,
+          "spot": 62644.01,
+          "side": "short",
+          "atm_iv": 0.442,
+          "iv_source": "options",
+          "iv_percentile": 2.33,
+          "horizon_days": 14.83,
+          "expected_move_usd": 5581.18,
+          "expected_move_pct": 0.0891,
+          "entry_price": 81352.72,
+          "stop_loss_price": 86096.72,
+          "take_profit_price": 74236.71,
+          "entry_note": "IV 反弹限价参考（偏空）",
+          "stop_loss_pct": 0.0583,
+          "take_profit_pct": -0.0875,
+          "bollinger_lower": 56144.04380736501,
+          "bollinger_upper": 81515.74719263501,
+          "disclaimer": "参考价位基于 ATM 隐含波动率与持有周期估算的预期波动带，未计资金费率、滑点与跳空；不构成交易指令。"
+        },
+        "disclaimer": "研究用途，非投资建议。"
+      },
+      "summary": "BTC Workflow：看跌（建议仓位 0%），风险等级 中 · 参考买 81352.72 / 止损 86096.72 / 止盈 74236.71"
+    }
+  ],
+  "step_timings_s": {
+    "technical": 0.016,
+    "qlib_ml": 0.817,
+    "zipline_strategy": 0.255,
+    "var_symbol": 0.01,
+    "options_vol": 6.651
+  },
+  "advice": {
+    "stance": "看跌",
+    "action": "sell",
+    "score": -4,
+    "confidence": 0.8,
+    "suggested_position_pct": 0.0,
+    "risk_level": "中",
+    "var_gate_triggered": false,
+    "signal_agreement": "部分一致",
+    "headline": "BTC Workflow：看跌（建议仓位 0%），风险等级 中",
+    "bullets": [
+      "技术面：看跌（score -3）",
+      "qlib ML：看跌（与技术面 分歧）",
+      "策略 heikin_ashi_trend：目标仓位 0%",
+      "99% VaR：6.53%（约 652.9333 USDT）",
+      "期权：技术面偏空但 IV 未显著抬升：可关注反弹至压力位的减仓机会。",
+      "IV 价位参考（期权 IV 44.2%，14.83 日预期波动约 8.9%）：参考买 81352.72，止损 86096.72（+5.8%），止盈 74236.71（-8.8%）"
+    ],
+    "advice": "建议减仓或观望，避免逆势加仓。",
+    "price_guidance": {
+      "available": true,
+      "spot": 62644.01,
+      "side": "short",
+      "atm_iv": 0.442,
+      "iv_source": "options",
+      "iv_percentile": 2.33,
+      "horizon_days": 14.83,
+      "expected_move_usd": 5581.18,
+      "expected_move_pct": 0.0891,
+      "entry_price": 81352.72,
+      "stop_loss_price": 86096.72,
+      "take_profit_price": 74236.71,
+      "entry_note": "IV 反弹限价参考（偏空）",
+      "stop_loss_pct": 0.0583,
+      "take_profit_pct": -0.0875,
+      "bollinger_lower": 56144.04380736501,
+      "bollinger_upper": 81515.74719263501,
+      "disclaimer": "参考价位基于 ATM 隐含波动率与持有周期估算的预期波动带，未计资金费率、滑点与跳空；不构成交易指令。"
+    },
+    "sources": {
+      "technical": {
+        "stance": "看跌",
+        "score": -3
+      },
+      "qlib_ml": {
+        "stance": "看跌",
+        "agreement": "分歧"
+      },
+      "zipline_strategy": {
+        "strategy_id": "heikin_ashi_trend",
+        "target_pct": 0.0
+      },
+      "var_symbol": {
+        "var_99_pct": 0.06529333,
+        "var_99_usdt": 652.9333
+      },
+      "options_vol": {
+        "cross_summary": "技术面偏空但 IV 未显著抬升：可关注反弹至压力位的减仓机会。"
+      },
+      "price_guidance": {
+        "entry_price": 81352.72,
+        "stop_loss_price": 86096.72,
+        "take_profit_price": 74236.71,
+        "atm_iv": 0.442,
+        "iv_source": "options"
+      }
+    },
+    "markdown": "# Crypto Workflow 投资建议 — BTC\n\n**周期**：1d\n**生成**：2026-06-11 12:03:06\n\n## BTC Workflow：看跌（建议仓位 0%），风险等级 中\n\n建议减仓或观望，避免逆势加仓。\n\n### 分步摘要\n\n- 技术面：看跌（score -3）\n- qlib ML：看跌（与技术面 分歧）\n- 策略 heikin_ashi_trend：目标仓位 0%\n- 99% VaR：6.53%（约 652.9333 USDT）\n- 期权：技术面偏空但 IV 未显著抬升：可关注反弹至压力位的减仓机会。\n- IV 价位参考（期权 IV 44.2%，14.83 日预期波动约 8.9%）：参考买 81352.72，止损 86096.72（+5.8%），止盈 74236.71（-8.8%）\n\n### IV 参考价位\n\n- 现价：**62644.01**\n- 参考买入/入场：**81352.72**（IV 反弹限价参考（偏空））\n- 止损：**86096.72**\n- 止盈：**74236.71**\n- IV 来源：options，ATM IV 44.2%\n- 持有周期约 14.83 日，1σ 预期波动约 8.9%\n\n_参考价位基于 ATM 隐含波动率与持有周期估算的预期波动带，未计资金费率、滑点与跳空；不构成交易指令。_\n\n### 风险\n\n- VaR 基于历史收益，不保证未来损失上限。\n- 短周期 ML / 策略信号可能快速反转。\n- IV 参考价位为统计估算，不构成投资建议。",
+    "disclaimer": "研究用途，非投资建议。"
+  },
+  "generated_at": "2026-06-11T04:03:06.579410+00:00",
+  "generated_at_beijing": "2026-06-11 12:03:06"
+}

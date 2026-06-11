@@ -1,0 +1,11 @@
+{
+  "kind": "crypto_workflow",
+  "run_id": "e81a9e2b-1f57-4fb9-bb28-dedd07d70fd3",
+  "symbol": "ETH",
+  "timeframe": "15m",
+  "template_id": "default-btc-1d",
+  "stance": "看涨",
+  "risk_level": "低",
+  "headline": "ETH Workflow：看涨（建议仓位 50%），风险等级 低",
+  "data_dir": "data/crypto"
+}

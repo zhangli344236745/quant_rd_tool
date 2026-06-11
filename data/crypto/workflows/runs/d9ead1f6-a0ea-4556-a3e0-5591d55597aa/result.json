@@ -1,0 +1,218 @@
+{
+  "run_id": "d9ead1f6-a0ea-4556-a3e0-5591d55597aa",
+  "symbol": "ETH",
+  "pair": "ETH/USDT",
+  "timeframe": "15m",
+  "data_dir": "data/crypto",
+  "template_id": "default-btc-1d",
+  "template_name": "BTC 日线综合",
+  "bars": 800,
+  "period": [
+    "2026-06-03 04:15:00",
+    "2026-06-11 12:00:00"
+  ],
+  "steps": [
+    {
+      "id": "technical",
+      "order": 0,
+      "status": "ok",
+      "output": {
+        "stance": "看涨",
+        "action": "buy",
+        "score": 3,
+        "confidence": 0.75,
+        "reasons": [
+          "均线：多头排列",
+          "RSI=65.04（中性）",
+          "MACD：MACD 多头",
+          "近20日涨跌：2.48%",
+          "综合得分 3"
+        ]
+      },
+      "summary": "看涨 · score 3",
+      "elapsed_s": 0.013
+    },
+    {
+      "id": "qlib_ml",
+      "order": 1,
+      "status": "skipped",
+      "output": {
+        "skipped": true,
+        "reason": "样本不足（800 条 K 线），qlib 训练建议至少 2000 根（15m）。请增大 --backfill-days 或等待定时任务累积。",
+        "stance": "看涨",
+        "agreement": "仅技术面",
+        "ml_signal": null,
+        "ml_enabled": false
+      },
+      "summary": "样本不足（800 条 K 线），qlib 训练建议至少 2000 根（15m）。请增大 --backfill-days 或等待定时任务累积。",
+      "elapsed_s": 0.022
+    },
+    {
+      "id": "zipline_strategy",
+      "order": 2,
+      "status": "ok",
+      "output": {
+        "strategy_id": "heikin_ashi_trend",
+        "target_pct": 1.0,
+        "position": "long",
+        "bullish": true,
+        "metrics": {
+          "total_return": -0.029829,
+          "sharpe": -0.5564,
+          "max_drawdown": -0.072574,
+          "trade_count": 107
+        }
+      },
+      "summary": "heikin_ashi_trend → 仓位 100%",
+      "elapsed_s": 0.249
+    },
+    {
+      "id": "var_symbol",
+      "order": 3,
+      "status": "ok",
+      "output": {
+        "var_99_pct": 0.00810258,
+        "var_99_usdt": 81.0258,
+        "var_ratio": 0.00810258,
+        "headline": "ETH 在 1 日、0.81% 历史 VaR 下，名义 10000.0 USDT 的预估最大损失约 81.0258 USDT。"
+      },
+      "summary": "99% VaR 0.81% · 81.0258 USDT",
+      "elapsed_s": 0.009
+    },
+    {
+      "id": "options_vol",
+      "order": 4,
+      "status": "ok",
+      "output": {
+        "enabled": true,
+        "atm_iv": 0.583,
+        "iv_percentile": 2.33,
+        "cross_summary": "方向偏多且期权波动未极端：顺势参与性价比相对更好，仍须遵守杠杆与止损纪律。"
+      },
+      "summary": "ATM IV 58.3%",
+      "elapsed_s": 5.063
+    },
+    {
+      "id": "advice_synth",
+      "order": 5,
+      "status": "ok",
+      "output": {
+        "stance": "看涨",
+        "action": "buy",
+        "score": 4,
+        "confidence": 0.92,
+        "suggested_position_pct": 0.5,
+        "risk_level": "低",
+        "var_gate_triggered": false,
+        "signal_agreement": "一致",
+        "headline": "ETH Workflow：看涨（建议仓位 50%），风险等级 低",
+        "bullets": [
+          "技术面：看涨（score 3）",
+          "qlib ML：跳过（未运行）",
+          "策略 heikin_ashi_trend：目标仓位 100%",
+          "99% VaR：0.81%（约 81.0258 USDT）",
+          "期权：方向偏多且期权波动未极端：顺势参与性价比相对更好，仍须遵守杠杆与止损纪律。",
+          "IV 价位参考（期权 IV 58.3%，14.83 日预期波动约 11.8%）：参考买 1584.6，止损 1419.53（-10.4%），止盈 1832.21（+15.6%）"
+        ],
+        "advice": "可考虑小仓位分批建仓，设置止损；仓位建议不超过建议上限。",
+        "price_guidance": {
+          "available": true,
+          "spot": 1652.57,
+          "side": "long",
+          "atm_iv": 0.583,
+          "iv_source": "options",
+          "iv_percentile": 2.33,
+          "horizon_days": 14.83,
+          "expected_move_usd": 194.2,
+          "expected_move_pct": 0.1175,
+          "entry_price": 1584.6,
+          "stop_loss_price": 1419.53,
+          "take_profit_price": 1832.21,
+          "entry_note": "IV 回踩限价参考（偏多）",
+          "stop_loss_pct": -0.1042,
+          "take_profit_pct": 0.1563,
+          "bollinger_lower": 1617.3423721979336,
+          "bollinger_upper": 1655.3516278020663,
+          "disclaimer": "参考价位基于 ATM 隐含波动率与持有周期估算的预期波动带，未计资金费率、滑点与跳空；不构成交易指令。"
+        },
+        "disclaimer": "研究用途，非投资建议。"
+      },
+      "summary": "ETH Workflow：看涨（建议仓位 50%），风险等级 低 · 参考买 1584.6 / 止损 1419.53 / 止盈 1832.21"
+    }
+  ],
+  "step_timings_s": {
+    "technical": 0.013,
+    "qlib_ml": 0.022,
+    "zipline_strategy": 0.249,
+    "var_symbol": 0.009,
+    "options_vol": 5.063
+  },
+  "advice": {
+    "stance": "看涨",
+    "action": "buy",
+    "score": 4,
+    "confidence": 0.92,
+    "suggested_position_pct": 0.5,
+    "risk_level": "低",
+    "var_gate_triggered": false,
+    "signal_agreement": "一致",
+    "headline": "ETH Workflow：看涨（建议仓位 50%），风险等级 低",
+    "bullets": [
+      "技术面：看涨（score 3）",
+      "qlib ML：跳过（未运行）",
+      "策略 heikin_ashi_trend：目标仓位 100%",
+      "99% VaR：0.81%（约 81.0258 USDT）",
+      "期权：方向偏多且期权波动未极端：顺势参与性价比相对更好，仍须遵守杠杆与止损纪律。",
+      "IV 价位参考（期权 IV 58.3%，14.83 日预期波动约 11.8%）：参考买 1584.6，止损 1419.53（-10.4%），止盈 1832.21（+15.6%）"
+    ],
+    "advice": "可考虑小仓位分批建仓，设置止损；仓位建议不超过建议上限。",
+    "price_guidance": {
+      "available": true,
+      "spot": 1652.57,
+      "side": "long",
+      "atm_iv": 0.583,
+      "iv_source": "options",
+      "iv_percentile": 2.33,
+      "horizon_days": 14.83,
+      "expected_move_usd": 194.2,
+      "expected_move_pct": 0.1175,
+      "entry_price": 1584.6,
+      "stop_loss_price": 1419.53,
+      "take_profit_price": 1832.21,
+      "entry_note": "IV 回踩限价参考（偏多）",
+      "stop_loss_pct": -0.1042,
+      "take_profit_pct": 0.1563,
+      "bollinger_lower": 1617.3423721979336,
+      "bollinger_upper": 1655.3516278020663,
+      "disclaimer": "参考价位基于 ATM 隐含波动率与持有周期估算的预期波动带，未计资金费率、滑点与跳空；不构成交易指令。"
+    },
+    "sources": {
+      "technical": {
+        "stance": "看涨",
+        "score": 3
+      },
+      "zipline_strategy": {
+        "strategy_id": "heikin_ashi_trend",
+        "target_pct": 1.0
+      },
+      "var_symbol": {
+        "var_99_pct": 0.00810258,
+        "var_99_usdt": 81.0258
+      },
+      "options_vol": {
+        "cross_summary": "方向偏多且期权波动未极端：顺势参与性价比相对更好，仍须遵守杠杆与止损纪律。"
+      },
+      "price_guidance": {
+        "entry_price": 1584.6,
+        "stop_loss_price": 1419.53,
+        "take_profit_price": 1832.21,
+        "atm_iv": 0.583,
+        "iv_source": "options"
+      }
+    },
+    "markdown": "# Crypto Workflow 投资建议 — ETH\n\n**周期**：15m\n**生成**：2026-06-11 12:03:31\n\n## ETH Workflow：看涨（建议仓位 50%），风险等级 低\n\n可考虑小仓位分批建仓，设置止损；仓位建议不超过建议上限。\n\n### 分步摘要\n\n- 技术面：看涨（score 3）\n- qlib ML：跳过（未运行）\n- 策略 heikin_ashi_trend：目标仓位 100%\n- 99% VaR：0.81%（约 81.0258 USDT）\n- 期权：方向偏多且期权波动未极端：顺势参与性价比相对更好，仍须遵守杠杆与止损纪律。\n- IV 价位参考（期权 IV 58.3%，14.83 日预期波动约 11.8%）：参考买 1584.6，止损 1419.53（-10.4%），止盈 1832.21（+15.6%）\n\n### IV 参考价位\n\n- 现价：**1652.57**\n- 参考买入/入场：**1584.6**（IV 回踩限价参考（偏多））\n- 止损：**1419.53**\n- 止盈：**1832.21**\n- IV 来源：options，ATM IV 58.3%\n- 持有周期约 14.83 日，1σ 预期波动约 11.8%\n\n_参考价位基于 ATM 隐含波动率与持有周期估算的预期波动带，未计资金费率、滑点与跳空；不构成交易指令。_\n\n### 风险\n\n- VaR 基于历史收益，不保证未来损失上限。\n- 短周期 ML / 策略信号可能快速反转。\n- IV 参考价位为统计估算，不构成投资建议。",
+    "disclaimer": "研究用途，非投资建议。"
+  },
+  "generated_at": "2026-06-11T04:03:31.667588+00:00",
+  "generated_at_beijing": "2026-06-11 12:03:31"
+}
