@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import type { OptionsPortfolioGreeksResult } from "@/api/crypto";
+import GreekLabel from "./GreekLabel.vue";
 
 const props = defineProps<{
   report: OptionsPortfolioGreeksResult | null;
@@ -62,7 +63,13 @@ function pct(v: number | null | undefined) {
       <el-row :gutter="12" class="metric-row">
         <el-col :xs="12" :sm="6">
           <div class="metric-card">
-            <div class="metric-label">{{ isMulti ? "净 Δ（USD）" : "净 Δ（币）" }}</div>
+            <div class="metric-label">
+              <GreekLabel
+                greek="delta"
+                lead="净"
+                :suffix="isMulti ? '（USD）' : '（币）'"
+              />
+            </div>
             <div class="metric-value">
               {{ isMulti ? usd(summary.delta_usd) : greekVal(summary.delta_coins) }}
             </div>
@@ -71,19 +78,25 @@ function pct(v: number | null | undefined) {
         </el-col>
         <el-col :xs="12" :sm="6">
           <div class="metric-card">
-            <div class="metric-label">净 Γ</div>
+            <div class="metric-label">
+              <GreekLabel greek="gamma" lead="净" />
+            </div>
             <div class="metric-value">{{ greekVal(summary.net?.gamma, 6) }}</div>
           </div>
         </el-col>
         <el-col :xs="12" :sm="6">
           <div class="metric-card">
-            <div class="metric-label">净 Θ（日）</div>
+            <div class="metric-label">
+              <GreekLabel greek="theta" lead="净" suffix="（日）" />
+            </div>
             <div class="metric-value">{{ greekVal(summary.net?.theta, 2) }}</div>
           </div>
         </el-col>
         <el-col :xs="12" :sm="6">
           <div class="metric-card">
-            <div class="metric-label">净 V</div>
+            <div class="metric-label">
+              <GreekLabel greek="vega" lead="净" />
+            </div>
             <div class="metric-value">{{ greekVal(summary.net?.vega, 2) }}</div>
           </div>
         </el-col>
@@ -152,13 +165,22 @@ function pct(v: number | null | undefined) {
         <el-table-column label="权重" width="72">
           <template #default="{ row }">{{ row.weight_pct }}%</template>
         </el-table-column>
-        <el-table-column label="Δ USD" width="100">
+        <el-table-column width="108">
+          <template #header>
+            <GreekLabel greek="delta" suffix="USD" />
+          </template>
           <template #default="{ row }">{{ usd(row.summary?.delta_usd) }}</template>
         </el-table-column>
-        <el-table-column label="Θ" width="80">
+        <el-table-column width="88">
+          <template #header>
+            <GreekLabel greek="theta" />
+          </template>
           <template #default="{ row }">{{ greekVal(row.summary?.net?.theta, 2) }}</template>
         </el-table-column>
-        <el-table-column label="V" width="80">
+        <el-table-column width="88">
+          <template #header>
+            <GreekLabel greek="vega" />
+          </template>
           <template #default="{ row }">{{ greekVal(row.summary?.net?.vega, 2) }}</template>
         </el-table-column>
         <el-table-column label="保证金" min-width="100">
@@ -175,16 +197,28 @@ function pct(v: number | null | undefined) {
         max-height="220"
       >
         <el-table-column prop="label" label="腿" min-width="140" />
-        <el-table-column label="Δ" width="72">
+        <el-table-column width="80">
+          <template #header>
+            <GreekLabel greek="delta" />
+          </template>
           <template #default="{ row }">{{ greekVal(row.contribution?.delta) }}</template>
         </el-table-column>
-        <el-table-column label="Γ" width="80">
+        <el-table-column width="88">
+          <template #header>
+            <GreekLabel greek="gamma" />
+          </template>
           <template #default="{ row }">{{ greekVal(row.contribution?.gamma, 6) }}</template>
         </el-table-column>
-        <el-table-column label="Θ" width="80">
+        <el-table-column width="88">
+          <template #header>
+            <GreekLabel greek="theta" />
+          </template>
           <template #default="{ row }">{{ greekVal(row.contribution?.theta, 2) }}</template>
         </el-table-column>
-        <el-table-column label="V" width="80">
+        <el-table-column width="88">
+          <template #header>
+            <GreekLabel greek="vega" />
+          </template>
           <template #default="{ row }">{{ greekVal(row.contribution?.vega, 2) }}</template>
         </el-table-column>
         <el-table-column

@@ -27,6 +27,8 @@ import IvSkewChart from "@/components/options/IvSkewChart.vue";
 import StrikeProbChart from "@/components/options/StrikeProbChart.vue";
 import DualVenueLineChart from "@/components/options/DualVenueLineChart.vue";
 import OptionsPortfolioGreeksPanel from "@/components/options/OptionsPortfolioGreeksPanel.vue";
+import GreekLabel from "@/components/options/GreekLabel.vue";
+import GreeksLegend from "@/components/options/GreeksLegend.vue";
 
 const router = useRouter();
 const activeTab = ref("scan");
@@ -1053,6 +1055,7 @@ onMounted(async () => {
               到期 {{ greeksReport.expiry_date }} · DTE {{ greeksReport.dte }}d · ATM
               {{ greeksReport.atm_strike }}
             </p>
+            <GreeksLegend v-if="greeksReport?.rows?.length" />
             <el-table
               v-if="greeksReport?.rows?.length"
               :data="greeksReport.rows"
@@ -1066,28 +1069,52 @@ onMounted(async () => {
                   {{ row.moneyness_pct != null ? row.moneyness_pct + "%" : "—" }}
                 </template>
               </el-table-column>
-              <el-table-column label="B Δ" width="72">
+              <el-table-column width="88">
+                <template #header>
+                  <GreekLabel greek="delta" prefix="B" />
+                </template>
                 <template #default="{ row }">{{ greekVal(venueGreeks(row, "binance")?.delta) }}</template>
               </el-table-column>
-              <el-table-column label="B Γ" width="80">
+              <el-table-column width="92">
+                <template #header>
+                  <GreekLabel greek="gamma" prefix="B" />
+                </template>
                 <template #default="{ row }">{{ greekVal(venueGreeks(row, "binance")?.gamma, 6) }}</template>
               </el-table-column>
-              <el-table-column label="B Θ" width="80">
+              <el-table-column width="92">
+                <template #header>
+                  <GreekLabel greek="theta" prefix="B" />
+                </template>
                 <template #default="{ row }">{{ greekVal(venueGreeks(row, "binance")?.theta, 2) }}</template>
               </el-table-column>
-              <el-table-column label="B V" width="80">
+              <el-table-column width="92">
+                <template #header>
+                  <GreekLabel greek="vega" prefix="B" />
+                </template>
                 <template #default="{ row }">{{ greekVal(venueGreeks(row, "binance")?.vega, 2) }}</template>
               </el-table-column>
-              <el-table-column label="D Δ" width="72">
+              <el-table-column width="88">
+                <template #header>
+                  <GreekLabel greek="delta" prefix="D" />
+                </template>
                 <template #default="{ row }">{{ greekVal(venueGreeks(row, "deribit")?.delta) }}</template>
               </el-table-column>
-              <el-table-column label="D Γ" width="80">
+              <el-table-column width="92">
+                <template #header>
+                  <GreekLabel greek="gamma" prefix="D" />
+                </template>
                 <template #default="{ row }">{{ greekVal(venueGreeks(row, "deribit")?.gamma, 6) }}</template>
               </el-table-column>
-              <el-table-column label="D Θ" width="80">
+              <el-table-column width="92">
+                <template #header>
+                  <GreekLabel greek="theta" prefix="D" />
+                </template>
                 <template #default="{ row }">{{ greekVal(venueGreeks(row, "deribit")?.theta, 2) }}</template>
               </el-table-column>
-              <el-table-column label="D V" width="80">
+              <el-table-column width="92">
+                <template #header>
+                  <GreekLabel greek="vega" prefix="D" />
+                </template>
                 <template #default="{ row }">{{ greekVal(venueGreeks(row, "deribit")?.vega, 2) }}</template>
               </el-table-column>
             </el-table>
@@ -1207,9 +1234,15 @@ onMounted(async () => {
               <div class="history-head">
                 <span class="muted small">Greeks 历史 · {{ portfolioHistoryId() }}</span>
                 <el-radio-group v-model="greeksHistoryMetric" size="small">
-                  <el-radio-button value="delta_usd">Δ USD</el-radio-button>
-                  <el-radio-button value="theta">Θ</el-radio-button>
-                  <el-radio-button value="vega">V</el-radio-button>
+                  <el-radio-button value="delta_usd">
+                    <GreekLabel greek="delta" suffix="USD" layout="inline" />
+                  </el-radio-button>
+                  <el-radio-button value="theta">
+                    <GreekLabel greek="theta" layout="inline" />
+                  </el-radio-button>
+                  <el-radio-button value="vega">
+                    <GreekLabel greek="vega" layout="inline" />
+                  </el-radio-button>
                 </el-radio-group>
               </div>
               <OptionsLineChart
