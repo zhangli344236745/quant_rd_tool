@@ -162,6 +162,12 @@ function optAlertType(level: string) {
               <strong>{{ var99Usdt()?.toLocaleString(undefined, { maximumFractionDigits: 2 }) }} USDT</strong>
             </p>
             <router-link
+              :to="{ path: '/crypto-workflow', query: { symbol: form.symbol } }"
+              class="workflow-link"
+            >
+              Workflow 分析
+            </router-link>
+            <router-link
               :to="{ path: '/crypto-var', query: { symbol: form.symbol, tab: 'symbol' } }"
               class="var-link"
             >

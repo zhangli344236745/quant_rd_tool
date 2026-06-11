@@ -15,9 +15,11 @@ from quant_rd_tool.crypto_zipline_zipline_engine import (
     _bar_timestamps,
     _extract_perf,
     _final_signal_from_perf,
+    _prepare_ml_zipline_targets,
     _session_start_for_zipline,
     _slice_bars_for_backtest,
 )
+from quant_rd_tool.stock_zipline_strategies import is_stock_strategy
 from quant_rd_tool.stock_zipline_bundle import (
     configure_zipline_env,
     ensure_bundle_ingested,
@@ -27,6 +29,7 @@ from quant_rd_tool.stock_zipline_timeframes import (
     DEFAULT_TIMEFRAME,
     bar_minutes_for,
     bundle_name_for,
+    effective_ml_train_bars,
     normalize_timeframe,
 )
 
@@ -52,6 +55,9 @@ def run_zipline_backtest_inprocess(
     bundle = bundle_name_for(tf)
 
     combo: dict[str, Any] | None = None
+    ml_metrics: dict[str, Any] | None = None
+    target_lookup: dict[int, float] | None = None
+    is_ml = False
     if combo_spec:
         if "legs" in combo_spec and isinstance(combo_spec.get("legs"), list):
             combo = normalize_combo_spec(legs=combo_spec["legs"], mode=combo_spec.get("mode", "vote"))
@@ -63,8 +69,16 @@ def run_zipline_backtest_inprocess(
         strat = get_strategy(strategy_id)
         if not strat:
             raise ValueError(f"Unknown strategy: {strategy_id}")
+        if not is_stock_strategy(strategy_id):
+            raise ValueError(f"Strategy {strategy_id} is not available for A-share lab")
         algo_params = {**strat["default_params"], **(strategy_params or {})}
         warmup = int(strat.get("min_bars", 20)) + 5
+        is_ml = strategy_id.startswith("xgb_")
+        if is_ml:
+            warmup = max(
+                warmup,
+                effective_ml_train_bars(tf, int(algo_params.get("train_bars", 2000))) + 5,
+            )
 
     df = load_ohlcv_window(
         symbol,
@@ -101,6 +115,14 @@ def run_zipline_backtest_inprocess(
         force=force_reingest,
     )
 
+    if is_ml and not combo:
+        target_lookup, ml_metrics = _prepare_ml_zipline_targets(
+            df,
+            strategy_id=strategy_id,
+            algo_params=algo_params,
+            timeframe=tf,
+        )
+
     if combo:
         initialize, handle_data = build_zipline_algo(
             asset_name, combo_spec=combo, params=combo, bar_freq=ZIPLINE_BAR_FREQ
@@ -110,6 +132,7 @@ def run_zipline_backtest_inprocess(
             asset_name,
             strategy_id=strategy_id,
             params=algo_params,
+            precomputed_targets=target_lookup,
             bar_freq=ZIPLINE_BAR_FREQ,
         )
 
@@ -149,4 +172,6 @@ def run_zipline_backtest_inprocess(
     if combo:
         out["combo_mode"] = combo["mode"]
         out["combo_legs"] = combo["legs"]
+    if ml_metrics:
+        out["ml_metrics"] = ml_metrics
     return out

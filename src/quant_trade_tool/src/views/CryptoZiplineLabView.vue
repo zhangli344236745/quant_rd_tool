@@ -70,6 +70,8 @@ const form = ref({
   start: "2026-01-01",
   end: "2026-06-03",
   capital_base: 100000,
+  commission_pct: 0.1,
+  slippage_pct: 0.05,
   sync_first: true,
   force_reingest: false,
   with_options_context: false,
@@ -422,6 +424,8 @@ async function runBacktest() {
       start: form.value.start,
       end: form.value.end,
       capital_base: form.value.capital_base,
+      commission_pct: form.value.commission_pct / 100,
+      slippage_pct: form.value.slippage_pct / 100,
       strategy_params: form.value.use_combo ? undefined : strategyParams(),
       strategy_combo: buildComboLegs(),
       combo_mode: form.value.combo_mode,
@@ -735,6 +739,12 @@ onMounted(async () => {
         <el-form-item label="初始资金">
           <el-input-number v-model="form.capital_base" :min="1000" :step="10000" />
         </el-form-item>
+        <el-form-item label="手续费 %">
+          <el-input-number v-model="form.commission_pct" :min="0" :max="5" :step="0.05" :precision="3" />
+        </el-form-item>
+        <el-form-item label="滑点 %">
+          <el-input-number v-model="form.slippage_pct" :min="0" :max="5" :step="0.01" :precision="3" />
+        </el-form-item>
         <el-form-item label="引擎">
           <el-select v-model="form.engine" style="width: 140px">
             <el-option label="自动" value="auto" />
@@ -798,9 +808,36 @@ onMounted(async () => {
       />
       <div class="metrics">
         <el-tag type="info">总收益 {{ pct(result.metrics?.total_return) }}</el-tag>
+        <el-tag v-if="result.metrics?.annualized_return != null" type="info">
+          年化 {{ pct(result.metrics.annualized_return) }}
+        </el-tag>
         <el-tag type="info">Sharpe {{ result.metrics?.sharpe ?? "—" }}</el-tag>
+        <el-tag v-if="result.metrics?.sortino != null" type="info">
+          Sortino {{ result.metrics.sortino }}
+        </el-tag>
+        <el-tag v-if="result.metrics?.calmar != null" type="info">
+          Calmar {{ result.metrics.calmar }}
+        </el-tag>
         <el-tag type="warning">最大回撤 {{ pct(result.metrics?.max_drawdown) }}</el-tag>
         <el-tag>交易 {{ result.metrics?.trade_count ?? 0 }} 次</el-tag>
+        <el-tag v-if="result.metrics?.win_rate != null" type="info">
+          胜率 {{ pct(result.metrics.win_rate) }}
+        </el-tag>
+        <el-tag v-if="result.metrics?.profit_factor != null" type="info">
+          盈亏比 {{ result.metrics.profit_factor }}
+        </el-tag>
+        <el-tag v-if="result.metrics?.buy_hold_return != null" type="info">
+          Buy&amp;Hold {{ pct(result.metrics.buy_hold_return) }}
+        </el-tag>
+        <el-tag
+          v-if="result.metrics?.excess_vs_hold != null"
+          :type="result.metrics.excess_vs_hold >= 0 ? 'success' : 'danger'"
+        >
+          超额 {{ pct(result.metrics.excess_vs_hold) }}
+        </el-tag>
+        <el-tag v-if="result.metrics?.total_fees" type="warning">
+          费用 {{ Math.round(result.metrics.total_fees) }} USDT
+        </el-tag>
         <el-tag v-if="result.final_signal" type="success">
           末 bar {{ result.final_signal.position }} ({{ Math.round((result.final_signal.target_pct ?? 0) * 100) }}%)
         </el-tag>

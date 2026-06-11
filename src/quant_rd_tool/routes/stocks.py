@@ -247,6 +247,22 @@ class StockZiplineSyncRequest(BaseModel):
     backfill_days: int = Field(800, ge=30, le=3000)
 
 
+class StockVarHolding(BaseModel):
+    symbol: str
+    notional_cny: float | None = Field(None, ge=0)
+    shares: float | None = None
+
+
+class StockVarPortfolioRequest(BaseModel):
+    holdings: list[StockVarHolding] = Field(..., min_length=1)
+    data_dir: str = "data/stocks"
+    lookback_bars: int = Field(252, ge=30, le=2000)
+    horizon_days: int = Field(1, ge=1, le=30)
+    confidence: str = "0.95,0.99"
+    mc_n_sims: int = Field(10_000, ge=1000, le=100_000)
+    mc_seed: int = 42
+
+
 class StockZiplineComboLeg(BaseModel):
     strategy: str
     params: dict[str, Any] | None = None
@@ -268,6 +284,124 @@ class StockZiplineBacktestRequest(BaseModel):
     timeframe: str = "1d"
     strategy_combo: list[StockZiplineComboLeg] | None = None
     combo_mode: str = Field("vote", pattern="^(vote|and|or|weighted)$")
+
+
+@router.get("/var/symbol")
+def stock_var_symbol(
+    symbol: str = "600519",
+    notional_cny: float = 0.0,
+    data_dir: str = "data/stocks",
+    lookback_bars: int = 252,
+    horizon_days: int = 1,
+    confidence: str = "0.95,0.99",
+    mc_n_sims: int = 10_000,
+    mc_seed: int = 42,
+) -> dict[str, Any]:
+    from quant_rd_tool.crypto_var import parse_confidence_levels
+    from quant_rd_tool.stock_var import build_symbol_var_report
+
+    levels = parse_confidence_levels(confidence)
+    try:
+        return build_symbol_var_report(
+            symbol=symbol,
+            notional_cny=notional_cny,
+            data_dir=data_dir,
+            lookback_bars=min(lookback_bars, 2000),
+            horizon_days=horizon_days,
+            confidence_levels=levels,
+            mc_n_sims=mc_n_sims,
+            mc_seed=mc_seed,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@router.get("/var/symbol/history")
+def stock_var_symbol_history(
+    symbol: str = "600519",
+    window: int = 60,
+    confidence: float = 0.99,
+    data_dir: str = "data/stocks",
+    lookback_bars: int = 252,
+    horizon_days: int = 1,
+    notional_cny: float = 0.0,
+) -> dict[str, Any]:
+    from quant_rd_tool.stock_var import build_symbol_var_history
+
+    try:
+        return build_symbol_var_history(
+            symbol=symbol,
+            window=min(window, 500),
+            confidence=confidence,
+            data_dir=data_dir,
+            lookback_bars=min(lookback_bars, 2000),
+            horizon_days=horizon_days,
+            notional_cny=notional_cny,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@router.post("/var/portfolio")
+def stock_var_portfolio_post(req: StockVarPortfolioRequest) -> dict[str, Any]:
+    from quant_rd_tool.crypto_var import parse_confidence_levels
+    from quant_rd_tool.stock_var import build_portfolio_var_report
+
+    levels = parse_confidence_levels(req.confidence)
+    holdings = [h.model_dump() for h in req.holdings]
+    try:
+        return build_portfolio_var_report(
+            holdings,
+            data_dir=req.data_dir,
+            lookback_bars=req.lookback_bars,
+            horizon_days=req.horizon_days,
+            confidence_levels=levels,
+            mc_n_sims=req.mc_n_sims,
+            mc_seed=req.mc_seed,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@router.get("/var/portfolio")
+def stock_var_portfolio_get(
+    symbols: str = "600519,000001",
+    notionals: str | None = None,
+    data_dir: str = "data/stocks",
+    lookback_bars: int = 252,
+    horizon_days: int = 1,
+    confidence: str = "0.95,0.99",
+    mc_n_sims: int = 10_000,
+    mc_seed: int = 42,
+) -> dict[str, Any]:
+    from quant_rd_tool.crypto_var import parse_confidence_levels
+    from quant_rd_tool.stock_var import build_portfolio_var_report
+
+    sym_list = [s.strip() for s in symbols.split(",") if s.strip()]
+    notional_list: list[float | None] = []
+    if notionals:
+        for part in notionals.split(","):
+            part = part.strip()
+            notional_list.append(float(part) if part else None)
+    holdings = []
+    for i, sym in enumerate(sym_list):
+        row: dict[str, Any] = {"symbol": sym}
+        if i < len(notional_list) and notional_list[i] is not None:
+            row["notional_cny"] = notional_list[i]
+        holdings.append(row)
+    levels = parse_confidence_levels(confidence)
+    try:
+        return build_portfolio_var_report(
+            holdings,
+            data_dir=data_dir,
+            lookback_bars=min(lookback_bars, 2000),
+            horizon_days=horizon_days,
+            confidence_levels=levels,
+            mc_n_sims=mc_n_sims,
+            mc_seed=mc_seed,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @router.get("/zipline/status")

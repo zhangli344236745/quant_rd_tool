@@ -6,7 +6,8 @@ export type JobType =
   | "backtest_run"
   | "macro_panel"
   | "crypto_analyze"
-  | "crypto_options_vol_scan";
+  | "crypto_options_vol_scan"
+  | "crypto_workflow";
 
 export interface JobRecord {
   id: string;
@@ -28,6 +29,7 @@ export const JOB_TYPE_LABELS: Record<string, string> = {
   macro_panel: "宏观面板",
   crypto_analyze: "Crypto 分析",
   crypto_options_vol_scan: "期权 IV 扫描",
+  crypto_workflow: "Crypto Workflow",
 };
 
 export const jobsApi = {
@@ -53,6 +55,9 @@ export const jobsApi = {
 
   cryptoOptionsVolScan: (body?: { data_dir?: string; symbols?: string[]; lookback_days?: number }) =>
     http.post<{ job_id: string }>("/jobs/crypto-options-vol-scan", body ?? {}),
+
+  cryptoWorkflow: (body: Record<string, unknown>) =>
+    http.post<{ job_id: string }>("/jobs/crypto-workflow", body),
 
   batchQlib: (body: { codes: string[]; years?: number; with_ml?: boolean }) =>
     http.post<{ job_ids: string[] }>("/jobs/batch-qlib", body),

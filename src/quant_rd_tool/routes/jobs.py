@@ -102,6 +102,16 @@ class CryptoOptionsVolScanJobRequest(BaseModel):
     lookback_days: int | None = None
 
 
+class CryptoWorkflowJobRequest(BaseModel):
+    symbol: str | None = None
+    timeframe: str | None = None
+    template_id: str | None = None
+    template: dict[str, Any] | None = None
+    steps: list[dict[str, Any]] | None = None
+    data_dir: str = "data/crypto"
+    refresh_ohlcv: bool = True
+
+
 def _store(request: Request):
     store = getattr(request.app.state, "job_store", None)
     if store is None:
@@ -160,6 +170,17 @@ def enqueue_crypto_analyze(req: CryptoAnalyzeJobRequest, request: Request) -> di
     job = store.create(
         type="crypto_analyze",
         code=req.symbol.strip(),
+        payload=req.model_dump(),
+    )
+    return {"job_id": job["id"]}
+
+
+@router.post("/crypto-workflow", status_code=202)
+def enqueue_crypto_workflow(req: CryptoWorkflowJobRequest, request: Request) -> dict[str, str]:
+    store = _store(request)
+    job = store.create(
+        type="crypto_workflow",
+        code=(req.symbol or "BTC").strip().upper(),
         payload=req.model_dump(),
     )
     return {"job_id": job["id"]}

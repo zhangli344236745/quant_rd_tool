@@ -12,7 +12,7 @@ from quant_rd_tool.config import _project_root
 from quant_rd_tool.crypto_zipline_combo import normalize_combo_spec
 from quant_rd_tool.crypto_zipline_env import zipline_venv_ready
 from quant_rd_tool.crypto_zipline_storage import save_run
-from quant_rd_tool.crypto_zipline_strategies import list_strategies
+from quant_rd_tool.stock_zipline_strategies import list_stock_strategies
 from quant_rd_tool.stock_storage import csv_path, save_csv, stock_root, write_meta
 from quant_rd_tool.stock_zipline_bundle import data_status, read_bundle_manifest
 from quant_rd_tool.stock_zipline_runner import run_backtest
@@ -172,4 +172,4 @@ def run_lab_backtest(
 
 
 def get_strategies() -> list[dict[str, Any]]:
-    return list_strategies()
+    return list_stock_strategies()

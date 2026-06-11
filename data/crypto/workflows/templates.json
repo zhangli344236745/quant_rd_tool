@@ -1,0 +1,61 @@
+[
+  {
+    "id": "default-btc-1d",
+    "name": "BTC 日线综合",
+    "symbol_default": "BTC",
+    "timeframe": "1d",
+    "data_dir": "data/crypto",
+    "steps": [
+      {
+        "id": "technical",
+        "enabled": true,
+        "order": 0,
+        "params": {}
+      },
+      {
+        "id": "qlib_ml",
+        "enabled": true,
+        "order": 1,
+        "params": {
+          "algorithm": "both"
+        }
+      },
+      {
+        "id": "zipline_strategy",
+        "enabled": true,
+        "order": 2,
+        "params": {
+          "strategy_id": "ma_crossover",
+          "capital_base": 100000
+        }
+      },
+      {
+        "id": "var_symbol",
+        "enabled": true,
+        "order": 3,
+        "params": {
+          "notional_usdt": 10000,
+          "lookback_bars": 252,
+          "horizon_days": 1,
+          "confidence": "0.95,0.99"
+        }
+      },
+      {
+        "id": "options_vol",
+        "enabled": true,
+        "order": 4,
+        "params": {}
+      },
+      {
+        "id": "advice_synth",
+        "enabled": true,
+        "order": 5,
+        "params": {
+          "var_gate_pct": 0.08
+        }
+      }
+    ],
+    "created_at": "2026-06-11T03:32:04.332057+00:00",
+    "updated_at": "2026-06-11T03:32:04.332069+00:00"
+  }
+]

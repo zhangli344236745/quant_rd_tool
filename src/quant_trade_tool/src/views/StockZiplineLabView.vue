@@ -96,7 +96,34 @@ const form = ref({
   squeeze_lookback: 120,
   keltner_mult: 1.5,
   ichimoku_kijun: 26,
+  train_bars: 400,
+  retrain_every: 100,
+  ml_base_strategy: "supertrend",
 });
+
+const CATEGORY_LABELS: Record<string, string> = {
+  trend: "趋势",
+  momentum: "动量",
+  volatility: "波动",
+  volume: "成交量",
+  combo: "组合",
+  ml: "机器学习",
+};
+
+const strategyGroups = computed(() => {
+  const groups: Record<string, StockZiplineStrategy[]> = {};
+  for (const s of strategies.value) {
+    const cat = s.category || "other";
+    if (!groups[cat]) groups[cat] = [];
+    groups[cat].push(s);
+  }
+  const order = ["ml", "trend", "momentum", "volatility", "volume", "combo", "other"];
+  return order
+    .filter((cat) => groups[cat]?.length)
+    .map((cat) => ({ label: CATEGORY_LABELS[cat] || cat, items: groups[cat] }));
+});
+
+const isMlStrategy = computed(() => form.value.strategy.startsWith("xgb_"));
 
 const selectedStrategy = computed(() =>
   strategies.value.find((s) => s.id === form.value.strategy),
@@ -189,6 +216,16 @@ function strategyParams(): Record<string, number> {
   }
   if (s === "vwap_trend") {
     return { lookback: form.value.vol_lookback };
+  }
+  if (s === "xgb_alpha158" || s === "xgb_tv_ensemble") {
+    return { train_bars: form.value.train_bars, retrain_every: form.value.retrain_every };
+  }
+  if (s === "xgb_tv_filter") {
+    return {
+      base_strategy: form.value.ml_base_strategy,
+      train_bars: form.value.train_bars,
+      retrain_every: form.value.retrain_every,
+    };
   }
   const spec = selectedStrategy.value;
   if (spec?.default_params) {
@@ -543,16 +580,40 @@ onMounted(async () => {
           </el-form-item>
         </template>
         <el-form-item v-else label="策略">
-          <el-select v-model="form.strategy" style="width: 200px">
-            <el-option
-              v-for="s in strategies"
-              :key="s.id"
-              :label="s.name"
-              :value="s.id"
-            />
+          <el-select v-model="form.strategy" filterable style="width: 240px">
+            <el-option-group
+              v-for="g in strategyGroups"
+              :key="g.label"
+              :label="g.label"
+            >
+              <el-option
+                v-for="s in g.items"
+                :key="s.id"
+                :label="s.name"
+                :value="s.id"
+              />
+            </el-option-group>
           </el-select>
           <span v-if="selectedStrategy" class="hint">{{ selectedStrategy.description }}</span>
         </el-form-item>
+        <template v-if="!form.use_combo && isMlStrategy">
+          <el-form-item label="训练窗口">
+            <el-input-number v-model="form.train_bars" :min="80" :max="2000" :step="20" />
+          </el-form-item>
+          <el-form-item label="重训间隔">
+            <el-input-number v-model="form.retrain_every" :min="20" :max="500" :step="20" />
+          </el-form-item>
+          <el-form-item v-if="form.strategy === 'xgb_tv_filter'" label="基础 TV 策略">
+            <el-select v-model="form.ml_base_strategy" filterable style="width: 200px">
+              <el-option
+                v-for="s in strategies.filter((x) => x.source !== 'ml')"
+                :key="s.id"
+                :label="s.name"
+                :value="s.id"
+              />
+            </el-select>
+          </el-form-item>
+        </template>
         <el-form-item
           v-if="
             !form.use_combo &&
@@ -697,6 +758,12 @@ onMounted(async () => {
         </el-tag>
         <el-tag v-if="result.bar_count" type="info">{{ result.bar_count }} bars</el-tag>
         <el-tag v-if="result.ingest_skipped" type="success">bundle 缓存命中</el-tag>
+        <el-tag v-if="result.ml_metrics?.ic != null" type="info">
+          ML IC {{ result.ml_metrics.ic }}
+        </el-tag>
+        <el-tag v-if="result.ml_metrics?.direction_accuracy != null" type="info">
+          方向命中 {{ (result.ml_metrics.direction_accuracy * 100).toFixed(1) }}%
+        </el-tag>
       </div>
       <EquityCurveChart
         v-if="result.equity_curve?.length"

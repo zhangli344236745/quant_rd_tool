@@ -24,5 +24,16 @@ def bundle_name_for(timeframe: str) -> str:
     return f"stock_ashare_{normalize_timeframe(timeframe)}"
 
 
+ML_WINDOW_SCALE: dict[str, float] = {"1d": 0.05}
+
+
+def ml_window_scale(timeframe: str) -> float:
+    return ML_WINDOW_SCALE[normalize_timeframe(timeframe)]
+
+
+def effective_ml_train_bars(timeframe: str, base: int = 2000) -> int:
+    return max(80, int(base * ml_window_scale(timeframe)))
+
+
 def list_timeframe_options() -> list[dict[str, str | int]]:
     return [{"id": "1d", "label": "日线", "bar_minutes": 1440}]

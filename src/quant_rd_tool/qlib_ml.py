@@ -148,14 +148,34 @@ def _build_handler(
     )
 
 
-def _signal_from_pred(latest_pred: float | None) -> str:
+DEFAULT_SIGNAL_THRESHOLD = 0.005
+
+
+def _signal_from_pred(
+    latest_pred: float | None, threshold: float = DEFAULT_SIGNAL_THRESHOLD
+) -> str:
     if latest_pred is None:
         return "中性"
-    if latest_pred > 0.005:
+    if latest_pred > threshold:
         return "模型偏多"
-    if latest_pred < -0.005:
+    if latest_pred < -threshold:
         return "模型偏空"
     return "中性"
+
+
+def _adaptive_signal_threshold(label: pd.Series) -> float:
+    """Scale signal threshold to label volatility so intraday bars can fire.
+
+    Fixed ±0.5% kills 15m/1h signals (per-bar returns ~0.1%); use 0.3 * label std,
+    floored to avoid noise-trading on a dead-flat series.
+    """
+    clean = pd.Series(label).dropna()
+    if len(clean) < 30:
+        return DEFAULT_SIGNAL_THRESHOLD
+    std = float(clean.std())
+    if not np.isfinite(std) or std <= 0:
+        return DEFAULT_SIGNAL_THRESHOLD
+    return max(1e-4, round(0.3 * std, 6))
 
 
 def _fit_xgb(
@@ -329,7 +349,10 @@ def _run_one_model(
     latest_date = (
         str(pred_test.index.get_level_values(0)[-1].date()) if len(pred_test) else None
     )
-    signal = _signal_from_pred(latest_pred)
+    signal_threshold = _adaptive_signal_threshold(
+        pd.concat([label_valid, label_test]) if len(label_valid) or len(label_test) else label_test
+    )
+    signal = _signal_from_pred(latest_pred, signal_threshold)
 
     oos_pred = pd.concat([pred_valid, pred_test])
     score_series = _pred_to_date_series(oos_pred, qlib_code)
@@ -348,6 +371,7 @@ def _run_one_model(
             "date": latest_date,
             "predicted_return": round(latest_pred, 6) if latest_pred is not None else None,
             "signal": signal,
+            "signal_threshold": signal_threshold,
         },
         "interpretation": _ml_interpretation(
             test_metrics, latest_pred, signal, top_features[:5], algorithm

@@ -186,6 +186,44 @@ class JobRunner:
             }
             return save_job_result(job_id, snap), out
 
+        if jtype == "crypto_workflow":
+            from quant_rd_tool.crypto_workflow import resolve_template_for_run, run_workflow
+
+            data_dir = str(payload.get("data_dir", "data/crypto"))
+            tpl = resolve_template_for_run(
+                data_dir=data_dir,
+                template_id=payload.get("template_id"),
+                template=payload.get("template"),
+                timeframe=payload.get("timeframe"),
+                steps=payload.get("steps"),
+            )
+            sym = str(payload.get("symbol") or tpl.get("symbol_default") or "BTC").strip().upper()
+
+            def _on_progress(progress: float, message: str) -> None:
+                self.store.mark_progress(job_id, progress, message=message)
+
+            out = run_workflow(
+                symbol=sym,
+                template=tpl,
+                data_dir=data_dir,
+                refresh_ohlcv=bool(payload.get("refresh_ohlcv", True)),
+                save=True,
+                progress_cb=_on_progress,
+            )
+            advice = out.get("advice") or {}
+            snap = {
+                "kind": "crypto_workflow",
+                "run_id": out.get("run_id"),
+                "symbol": out.get("symbol"),
+                "timeframe": out.get("timeframe"),
+                "template_id": out.get("template_id"),
+                "stance": advice.get("stance"),
+                "risk_level": advice.get("risk_level"),
+                "headline": advice.get("headline"),
+                "data_dir": data_dir,
+            }
+            return save_job_result(job_id, snap), out
+
         if jtype == "crypto_options_vol_scan":
             from quant_rd_tool.crypto_options_vol_scan import run_options_iv_maintenance
 

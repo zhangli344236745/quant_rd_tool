@@ -121,6 +121,8 @@ def run_lab_backtest(
     with_options_backtest: bool = False,
     options_overlay: str = "auto",
     options_backtest_params: dict[str, Any] | None = None,
+    commission_pct: float | None = None,
+    slippage_pct: float | None = None,
 ) -> dict[str, Any]:
     sym = symbol.strip().upper()
     tf = normalize_timeframe(timeframe)
@@ -146,6 +148,8 @@ def run_lab_backtest(
         force_reingest=force_reingest,
         timeframe=tf,
         combo_spec=combo_spec,
+        commission_pct=commission_pct,
+        slippage_pct=slippage_pct,
     )
     result = {
         "run_id": str(uuid.uuid4()),

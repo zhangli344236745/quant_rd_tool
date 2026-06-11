@@ -1,11 +1,11 @@
 {
-  "fingerprint": "2a8965bb0419ad9bbec70d51",
+  "fingerprint": "76bd6d325e1b46c6373329cf",
   "symbol": "BTC",
   "timeframe": "15m",
-  "bars": 8152,
+  "bars": 18,
   "bar_minutes": 15,
-  "ingest_start": "2026-03-10 00:00:00",
+  "ingest_start": "2026-06-02 00:00:00",
   "ingest_end": "2026-06-03 00:00:00",
-  "ingested_at": "2026-06-08T02:11:03.947386+00:00",
+  "ingested_at": "2026-06-11T05:30:05.733363+00:00",
   "bundle": "crypto_ccxt_15m"
 }

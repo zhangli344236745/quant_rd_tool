@@ -22,6 +22,9 @@ export interface StockZiplineStrategy {
   description: string;
   default_params: Record<string, number>;
   min_bars: number;
+  category?: string;
+  source?: string;
+  tv_ref?: string;
 }
 
 export interface StockZiplineTimeframeOption {
@@ -117,6 +120,150 @@ export interface StockZiplineBacktestResult {
   ingest_skipped?: boolean;
   fingerprint?: string;
   generated_at?: string;
+  ml_metrics?: {
+    ic?: number;
+    direction_accuracy?: number;
+    train_samples?: number;
+    feature_count?: number;
+  };
+  ml_preferred_engine?: boolean;
+}
+
+export interface StockVarBacktest {
+  observations: number;
+  violations: number;
+  expected_violation_rate: number;
+  actual_violation_rate: number;
+  violation_ratio?: number | null;
+  worst_day_return?: number;
+  max_exceedance_pct?: number;
+  backtest_ok?: boolean;
+}
+
+export interface StockMonteCarloVarLeg {
+  var_pct: number;
+  cvar_pct: number;
+  var_cny?: number;
+  cvar_cny?: number;
+  df?: number;
+  label?: string;
+}
+
+export interface StockMonteCarloVarBlock {
+  n_simulations: number;
+  seed: number;
+  horizon_days: number;
+  gbm: StockMonteCarloVarLeg;
+  student_t: StockMonteCarloVarLeg;
+}
+
+export interface StockVarMetric {
+  var_pct: number;
+  cvar_pct: number;
+  var_cny: number;
+  cvar_cny: number;
+  parametric_var_pct?: number | null;
+  parametric_var_cny?: number | null;
+  method_spread_pct?: number | null;
+  monte_carlo?: StockMonteCarloVarBlock | null;
+  backtest?: StockVarBacktest;
+}
+
+export interface StockVarNarrative {
+  headline: string;
+  bullets: string[];
+  disclaimer: string;
+}
+
+export interface StockSymbolVarReport {
+  market?: string;
+  symbol: string;
+  code?: string;
+  method: string;
+  params: {
+    lookback_bars: number;
+    horizon_days: number;
+    confidence_levels: number[];
+    timeframe: string;
+    data_dir?: string;
+    mc_n_sims?: number;
+    mc_seed?: number;
+  };
+  notional_cny: number;
+  latest_price: number;
+  observations: number;
+  return_stats?: {
+    mean_daily_return?: number;
+    daily_volatility?: number;
+    annualized_volatility?: number;
+    skewness?: number | null;
+    excess_kurtosis?: number | null;
+    worst_day_return?: number;
+    best_day_return?: number;
+  };
+  return_histogram?: Array<{ bin_low: number; bin_high: number; count: number }>;
+  stress_scenarios?: Array<{ shock_pct: number; loss_pct: number; loss_cny: number }>;
+  narrative?: StockVarNarrative;
+  metrics: Record<string, StockVarMetric>;
+}
+
+export interface StockPortfolioVarPosition {
+  code: string;
+  qlib_code: string;
+  side: string;
+  latest_price: number;
+  shares?: number | null;
+  notional_cny: number;
+  signed_notional_cny: number;
+  weight?: number;
+  standalone_var_cny?: number;
+  var_contribution_cny?: number;
+  var_contribution_pct?: number;
+}
+
+export interface StockPortfolioVarReport {
+  enabled: boolean;
+  market?: string;
+  error?: string;
+  message?: string;
+  method?: string;
+  params?: Record<string, unknown>;
+  positions: StockPortfolioVarPosition[];
+  gross_exposure_cny?: number;
+  net_exposure_cny?: number;
+  diversification_ratio?: number | null;
+  observations?: number;
+  return_stats?: StockSymbolVarReport["return_stats"];
+  correlation?: { symbols: string[]; matrix: (number | null)[][] };
+  stress_scenarios?: Array<{ shock_pct: number; loss_pct: number; loss_cny: number }>;
+  narrative?: StockVarNarrative;
+  metrics: Record<string, StockVarMetric> | null;
+}
+
+export interface StockVarHistoryPoint {
+  date: string;
+  var_pct: number;
+  var_cny: number;
+  actual_return?: number;
+  breach?: boolean;
+}
+
+export interface StockSymbolVarHistory {
+  market?: string;
+  symbol: string;
+  code?: string;
+  confidence: number;
+  window: number;
+  lookback_bars: number;
+  notional_cny: number;
+  breach_count: number;
+  series: StockVarHistoryPoint[];
+}
+
+export interface StockVarHolding {
+  symbol: string;
+  notional_cny?: number;
+  shares?: number;
 }
 
 export interface StockListItem {
@@ -378,4 +525,62 @@ export const stocksApi = {
 
   ziplineRun: (run_id: string, data_dir = "data/stocks") =>
     http.get<StockZiplineBacktestResult>("/stocks/zipline/runs/" + run_id, { params: { data_dir } }),
+
+  varSymbol: (params?: {
+    symbol?: string;
+    notional_cny?: number;
+    data_dir?: string;
+    lookback_bars?: number;
+    horizon_days?: number;
+    confidence?: string;
+    mc_n_sims?: number;
+    mc_seed?: number;
+  }) =>
+    http.get<StockSymbolVarReport>("/stocks/var/symbol", {
+      params: { data_dir: "data/stocks", ...params },
+    }),
+
+  varSymbolHistory: (params?: {
+    symbol?: string;
+    window?: number;
+    confidence?: number;
+    data_dir?: string;
+    lookback_bars?: number;
+    horizon_days?: number;
+    notional_cny?: number;
+  }) =>
+    http.get<StockSymbolVarHistory>("/stocks/var/symbol/history", {
+      params: { data_dir: "data/stocks", ...params },
+    }),
+
+  varPortfolio: (body: {
+    holdings: StockVarHolding[];
+    data_dir?: string;
+    lookback_bars?: number;
+    horizon_days?: number;
+    confidence?: string;
+    mc_n_sims?: number;
+    mc_seed?: number;
+  }) =>
+    http.post<StockPortfolioVarReport>("/stocks/var/portfolio", {
+      data_dir: "data/stocks",
+      lookback_bars: 252,
+      horizon_days: 1,
+      confidence: "0.95,0.99",
+      ...body,
+    }),
+
+  varPortfolioGet: (params?: {
+    symbols?: string;
+    notionals?: string;
+    data_dir?: string;
+    lookback_bars?: number;
+    horizon_days?: number;
+    confidence?: string;
+    mc_n_sims?: number;
+    mc_seed?: number;
+  }) =>
+    http.get<StockPortfolioVarReport>("/stocks/var/portfolio", {
+      params: { data_dir: "data/stocks", ...params },
+    }),
 };

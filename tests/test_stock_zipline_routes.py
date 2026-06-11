@@ -13,7 +13,12 @@ def test_stock_zipline_strategies_route():
     r = client.get("/api/v1/stocks/zipline/strategies")
     assert r.status_code == 200, r.text
     body = r.json()
-    assert len(body.get("strategies", [])) >= 2
+    strategies = body.get("strategies", [])
+    assert len(strategies) >= 2
+    ids = {s["id"] for s in strategies}
+    assert "ma_crossover" in ids
+    assert "xgb_alpha158" in ids
+    assert not any(i.startswith("opt_") for i in ids)
 
 
 def test_stock_zipline_status_route():
@@ -45,3 +50,5 @@ def test_stock_zipline_backtest_mock(tmp_path, monkeypatch):
         )
     assert r.status_code == 200, r.text
     assert r.json()["run_id"] == "r1"
+
+

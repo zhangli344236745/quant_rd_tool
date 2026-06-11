@@ -5,7 +5,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from quant_rd_tool.crypto_zipline_pandas import run_bar_backtest
+from quant_rd_tool.crypto_zipline_pandas import backtest_cost_context, run_bar_backtest
 from quant_rd_tool.crypto_zipline_storage import list_runs, load_run, save_run
 from quant_rd_tool.crypto_zipline_strategies import list_strategies, run_ma_crossover
 
@@ -36,6 +36,74 @@ def test_run_bar_backtest_metrics():
     assert "equity_curve" in out
     assert len(out["equity_curve"]) == len(df)
     assert out["final_signal"]["position"] in ("long", "flat", "short")
+
+
+def test_run_bar_backtest_costs_reduce_return():
+    df = _sample_df(100)
+    df["target"] = (df["close"].rolling(5).mean() > df["close"].rolling(10).mean()).astype(float)
+    free = run_bar_backtest(df, capital_base=10_000, warmup=12, commission_pct=0.0, slippage_pct=0.0)
+    costly = run_bar_backtest(df, capital_base=10_000, warmup=12, commission_pct=0.002, slippage_pct=0.001)
+    assert costly["metrics"]["total_return"] < free["metrics"]["total_return"]
+    assert costly["metrics"]["total_fees"] > 0
+    assert free["metrics"]["total_fees"] == 0
+    assert costly["cost_model"]["commission_pct"] == 0.002
+    assert all("fee" in t for t in costly["trades"])
+
+
+def test_run_bar_backtest_extended_metrics():
+    df = _sample_df(100)
+    df["target"] = (df["close"].rolling(5).mean() > df["close"].rolling(10).mean()).astype(float)
+    out = run_bar_backtest(
+        df, capital_base=10_000, warmup=12, commission_pct=0.0, slippage_pct=0.0, bars_per_year=35040
+    )
+    m = out["metrics"]
+    assert "sortino" in m
+    assert "annualized_return" in m
+    assert "buy_hold_return" in m
+    assert "excess_vs_hold" in m
+    assert abs(m["excess_vs_hold"] - (m["total_return"] - m["buy_hold_return"])) < 1e-6
+    if m["trade_count"] >= 2:
+        assert "win_rate" in m
+
+
+def test_backtest_cost_context_injects_defaults():
+    df = _sample_df(100)
+    df["target"] = (df["close"].rolling(5).mean() > df["close"].rolling(10).mean()).astype(float)
+    with backtest_cost_context(commission_pct=0.005, slippage_pct=0.0, bars_per_year=365):
+        out = run_bar_backtest(df, capital_base=10_000, warmup=12)
+    assert out["cost_model"]["commission_pct"] == 0.005
+    assert "annualized_return" in out["metrics"]
+
+
+def test_sharpe_annualization_stable_with_length():
+    """Sharpe should not blow up just because the sample is longer."""
+    import numpy as np
+
+    rng = np.random.default_rng(42)
+
+    def _df(n: int) -> pd.DataFrame:
+        steps = rng.normal(0.0005, 0.01, n)
+        price = 100 * (1 + pd.Series(steps)).cumprod()
+        return pd.DataFrame(
+            {
+                "date": pd.date_range("2025-01-01", periods=n, freq="15min").astype(str),
+                "open": price,
+                "high": price * 1.001,
+                "low": price * 0.999,
+                "close": price,
+                "volume": 1000.0,
+                "target": 1.0,
+            }
+        )
+
+    short = run_bar_backtest(
+        _df(200), capital_base=10_000, warmup=5, commission_pct=0, slippage_pct=0, bars_per_year=35040
+    )
+    long = run_bar_backtest(
+        _df(2000), capital_base=10_000, warmup=5, commission_pct=0, slippage_pct=0, bars_per_year=35040
+    )
+    # Same annualization factor: longer sample shouldn't yield mechanically larger sharpe
+    assert abs(long["metrics"]["sharpe"]) < abs(short["metrics"]["sharpe"]) * 10 + 5
 
 
 def test_ma_crossover_strategy():

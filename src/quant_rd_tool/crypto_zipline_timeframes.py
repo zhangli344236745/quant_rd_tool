@@ -16,6 +16,20 @@ TIMEFRAME_BAR_MINUTES: dict[str, int] = {
 
 DEFAULT_TIMEFRAME = "15m"
 
+# Crypto trades 24/7: bars per 365-day year for annualization
+BARS_PER_YEAR: dict[str, int] = {
+    "5m": 105_120,
+    "15m": 35_040,
+    "30m": 17_520,
+    "1h": 8_760,
+    "4h": 2_190,
+    "1d": 365,
+}
+
+
+def bars_per_year_for(timeframe: str) -> int:
+    return BARS_PER_YEAR[normalize_timeframe(timeframe)]
+
 
 def normalize_timeframe(timeframe: str) -> str:
     tf = (timeframe or DEFAULT_TIMEFRAME).strip().lower()

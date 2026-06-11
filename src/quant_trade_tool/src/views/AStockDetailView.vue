@@ -236,6 +236,12 @@ function newsLink(row: Record<string, unknown>) {
         <el-tab-pane label="分析" name="analysis">
           <div v-loading="reportLoading" class="analysis-pane">
             <div class="analysis-actions">
+              <router-link
+                :to="{ path: '/stock-var', query: { symbol: code, tab: 'symbol' } }"
+                class="var-link"
+              >
+                <el-button>风险 VaR</el-button>
+              </router-link>
               <el-button type="primary" :loading="analyzeSubmitting" @click="submitFullAnalyze">
                 完整分析（OpenBB+ML）
               </el-button>

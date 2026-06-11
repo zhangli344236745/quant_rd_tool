@@ -35,6 +35,11 @@ const router = createRouter({
           name: "stock-zipline",
           component: () => import("@/views/StockZiplineLabView.vue"),
         },
+        {
+          path: "stock-var",
+          name: "stock-var",
+          component: () => import("@/views/StockVarView.vue"),
+        },
         { path: "tasks", name: "tasks", component: () => import("@/views/TasksView.vue") },
         { path: "stock-analyze", name: "stock-analyze", component: () => import("@/views/StockAnalyzeView.vue") },
         { path: "backtest", name: "backtest", component: () => import("@/views/BacktestView.vue") },
@@ -49,6 +54,11 @@ const router = createRouter({
           path: "crypto-var",
           name: "crypto-var",
           component: () => import("@/views/CryptoVarView.vue"),
+        },
+        {
+          path: "crypto-workflow",
+          name: "crypto-workflow",
+          component: () => import("@/views/CryptoWorkflowView.vue"),
         },
         {
           path: "crypto-news",

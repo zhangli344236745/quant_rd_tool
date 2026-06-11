@@ -14,9 +14,13 @@ from quant_rd_tool.config import _project_root
 from quant_rd_tool.crypto_zipline_bundle import load_ohlcv_window
 from quant_rd_tool.crypto_zipline_combo import combo_min_bars, normalize_combo_spec, run_combo_pandas
 from quant_rd_tool.crypto_zipline_env import ensure_zipline_venv, zipline_venv_python, zipline_venv_ready
-from quant_rd_tool.crypto_zipline_pandas import run_bar_backtest
+from quant_rd_tool.crypto_zipline_pandas import backtest_cost_context, run_bar_backtest
 from quant_rd_tool.crypto_zipline_strategies import get_runner, get_strategy
-from quant_rd_tool.crypto_zipline_timeframes import DEFAULT_TIMEFRAME, normalize_timeframe
+from quant_rd_tool.crypto_zipline_timeframes import (
+    DEFAULT_TIMEFRAME,
+    bars_per_year_for,
+    normalize_timeframe,
+)
 from quant_rd_tool.crypto_zipline_zipline_engine import _slice_bars_for_backtest
 
 logger = logging.getLogger(__name__)
@@ -36,9 +40,18 @@ def run_pandas_backtest(
     timeframe: str = DEFAULT_TIMEFRAME,
     symbol: str = "BTC",
     data_dir: str = "data/crypto",
+    commission_pct: float | None = None,
+    slippage_pct: float | None = None,
 ) -> dict[str, Any]:
+    tf = normalize_timeframe(timeframe)
+    cost_ctx = backtest_cost_context(
+        commission_pct=commission_pct,
+        slippage_pct=slippage_pct,
+        bars_per_year=bars_per_year_for(tf),
+    )
     if combo_spec:
-        out = run_combo_pandas(df, combo_spec, capital_base)
+        with cost_ctx:
+            out = run_combo_pandas(df, combo_spec, capital_base)
         out["engine"] = "pandas"
         return out
 
@@ -50,14 +63,15 @@ def run_pandas_backtest(
         params["_symbol"] = symbol.strip().upper()
         params["_data_dir"] = data_dir
     if strategy_id.startswith("xgb_"):
-        params["_timeframe"] = normalize_timeframe(timeframe)
+        params["_timeframe"] = tf
     min_bars = int(spec.get("min_bars", 20))
     if len(df) < min_bars:
         raise ValueError(f"Need at least {min_bars} bars, got {len(df)}")
     runner = get_runner(strategy_id)
     if not runner:
         raise ValueError(f"No runner for strategy: {strategy_id}")
-    out = runner(df, params, capital_base)
+    with cost_ctx:
+        out = runner(df, params, capital_base)
     out["engine"] = "pandas"
     out["strategy_params"] = params
     return out
@@ -181,6 +195,8 @@ def run_backtest(
     force_reingest: bool = False,
     timeframe: str = DEFAULT_TIMEFRAME,
     combo_spec: dict[str, Any] | None = None,
+    commission_pct: float | None = None,
+    slippage_pct: float | None = None,
 ) -> dict[str, Any]:
     tf = normalize_timeframe(timeframe)
 
@@ -205,6 +221,8 @@ def run_backtest(
             timeframe=tf,
             symbol=symbol,
             data_dir=data_dir,
+            commission_pct=commission_pct,
+            slippage_pct=slippage_pct,
         )
 
     spec = get_strategy(strategy_id)
@@ -228,6 +246,8 @@ def run_backtest(
             timeframe=tf,
             symbol=symbol,
             data_dir=data_dir,
+            commission_pct=commission_pct,
+            slippage_pct=slippage_pct,
         )
         out["engine"] = "pandas"
         out["options_only_engine"] = True
@@ -280,6 +300,8 @@ def run_backtest(
         timeframe=tf,
         symbol=symbol,
         data_dir=data_dir,
+        commission_pct=commission_pct,
+        slippage_pct=slippage_pct,
     )
     out["zipline_fallback_reason"] = z_err if not z_ok else "zipline_run_failed"
     return out

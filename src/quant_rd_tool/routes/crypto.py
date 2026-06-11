@@ -51,6 +51,7 @@ class CryptoMlRequest(BaseModel):
     symbol: str = "BTC"
     data_dir: str = "data/crypto"
     algorithm: str = "both"
+    use_cache: bool = True
 
 
 class CryptoBotRequest(BaseModel):
@@ -168,6 +169,7 @@ def crypto_ml(req: CryptoMlRequest) -> dict[str, Any]:
             end_date=str(df["date"].max().date()),
             num_bars=len(df),
             algorithm=req.algorithm,  # type: ignore[arg-type]
+            use_cache=req.use_cache,
         )
     except Exception as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
@@ -919,6 +921,32 @@ def crypto_var_symbol_history(
         raise HTTPException(status_code=400, detail=str(e)) from e
 
 
+class CryptoWorkflowStep(BaseModel):
+    id: str
+    enabled: bool = True
+    order: int = 0
+    params: dict[str, Any] = Field(default_factory=dict)
+
+
+class CryptoWorkflowTemplateBody(BaseModel):
+    id: str | None = None
+    name: str = "自定义 Workflow"
+    symbol_default: str = "BTC"
+    timeframe: str = "1d"
+    data_dir: str = "data/crypto"
+    steps: list[CryptoWorkflowStep] = Field(default_factory=list)
+
+
+class CryptoWorkflowRunRequest(BaseModel):
+    symbol: str | None = None
+    timeframe: str | None = None
+    template_id: str | None = None
+    template: CryptoWorkflowTemplateBody | None = None
+    steps: list[CryptoWorkflowStep] | None = None
+    data_dir: str = "data/crypto"
+    refresh_ohlcv: bool = True
+
+
 class CryptoNewsConfigBody(BaseModel):
     enabled: bool | None = None
     min_score: int | None = Field(None, ge=0, le=100)
@@ -932,6 +960,129 @@ class CryptoNewsConfigBody(BaseModel):
 class CryptoNewsScanRequest(BaseModel):
     data_dir: str = "data"
     feed_ids: list[str] | None = None
+
+
+@router.get("/workflow/steps")
+def crypto_workflow_steps_get() -> dict[str, Any]:
+    from quant_rd_tool.crypto_workflow import list_step_catalog
+
+    return {"steps": list_step_catalog()}
+
+
+@router.get("/workflow/templates")
+def crypto_workflow_templates_get(data_dir: str = "data/crypto") -> dict[str, Any]:
+    from quant_rd_tool.crypto_workflow_storage import list_templates
+
+    items = list_templates(data_dir)
+    return {"count": len(items), "templates": items}
+
+
+@router.post("/workflow/templates")
+def crypto_workflow_templates_post(
+    body: CryptoWorkflowTemplateBody,
+    data_dir: str = "data/crypto",
+) -> dict[str, Any]:
+    from quant_rd_tool.crypto_workflow import normalize_template_steps
+    from quant_rd_tool.crypto_workflow_storage import upsert_template
+
+    payload = body.model_dump()
+    payload["data_dir"] = data_dir
+    payload["steps"] = normalize_template_steps([s.model_dump() for s in body.steps] or [])
+    tpl = upsert_template(data_dir, payload)
+    return {"ok": True, "template": tpl}
+
+
+@router.put("/workflow/templates/{template_id}")
+def crypto_workflow_templates_put(
+    template_id: str,
+    body: CryptoWorkflowTemplateBody,
+    data_dir: str = "data/crypto",
+) -> dict[str, Any]:
+    from quant_rd_tool.crypto_workflow import normalize_template_steps
+    from quant_rd_tool.crypto_workflow_storage import upsert_template
+
+    payload = body.model_dump()
+    payload["id"] = template_id
+    payload["data_dir"] = data_dir
+    payload["steps"] = normalize_template_steps([s.model_dump() for s in body.steps] or [])
+    tpl = upsert_template(data_dir, payload)
+    return {"ok": True, "template": tpl}
+
+
+@router.delete("/workflow/templates/{template_id}")
+def crypto_workflow_templates_delete(template_id: str, data_dir: str = "data/crypto") -> dict[str, Any]:
+    from quant_rd_tool.crypto_workflow_storage import delete_template
+
+    ok = delete_template(data_dir, template_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Template not found")
+    return {"ok": True}
+
+
+@router.post("/workflow/templates/{template_id}/duplicate")
+def crypto_workflow_templates_duplicate(
+    template_id: str,
+    data_dir: str = "data/crypto",
+    name: str | None = None,
+) -> dict[str, Any]:
+    from quant_rd_tool.crypto_workflow_storage import duplicate_template
+
+    tpl = duplicate_template(data_dir, template_id, name=name)
+    if not tpl:
+        raise HTTPException(status_code=404, detail="Template not found")
+    return {"ok": True, "template": tpl}
+
+
+@router.post("/workflow/run")
+def crypto_workflow_run_post(req: CryptoWorkflowRunRequest) -> dict[str, Any]:
+    from quant_rd_tool.crypto_workflow import resolve_template_for_run, run_workflow
+
+    data_dir = req.data_dir
+    try:
+        tpl = resolve_template_for_run(
+            data_dir=data_dir,
+            template_id=req.template_id,
+            template=req.template.model_dump() if req.template else None,
+            timeframe=req.timeframe,
+            steps=[s.model_dump() for s in req.steps] if req.steps else None,
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+
+    symbol = (req.symbol or tpl.get("symbol_default") or "BTC").strip().upper()
+    try:
+        return run_workflow(
+            symbol=symbol,
+            template=tpl,
+            data_dir=data_dir,
+            refresh_ohlcv=req.refresh_ohlcv,
+            save=True,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+@router.get("/workflow/runs")
+def crypto_workflow_runs_get(
+    data_dir: str = "data/crypto",
+    limit: int = Query(20, ge=1, le=100),
+) -> dict[str, Any]:
+    from quant_rd_tool.crypto_workflow_storage import list_runs
+
+    items = list_runs(data_dir, limit=limit)
+    return {"count": len(items), "runs": items}
+
+
+@router.get("/workflow/runs/{run_id}")
+def crypto_workflow_run_get(run_id: str, data_dir: str = "data/crypto") -> dict[str, Any]:
+    from quant_rd_tool.crypto_workflow_storage import load_run
+
+    run = load_run(data_dir, run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+    return run
 
 
 @router.get("/news/digest")
@@ -1054,6 +1205,12 @@ class CryptoZiplineBacktestRequest(BaseModel):
         description="auto（strategy_pack）| call_overlay | put_hedge | short_straddle_iv | covered_call | long_straddle",
     )
     options_backtest_params: dict[str, Any] | None = None
+    commission_pct: float | None = Field(
+        None, ge=0, le=0.05, description="单边手续费比例，默认 0.001（0.1%）"
+    )
+    slippage_pct: float | None = Field(
+        None, ge=0, le=0.05, description="单边滑点比例，默认 0.0005（0.05%）"
+    )
 
 
 @router.get("/zipline/status")
@@ -1132,6 +1289,8 @@ def crypto_zipline_backtest_post(req: CryptoZiplineBacktestRequest) -> dict[str,
             with_options_backtest=req.with_options_backtest,
             options_overlay=req.options_overlay,
             options_backtest_params=req.options_backtest_params,
+            commission_pct=req.commission_pct,
+            slippage_pct=req.slippage_pct,
         )
     except FileNotFoundError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e

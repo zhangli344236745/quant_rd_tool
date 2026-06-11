@@ -17,6 +17,7 @@ from quant_rd_tool.crypto_zipline_pandas import run_bar_backtest
 from quant_rd_tool.crypto_zipline_strategies import get_runner, get_strategy
 from quant_rd_tool.crypto_zipline_zipline_engine import _slice_bars_for_backtest
 from quant_rd_tool.stock_zipline_bundle import load_ohlcv_window
+from quant_rd_tool.stock_zipline_strategies import is_stock_strategy
 from quant_rd_tool.stock_zipline_timeframes import DEFAULT_TIMEFRAME, normalize_timeframe
 
 logger = logging.getLogger(__name__)
@@ -33,6 +34,9 @@ def run_pandas_backtest(
     strategy_params: dict[str, Any] | None,
     capital_base: float,
     combo_spec: dict[str, Any] | None = None,
+    timeframe: str = DEFAULT_TIMEFRAME,
+    symbol: str = "600519",
+    data_dir: str = "data/stocks",
 ) -> dict[str, Any]:
     if combo_spec:
         out = run_combo_pandas(df, combo_spec, capital_base)
@@ -43,7 +47,11 @@ def run_pandas_backtest(
     spec = get_strategy(strategy_id)
     if not spec:
         raise ValueError(f"Unknown strategy: {strategy_id}")
+    if not is_stock_strategy(strategy_id):
+        raise ValueError(f"Strategy {strategy_id} is not available for A-share lab")
     params = {**spec["default_params"], **(strategy_params or {})}
+    if strategy_id.startswith("xgb_"):
+        params["_timeframe"] = normalize_timeframe(timeframe)
     min_bars = int(spec.get("min_bars", 20))
     if len(df) < min_bars:
         raise ValueError(f"Need at least {min_bars} bars, got {len(df)}")
@@ -177,6 +185,8 @@ def run_backtest(
     combo_spec: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     tf = normalize_timeframe(timeframe)
+    if not is_stock_strategy(strategy_id) and not combo_spec:
+        raise ValueError(f"Strategy {strategy_id} is not available for A-share lab")
 
     if engine == "pandas":
         df = load_ohlcv_window(
@@ -196,7 +206,39 @@ def run_backtest(
             strategy_params=strategy_params,
             capital_base=capital_base,
             combo_spec=combo_spec,
+            timeframe=tf,
+            symbol=symbol,
+            data_dir=data_dir,
         )
+
+    spec = get_strategy(strategy_id)
+    if spec and spec.get("category") == "options":
+        raise ValueError(f"Options strategy {strategy_id} is not supported for stocks")
+
+    if strategy_id.startswith("xgb_") and not combo_spec:
+        df = load_ohlcv_window(
+            symbol,
+            data_dir=data_dir,
+            timeframe=tf,
+            lookback_days=lookback_days,
+            range_start=start,
+            range_end=end,
+        )
+        df = _prepare_backtest_df(
+            df, strategy_id=strategy_id, start=start, end=end, combo_spec=combo_spec
+        )
+        out = run_pandas_backtest(
+            df,
+            strategy_id=strategy_id,
+            strategy_params=strategy_params,
+            capital_base=capital_base,
+            timeframe=tf,
+            symbol=symbol,
+            data_dir=data_dir,
+        )
+        out["engine"] = "pandas"
+        out["ml_preferred_engine"] = True
+        return out
 
     z_ok, z_err = zipline_installed()
     if engine == "zipline" and not z_ok:
@@ -242,6 +284,9 @@ def run_backtest(
         strategy_params=strategy_params,
         capital_base=capital_base,
         combo_spec=combo_spec,
+        timeframe=tf,
+        symbol=symbol,
+        data_dir=data_dir,
     )
     out["zipline_fallback_reason"] = z_err if not z_ok else "zipline_run_failed"
     return out

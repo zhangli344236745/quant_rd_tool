@@ -246,6 +246,8 @@ export interface CryptoZiplineBacktestRequest {
     | "covered_call"
     | "long_straddle";
   options_backtest_params?: Record<string, number>;
+  commission_pct?: number;
+  slippage_pct?: number;
 }
 
 export interface StrategyPackSelection {
@@ -303,7 +305,16 @@ export interface CryptoZiplineBacktestResult {
     sharpe: number;
     max_drawdown: number;
     trade_count: number;
+    annualized_return?: number;
+    sortino?: number;
+    calmar?: number;
+    win_rate?: number;
+    profit_factor?: number | null;
+    buy_hold_return?: number;
+    excess_vs_hold?: number;
+    total_fees?: number;
   };
+  cost_model?: { commission_pct: number; slippage_pct: number; total_fees: number };
   final_signal?: {
     position: string;
     target_pct: number;
@@ -702,6 +713,57 @@ export const cryptoApi = {
     horizon_days?: number;
     notional_usdt?: number;
   }) => http.get<SymbolVarHistory>("/crypto/var/symbol/history", { params }),
+
+  workflowSteps: () => http.get<{ steps: CryptoWorkflowStepDef[] }>("/crypto/workflow/steps"),
+
+  workflowTemplates: (data_dir = "data/crypto") =>
+    http.get<{ count: number; templates: CryptoWorkflowTemplate[] }>("/crypto/workflow/templates", {
+      params: { data_dir },
+    }),
+
+  workflowTemplateSave: (body: CryptoWorkflowTemplate, data_dir = "data/crypto") =>
+    body.id
+      ? http.put<{ ok: boolean; template: CryptoWorkflowTemplate }>(
+          `/crypto/workflow/templates/${body.id}`,
+          body,
+          { params: { data_dir } },
+        )
+      : http.post<{ ok: boolean; template: CryptoWorkflowTemplate }>("/crypto/workflow/templates", body, {
+          params: { data_dir },
+        }),
+
+  workflowTemplateDelete: (template_id: string, data_dir = "data/crypto") =>
+    http.delete<{ ok: boolean }>(`/crypto/workflow/templates/${template_id}`, { params: { data_dir } }),
+
+  workflowTemplateDuplicate: (template_id: string, data_dir = "data/crypto", name?: string) =>
+    http.post<{ ok: boolean; template: CryptoWorkflowTemplate }>(
+      `/crypto/workflow/templates/${template_id}/duplicate`,
+      null,
+      { params: { data_dir, name } },
+    ),
+
+  workflowRun: (body: {
+    symbol?: string;
+    timeframe?: string;
+    template_id?: string;
+    template?: CryptoWorkflowTemplate;
+    steps?: CryptoWorkflowStepConfig[];
+    data_dir?: string;
+    refresh_ohlcv?: boolean;
+  }) =>
+    http.post<CryptoWorkflowRunResult>("/crypto/workflow/run", {
+      data_dir: "data/crypto",
+      refresh_ohlcv: true,
+      ...body,
+    }),
+
+  workflowRuns: (data_dir = "data/crypto", limit = 20) =>
+    http.get<{ count: number; runs: CryptoWorkflowRunSummary[] }>("/crypto/workflow/runs", {
+      params: { data_dir, limit },
+    }),
+
+  workflowRunGet: (run_id: string, data_dir = "data/crypto") =>
+    http.get<CryptoWorkflowRunResult>(`/crypto/workflow/runs/${run_id}`, { params: { data_dir } }),
 
   newsDigest: (data_dir = "data") =>
     http.get<CryptoNewsDigest>("/crypto/news/digest", { params: { data_dir } }),
@@ -1456,6 +1518,103 @@ export interface SymbolVarHistory {
   notional_usdt: number;
   breach_count?: number;
   series: VarHistoryPoint[];
+}
+
+export interface CryptoWorkflowStepDef {
+  id: string;
+  name: string;
+  description: string;
+  params_schema?: Record<string, unknown>;
+  required?: boolean;
+}
+
+export interface CryptoWorkflowStepConfig {
+  id: string;
+  enabled: boolean;
+  order: number;
+  params: Record<string, unknown>;
+}
+
+export interface CryptoWorkflowTemplate {
+  id?: string;
+  name: string;
+  symbol_default?: string;
+  timeframe?: string;
+  data_dir?: string;
+  steps: CryptoWorkflowStepConfig[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CryptoWorkflowPriceGuidance {
+  available: boolean;
+  spot?: number;
+  side?: string;
+  atm_iv?: number;
+  iv_source?: string;
+  iv_percentile?: number;
+  horizon_days?: number;
+  expected_move_usd?: number;
+  expected_move_pct?: number;
+  entry_price?: number;
+  stop_loss_price?: number;
+  take_profit_price?: number;
+  entry_note?: string;
+  stop_loss_pct?: number;
+  take_profit_pct?: number;
+  disclaimer?: string;
+  reason?: string;
+}
+
+export interface CryptoWorkflowAdvice {
+  stance: string;
+  action: string;
+  score: number;
+  confidence: number;
+  suggested_position_pct: number;
+  risk_level: string;
+  var_gate_triggered?: boolean;
+  signal_agreement?: string;
+  price_guidance?: CryptoWorkflowPriceGuidance;
+  headline: string;
+  bullets: string[];
+  advice: string;
+  markdown?: string;
+  disclaimer?: string;
+}
+
+export interface CryptoWorkflowStepResult {
+  id: string;
+  order: number;
+  status: string;
+  summary?: string;
+  elapsed_s?: number;
+  error?: string;
+  output?: Record<string, unknown>;
+}
+
+export interface CryptoWorkflowRunResult {
+  run_id: string;
+  symbol: string;
+  pair?: string;
+  timeframe: string;
+  template_id?: string;
+  template_name?: string;
+  bars?: number;
+  steps: CryptoWorkflowStepResult[];
+  advice?: CryptoWorkflowAdvice | null;
+  generated_at?: string;
+  generated_at_beijing?: string;
+}
+
+export interface CryptoWorkflowRunSummary {
+  run_id: string;
+  symbol?: string;
+  timeframe?: string;
+  template_id?: string;
+  stance?: string;
+  risk_level?: string;
+  generated_at?: string;
 }
 
 export interface StrikeProbabilityReport {

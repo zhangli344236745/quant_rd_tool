@@ -74,7 +74,11 @@ def _extract_perf(perf: Any, *, capital_base: float, bar_minutes: int) -> dict[s
 
             rets = pv_bars.pct_change().dropna()
             if len(rets) > 1 and rets.std() > 1e-12:
-                metrics["sharpe"] = round(float(rets.mean() / rets.std() * (len(rets) ** 0.5)), 4)
+                # Crypto trades 24/7: annualize by bars per 365-day year
+                bars_per_year = 365 * 24 * 60 / max(1, bar_minutes)
+                metrics["sharpe"] = round(
+                    float(rets.mean() / rets.std() * (bars_per_year**0.5)), 4
+                )
 
             peak = pv_bars.cummax()
             metrics["max_drawdown"] = round(float(((pv_bars - peak) / peak.replace(0, pd.NA)).min()), 6)

@@ -428,7 +428,8 @@ def _close_series(df: pd.DataFrame) -> pd.Series:
     return close.astype(float)
 
 
-def build_symbol_var_report(
+def build_symbol_var_report_from_df(
+    df: pd.DataFrame,
     symbol: str,
     *,
     notional_usdt: float,
@@ -440,9 +441,11 @@ def build_symbol_var_report(
     mc_seed: int = 42,
 ) -> dict[str, Any]:
     confidence_levels = confidence_levels or [0.95, 0.99]
-    df = fetch_ohlcv_df(symbol=symbol, timeframe=timeframe, limit=lookback_bars + 1)
-    close = _close_series(df)
+    work = df.tail(lookback_bars + 1)
+    close = _close_series(work)
     rets = returns_from_close(close)
+    if len(rets.dropna()) < MIN_OBSERVATIONS:
+        raise ValueError(f"insufficient data: need >={MIN_OBSERVATIONS}, got {len(rets.dropna())}")
     latest_price = float(close.iloc[-1])
     effective_notional = float(notional_usdt) if float(notional_usdt) > 0 else latest_price
 
@@ -477,6 +480,31 @@ def build_symbol_var_report(
     }
     report["narrative"] = build_symbol_narrative(report, stats=stats)
     return report
+
+
+def build_symbol_var_report(
+    symbol: str,
+    *,
+    notional_usdt: float,
+    lookback_bars: int = 252,
+    confidence_levels: list[float] | None = None,
+    horizon_days: int = 1,
+    timeframe: str = "1d",
+    mc_n_sims: int = DEFAULT_MC_SIMS,
+    mc_seed: int = 42,
+) -> dict[str, Any]:
+    df = fetch_ohlcv_df(symbol=symbol, timeframe=timeframe, limit=lookback_bars + 1)
+    return build_symbol_var_report_from_df(
+        df,
+        symbol,
+        notional_usdt=notional_usdt,
+        lookback_bars=lookback_bars,
+        confidence_levels=confidence_levels,
+        horizon_days=horizon_days,
+        timeframe=timeframe,
+        mc_n_sims=mc_n_sims,
+        mc_seed=mc_seed,
+    )
 
 
 def build_portfolio_returns(
