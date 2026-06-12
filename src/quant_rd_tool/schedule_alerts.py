@@ -86,19 +86,11 @@ def get_crypto_news_alert_config(raw: dict[str, Any] | None = None) -> dict[str,
 
 
 def _format_cycle_complete_message(job_id: str, rows: list[dict[str, Any]]) -> str:
-    """Short summary for Bark/Webhook after a successful schedule cycle."""
-    lines: list[str] = []
-    for row in rows[:12]:
-        sym = str(row.get("symbol") or row.get("pair") or "?")
-        stance = row.get("stance") or "-"
-        action = row.get("action") or "-"
-        new_bars = row.get("new_bars")
-        extra = f" +{new_bars}K" if new_bars not in (None, 0, "0") else ""
-        lines.append(f"{sym} {stance}/{action}{extra}")
-    if len(rows) > 12:
-        lines.append(f"…共 {len(rows)} 个标的")
-    body = "\n".join(lines) if lines else "（无分析结果）"
-    return f"[{job_id}] 定时分析完成\n{body}"
+    from quant_rd_tool.notification_format import format_cycle_complete_body, rule_meta
+
+    meta = rule_meta("cycle_complete")
+    header = f"{meta['emoji']} {meta['label']} · {job_id}"
+    return f"{header}\n{format_cycle_complete_body(job_id, rows)}"
 
 
 def _bark_from_env() -> dict[str, str]:
@@ -284,7 +276,9 @@ def tail_alert_log(*, limit: int = 50, log_path: Path = _DEFAULT_LOG) -> list[di
             rows.append(json.loads(line))
         except json.JSONDecodeError:
             continue
-    return rows
+    from quant_rd_tool.notification_format import alert_feed_item
+
+    return [alert_feed_item(row) for row in rows]
 
 
 def _cooldown_ok(
@@ -379,14 +373,19 @@ def _deliver_schedule_notifications(
     if bark_cfg["enabled"] and bark_cfg["device_key"]:
         try:
             from quant_rd_tool.bark_push import post_bark
+            from quant_rd_tool.notification_format import format_schedule_alert_bark
 
-            title = f"[{job_id}] {rule}"
+            bark = format_schedule_alert_bark(
+                job_id=job_id, rule=rule, message=message, detail=detail
+            )
             post_bark(
                 bark_cfg["device_key"],
-                title=title,
-                body=message,
+                title=bark["title"],
+                body=bark["body"],
+                subtitle=bark.get("subtitle"),
+                level=bark.get("level"),
                 server=bark_cfg["server"],
-                group="schedule",
+                group=bark.get("group", "schedule"),
             )
         except Exception:
             logger.warning("Bark push failed for %s", job_id, exc_info=True)
@@ -399,13 +398,17 @@ def send_test_bark(bark: dict[str, Any] | None = None) -> dict[str, Any]:
         raise ValueError("请在 .env 设置 BARK_DEVICE_KEY，或在页面填写 Device Key")
 
     from quant_rd_tool.bark_push import post_bark
+    from quant_rd_tool.notification_format import format_test_bark
 
+    bark = format_test_bark()
     return post_bark(
         bark_cfg["device_key"],
-        title="quant-rd 调度告警测试",
-        body="Bark 推送已连通。定时任务分析告警将推送到此设备。",
+        title=bark["title"],
+        body=bark["body"],
+        subtitle=bark.get("subtitle"),
+        level=bark.get("level"),
         server=bark_cfg["server"],
-        group="schedule",
+        group=bark.get("group", "schedule"),
     )
 
 

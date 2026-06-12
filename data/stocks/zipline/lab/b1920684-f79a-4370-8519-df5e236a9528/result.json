@@ -1,0 +1,38 @@
+{
+  "run_id": "b1920684-f79a-4370-8519-df5e236a9528",
+  "symbol": "SH600519",
+  "code": "600519",
+  "strategy": "heikin_ashi_trend",
+  "timeframe": "1d",
+  "start": "2024-01-01",
+  "end": "2026-06-03",
+  "capital_base": 100000.0,
+  "market": "stock",
+  "generated_at": "2026-06-11T09:49:32.304338+00:00",
+  "engine": "zipline",
+  "metrics": {
+    "total_return": -0.137268,
+    "sharpe": -0.5675,
+    "max_drawdown": -0.183566,
+    "trade_count": 59
+  },
+  "final_signal": {
+    "position": "flat",
+    "target_pct": 0.0,
+    "bar_time": "2026-06-03 20:00:00+00:00"
+  },
+  "strategy_params": {
+    "min_bull": 3
+  },
+  "disclaimer": "回测结果仅供参考，不构成投资建议。",
+  "bundle": "stock_ashare_1d",
+  "asset": "SH600519",
+  "bar_minutes": 1440,
+  "bar_count": 524,
+  "backtest_start": "2024-04-02 00:00:00",
+  "backtest_end": "2026-06-03 00:00:00",
+  "ingest_skipped": true,
+  "fingerprint": "ad674e36f7dea0d012a1f4fa",
+  "bars": 524,
+  "trade_count": 59
+}

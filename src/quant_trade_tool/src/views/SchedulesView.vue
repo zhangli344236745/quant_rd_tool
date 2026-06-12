@@ -1,9 +1,13 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref, watch } from "vue";
-import { ElMessage, ElMessageBox } from "element-plus";
+import { ElMessageBox } from "element-plus";
 import { cryptoApi } from "@/api/crypto";
 import { extractError } from "@/api/http";
+import AlertFeedPanel from "@/components/AlertFeedPanel.vue";
 import ResultPanel from "@/components/ResultPanel.vue";
+import { useNotify } from "@/composables/useNotify";
+
+const notify = useNotify();
 
 const dataDir = "data/crypto";
 const jobs = ref<Record<string, unknown>[]>([]);
@@ -81,10 +85,10 @@ async function load() {
 async function createJob() {
   try {
     await cryptoApi.scheduleCreate({ ...createForm, data_dir: dataDir, with_ml: true, ml_algorithm: "both" });
-    ElMessage.success("任务已创建");
+    notify.success("任务已创建");
     await load();
   } catch (e) {
-    ElMessage.error(extractError(e));
+    notify.error("创建失败", extractError(e));
   }
 }
 
@@ -96,15 +100,15 @@ async function runAction(jobId: string, action: "start" | "stop" | "run-once" | 
     else if (action === "run-once") {
       const { data } = await cryptoApi.scheduleRunOnce(jobId, dataDir);
       lastRun.value = data;
-      ElMessage.success("已执行一轮");
+      notify.success("已执行一轮");
     } else {
       await ElMessageBox.confirm(`删除任务 ${jobId}?`, "确认");
       await cryptoApi.scheduleDelete(jobId, dataDir);
-      ElMessage.success("已删除");
+      notify.success("已删除");
     }
     if (action !== "run-once") await load();
   } catch (e) {
-    if (e !== "cancel") ElMessage.error(extractError(e));
+    if (e !== "cancel") notify.error("操作失败", extractError(e));
   } finally {
     actionLoading.value = "";
   }
@@ -152,7 +156,7 @@ async function saveAlertRules() {
     custom_rules = JSON.parse(customRulesJson.value || "[]");
     if (!Array.isArray(custom_rules)) throw new Error("must be array");
   } catch {
-    ElMessage.error("custom_rules 必须是 JSON 数组");
+    notify.error("JSON 格式错误", "custom_rules 必须是 JSON 数组");
     return;
   }
   rulesSaving.value = true;
@@ -163,10 +167,10 @@ async function saveAlertRules() {
       bark: barkPayload(),
       webhook_on_alert: alertRules.webhook_on_alert,
     });
-    ElMessage.success("告警规则已保存");
+    notify.success("告警规则已保存");
     await loadAlertLog();
   } catch (e) {
-    ElMessage.error(extractError(e));
+    notify.error("保存失败", extractError(e));
   } finally {
     rulesSaving.value = false;
   }
@@ -198,15 +202,15 @@ function barkPayload() {
 async function testBark() {
   const payload = barkPayload();
   if (!bark.device_key_configured && !payload.device_key) {
-    ElMessage.warning("请在 .env 设置 BARK_DEVICE_KEY，或填写 Device Key");
+    notify.warning("未配置 Bark", "请在 .env 设置 BARK_DEVICE_KEY，或填写 Device Key");
     return;
   }
   barkTesting.value = true;
   try {
     await cryptoApi.scheduleAlertsTestBark({ bark: payload });
-    ElMessage.success("Bark 测试推送已发送（配置已自动保存）");
+    notify.success("Bark 测试已发送", "配置已自动保存，请查看手机通知");
   } catch (e) {
-    ElMessage.error(extractError(e));
+    notify.error("Bark 测试失败", extractError(e));
   } finally {
     barkTesting.value = false;
   }
@@ -215,10 +219,13 @@ async function testBark() {
 async function checkStale() {
   try {
     const { data } = await cryptoApi.scheduleAlertsCheckStale(dataDir);
-    ElMessage.info(data.count ? `触发 ${data.count} 条卡住告警` : "无卡住任务");
+    notify.info(
+      data.count ? `检测到 ${data.count} 条卡住任务` : "无卡住任务",
+      data.count ? "已写入告警日志" : undefined,
+    );
     await loadAlertLog();
   } catch (e) {
-    ElMessage.error(extractError(e));
+    notify.error("检测失败", extractError(e));
   }
 }
 
@@ -406,13 +413,11 @@ onMounted(async () => {
         </el-card>
 
         <el-card shadow="never" class="panel-card mt">
-          <template #header>最近告警</template>
-          <el-table :data="alertLog" size="small" max-height="220" empty-text="暂无告警记录">
-            <el-table-column prop="ts" label="时间" width="180" show-overflow-tooltip />
-            <el-table-column prop="job_id" label="任务" width="120" />
-            <el-table-column prop="rule" label="规则" width="140" />
-            <el-table-column prop="message" label="说明" min-width="200" show-overflow-tooltip />
-          </el-table>
+          <template #header>
+            <span>最近告警</span>
+            <el-button link type="primary" size="small" @click="loadAlertLog">刷新</el-button>
+          </template>
+          <AlertFeedPanel :items="alertLog" />
         </el-card>
 
         <ResultPanel v-if="lastRun" title="最近一次 run-once" :result="lastRun" />

@@ -61,8 +61,16 @@ def test_webhook_on_alert(tmp_path, monkeypatch):
     from quant_rd_tool.crypto_ops_control import save_crypto_ops
 
     save_crypto_ops(webhook_url="https://example.com/hook")
-    save_alert_rules(on_cycle_error=True, cooldown_minutes=0)
-    with patch("quant_rd_tool.crypto_ops_control.post_webhook") as post:
+    save_alert_rules(
+        on_cycle_error=True,
+        cooldown_minutes=0,
+        webhook_on_alert=True,
+        bark={"enabled": False},
+    )
+    with (
+        patch("quant_rd_tool.crypto_ops_control.post_webhook") as post,
+        patch("quant_rd_tool.bark_push.post_bark"),
+    ):
         evaluate_after_cycle(
             "j1",
             last_error="boom",
@@ -81,8 +89,12 @@ def test_webhook_on_alert_can_disable(tmp_path, monkeypatch):
         on_cycle_error=True,
         cooldown_minutes=0,
         webhook_on_alert=False,
+        bark={"enabled": False},
     )
-    with patch("quant_rd_tool.crypto_ops_control.post_webhook") as post:
+    with (
+        patch("quant_rd_tool.crypto_ops_control.post_webhook") as post,
+        patch("quant_rd_tool.bark_push.post_bark"),
+    ):
         evaluate_after_cycle(
             "j1",
             last_error="boom",

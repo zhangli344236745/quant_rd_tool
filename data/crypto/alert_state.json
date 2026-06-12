@@ -6,7 +6,9 @@
     },
     "btc-eth-5m": {
       "failure_streak": 0,
-      "last_alerts": {}
+      "last_alerts": {
+        "cycle_complete": "2026-06-12T05:35:20.697513+00:00"
+      }
     }
   }
 }

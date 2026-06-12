@@ -1,0 +1,13 @@
+{
+  "symbol": "SH600519",
+  "strategy": "ma_crossover",
+  "timeframe": "1d",
+  "start": "2024-01-01",
+  "end": "2026-06-03",
+  "capital_base": 100000.0,
+  "engine": "zipline",
+  "strategy_params": {
+    "fast": 10,
+    "slow": 30
+  }
+}

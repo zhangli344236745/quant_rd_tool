@@ -1,0 +1,12 @@
+{
+  "symbol": "SH600519",
+  "strategy": "heikin_ashi_trend",
+  "timeframe": "1d",
+  "start": "2024-01-01",
+  "end": "2026-06-03",
+  "capital_base": 100000.0,
+  "engine": "zipline",
+  "strategy_params": {
+    "min_bull": 3
+  }
+}

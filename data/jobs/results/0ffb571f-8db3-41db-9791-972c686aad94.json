@@ -1,0 +1,1297 @@
+{
+  "kind": "crypto_analyze",
+  "symbol": "ETH",
+  "pair": "ETH/USDT",
+  "timeframe": "5m",
+  "period": {
+    "start": "2026-06-09 02:20:00",
+    "end": "2026-06-12 13:35:00",
+    "bars": 1000
+  },
+  "combined_signal": {
+    "stance": "中性",
+    "action": "hold",
+    "score": -1,
+    "confidence": 0.2,
+    "technical": {
+      "stance": "中性",
+      "action": "hold"
+    },
+    "ml": {
+      "stance": null,
+      "signal": null,
+      "predicted_return": null,
+      "reliable": null,
+      "quality_note": null
+    },
+    "agreement": "仅技术面",
+    "reasons": [
+      "均线：震荡",
+      "RSI=32.2（中性）",
+      "MACD：MACD 空头",
+      "近20日涨跌：-0.48%",
+      "综合得分 -1"
+    ]
+  },
+  "ui_summary": {
+    "symbol": "CRYPTO_ETH",
+    "pair": "ETH/USDT",
+    "timeframe": "5m",
+    "period": {
+      "start": "2026-06-09 02:20:00",
+      "end": "2026-06-12 13:35:00",
+      "bars": 1000
+    },
+    "headline": "ETH/USDT：中性（hold）— 价 1,665，震荡，MACD 空头；详见多维拆解。",
+    "summary": "CRYPTO_ETH 最新价 1665.29，研判 中性（建议操作：hold），信号置信度约 20%。 现货与期权波动均未给出强方向，宜轻仓或观望。",
+    "stance": "中性",
+    "action": "hold",
+    "action_label": "观望",
+    "advice": "建议观望或维持现有仓位，等待趋势明朗；详见下方「投资方向说明」。",
+    "confidence": 0.2,
+    "agreement": "仅技术面",
+    "technical_stance": "中性",
+    "ml_stance": "未参与",
+    "price_snapshot": {
+      "latest": 1665.29,
+      "period_high": 1714.08,
+      "period_low": 1605.42,
+      "pct_from_high": -0.028464
+    },
+    "price_lines": [
+      "最新价约 1665.29",
+      "样本区间高/低 1714.08 / 1605.42",
+      "距区间高点 -2.85%"
+    ],
+    "technical_lines": [
+      "均线排列：震荡",
+      "MACD：MACD 空头",
+      "RSI(14)：32.2（中性）",
+      "布林带：接近布林下轨（偏弱/超卖）",
+      "近 5/20 根 K 线涨跌：-0.15% / -0.48%",
+      "样本最大回撤 -6.41%"
+    ],
+    "observations": [
+      "均线：震荡",
+      "RSI=32.2（中性）",
+      "MACD：MACD 空头",
+      "近20日涨跌：-0.48%",
+      "综合得分 -1",
+      "[期权] 近月 ATM 隐含波动率约 55.5%。",
+      "[期权] IV 历史分位约 3.64%。",
+      "[期权] 24h IV 变化约 -4.1%。",
+      "[期权] 横向波动排名 #4/4（含 BTC/ETH/SOL/BNB 等配置标的）。",
+      "[期权建议] ETH 期权波动未达告警阈值，可维持常规仓位管理。"
+    ],
+    "risks": [
+      "加密货币波动极大，杠杆与合约风险更高。",
+      "短周期（如 5m）信号变化快，需执行纪律，不宜重仓赌方向。",
+      "机器学习在单标的短周期上可能接近随机，勿单独作为开仓依据。",
+      "自动交易可能因滑点、限频、API 故障导致偏离预期。",
+      "不构成投资建议；实盘前请用测试网或 dry-run 验证。",
+      "期权波动与方向可能背离；卖方策略存在尾部风险。",
+      "行权价建议仅综合概率差、现货方向与 IV 环境，未计手续费、滑点与流动性；不构成投资建议。"
+    ],
+    "brief_sections": [
+      {
+        "title": "结论：「中性」在说什么",
+        "paragraphs": [
+          "综合研判为 **中性**（操作建议：hold），置信度约 20%。多空证据均不充分或相互抵消，宜观望或维持仓位，等待结构明朗。",
+          "技术面 中性，机器学习 未参与，二者 **仅技术面**。"
+        ]
+      },
+      {
+        "title": "价格结构",
+        "paragraphs": [
+          "现价约 **1,665.29**，样本区间高/低 **1,714.08 / 1,605.42**。",
+          "距区间高点约 **-2.8%**。",
+          "价格位于区间中上部，偏强整理或高位回落后的中段。",
+          "样本内最大回撤约 **-6.4%**，波动需纳入仓位管理。"
+        ]
+      },
+      {
+        "title": "多维度拆解",
+        "bullets": [
+          "**趋势（均线）**：震荡。 无明确顺势做多依据。",
+          "**动能（MACD）**：MACD 空头，短期卖压仍在，不宜仅凭小幅下跌抄底。",
+          "**RSI**：32.2（中性）。",
+          "**布林带**：接近布林下轨（偏弱/超卖）。存在超跌反弹可能，但趋势未扭转时反弹持续性存疑。",
+          "**短期收益**（近 5/20/60 根 K 线）：-0.15% / -0.48% / -0.56%。",
+          "**机器学习**：未启用（样本不足（1000 条 K 线），qlib 训练建议至少 2000 根（5m）。请增大 --backfill-days 或等待定时任务累积。）。"
+        ]
+      },
+      {
+        "title": "期权波动率（Binance × Deribit）",
+        "bullets": [
+          "近月 ATM IV 约 **55.5%**。",
+          "IV 历史分位 **3.64%**（告警 normal）。",
+          "24h IV 变化 **-4.1%**。",
+          "参考合约：`ETH-260703-1650-C`。",
+          "配置标的横向波动排名 **#4/4**。",
+          "综合 IV 最高标的：**BTC**。",
+          "现货与期权波动均未给出强方向，宜轻仓或观望。",
+          "ETH：中性。 IV 分位 3.64%，24h -4.1%。",
+          "ETH 期权波动未达告警阈值，可维持常规仓位管理。",
+          "**跨所同到期**（2026-07-03）：Binance vs Deribit IV 差 **+0.8pp**（neutral 偏高）。",
+          "ETH 同到期 2026-07-03 ATM IV 接近（差 +0.8pp）。",
+          "**期权策略框架**：维持观望。",
+          "**买 Call 摘要**：相对更可关注 1550.0 Call：概率与方向尚可、IV 未极端，可小仓评估买方 Call（设止损/限仓）。",
+          "K=1500.0：可考虑买入 — 概率与方向尚可、IV 未极端，可小仓评估买方 Call（设止损/限仓）。",
+          "K=1550.0：可考虑买入 — 概率与方向尚可、IV 未极端，可小仓评估买方 Call（设止损/限仓）。",
+          "K=1600.0：可考虑买入 — 概率与方向尚可、IV 未极端，可小仓评估买方 Call（设止损/限仓）。",
+          "K=1650.0：可考虑买入 — 概率与方向尚可、IV 未极端，可小仓评估买方 Call（设止损/限仓）。",
+          "K=1700.0：观望 — 信号混合，宜等待更好入场或改用价差降低权利金。"
+        ]
+      },
+      {
+        "title": "按持仓场景的操作倾向",
+        "scenarios": [
+          {
+            "role": "已有多单",
+            "text": "持有但不加仓；止损可设在区间下沿或成本下方固定比例；加仓需 MACD 转多、RSI 回升至 50 上方并站稳均线。"
+          },
+          {
+            "role": "空仓",
+            "text": "不追空、不急于抄底；可等待放量突破均线 + MACD 金叉，或缩量回踩支撑二次确认。"
+          },
+          {
+            "role": "短线/波段",
+            "text": "更适合区间内小仓位高抛低吸，而非重仓赌单边；现价若近布林下轨，偏多等反弹至均线压力再减，而非重仓赌 V 反。"
+          }
+        ]
+      },
+      {
+        "title": "何时会改变方向判断",
+        "upgrades": [
+          {
+            "condition": "均线转多头 + MACD 多头 + RSI 回升至 50 上方",
+            "bias": "偏多 → 可考虑分批建多"
+          },
+          {
+            "condition": "均线空头 + MACD 空头 + RSI 超买",
+            "bias": "偏空 → 减仓或不做多"
+          },
+          {
+            "condition": "放量跌破区间下沿",
+            "bias": "偏空 → 止损/降风险优先"
+          },
+          {
+            "condition": "ML 测试集 IC 持续为正且信号偏多",
+            "bias": "增强看多（需持续验证，不可单根 K 线决策）"
+          }
+        ]
+      }
+    ],
+    "disclaimer": "仅供量化研究学习，不构成投资建议。"
+  },
+  "narrative": {
+    "stance": "中性",
+    "action": "hold",
+    "summary": "CRYPTO_ETH 最新价 1665.29，研判 **中性**（建议操作：hold），信号置信度约 20%。 现货与期权波动均未给出强方向，宜轻仓或观望。",
+    "observations": [
+      "均线：震荡",
+      "RSI=32.2（中性）",
+      "MACD：MACD 空头",
+      "近20日涨跌：-0.48%",
+      "综合得分 -1",
+      "[期权] 近月 ATM 隐含波动率约 55.5%。",
+      "[期权] IV 历史分位约 3.64%。",
+      "[期权] 24h IV 变化约 -4.1%。",
+      "[期权] 横向波动排名 #4/4（含 BTC/ETH/SOL/BNB 等配置标的）。",
+      "[期权建议] ETH 期权波动未达告警阈值，可维持常规仓位管理。"
+    ],
+    "advice": "建议观望或维持现有仓位，等待趋势明朗；详见下方「投资方向说明」。",
+    "investment_brief": {
+      "sections": [
+        {
+          "title": "结论：「中性」在说什么",
+          "paragraphs": [
+            "综合研判为 **中性**（操作建议：hold），置信度约 20%。多空证据均不充分或相互抵消，宜观望或维持仓位，等待结构明朗。",
+            "技术面 中性，机器学习 未参与，二者 **仅技术面**。"
+          ]
+        },
+        {
+          "title": "价格结构",
+          "paragraphs": [
+            "现价约 **1,665.29**，样本区间高/低 **1,714.08 / 1,605.42**。",
+            "距区间高点约 **-2.8%**。",
+            "价格位于区间中上部，偏强整理或高位回落后的中段。",
+            "样本内最大回撤约 **-6.4%**，波动需纳入仓位管理。"
+          ]
+        },
+        {
+          "title": "多维度拆解",
+          "bullets": [
+            "**趋势（均线）**：震荡。 无明确顺势做多依据。",
+            "**动能（MACD）**：MACD 空头，短期卖压仍在，不宜仅凭小幅下跌抄底。",
+            "**RSI**：32.2（中性）。",
+            "**布林带**：接近布林下轨（偏弱/超卖）。存在超跌反弹可能，但趋势未扭转时反弹持续性存疑。",
+            "**短期收益**（近 5/20/60 根 K 线）：-0.15% / -0.48% / -0.56%。",
+            "**机器学习**：未启用（样本不足（1000 条 K 线），qlib 训练建议至少 2000 根（5m）。请增大 --backfill-days 或等待定时任务累积。）。"
+          ]
+        },
+        {
+          "title": "期权波动率（Binance × Deribit）",
+          "bullets": [
+            "近月 ATM IV 约 **55.5%**。",
+            "IV 历史分位 **3.64%**（告警 normal）。",
+            "24h IV 变化 **-4.1%**。",
+            "参考合约：`ETH-260703-1650-C`。",
+            "配置标的横向波动排名 **#4/4**。",
+            "综合 IV 最高标的：**BTC**。",
+            "现货与期权波动均未给出强方向，宜轻仓或观望。",
+            "ETH：中性。 IV 分位 3.64%，24h -4.1%。",
+            "ETH 期权波动未达告警阈值，可维持常规仓位管理。",
+            "**跨所同到期**（2026-07-03）：Binance vs Deribit IV 差 **+0.8pp**（neutral 偏高）。",
+            "ETH 同到期 2026-07-03 ATM IV 接近（差 +0.8pp）。",
+            "**期权策略框架**：维持观望。",
+            "**买 Call 摘要**：相对更可关注 1550.0 Call：概率与方向尚可、IV 未极端，可小仓评估买方 Call（设止损/限仓）。",
+            "K=1500.0：可考虑买入 — 概率与方向尚可、IV 未极端，可小仓评估买方 Call（设止损/限仓）。",
+            "K=1550.0：可考虑买入 — 概率与方向尚可、IV 未极端，可小仓评估买方 Call（设止损/限仓）。",
+            "K=1600.0：可考虑买入 — 概率与方向尚可、IV 未极端，可小仓评估买方 Call（设止损/限仓）。",
+            "K=1650.0：可考虑买入 — 概率与方向尚可、IV 未极端，可小仓评估买方 Call（设止损/限仓）。",
+            "K=1700.0：观望 — 信号混合，宜等待更好入场或改用价差降低权利金。"
+          ]
+        },
+        {
+          "title": "按持仓场景的操作倾向",
+          "scenarios": [
+            {
+              "role": "已有多单",
+              "text": "持有但不加仓；止损可设在区间下沿或成本下方固定比例；加仓需 MACD 转多、RSI 回升至 50 上方并站稳均线。"
+            },
+            {
+              "role": "空仓",
+              "text": "不追空、不急于抄底；可等待放量突破均线 + MACD 金叉，或缩量回踩支撑二次确认。"
+            },
+            {
+              "role": "短线/波段",
+              "text": "更适合区间内小仓位高抛低吸，而非重仓赌单边；现价若近布林下轨，偏多等反弹至均线压力再减，而非重仓赌 V 反。"
+            }
+          ]
+        },
+        {
+          "title": "何时会改变方向判断",
+          "upgrades": [
+            {
+              "condition": "均线转多头 + MACD 多头 + RSI 回升至 50 上方",
+              "bias": "偏多 → 可考虑分批建多"
+            },
+            {
+              "condition": "均线空头 + MACD 空头 + RSI 超买",
+              "bias": "偏空 → 减仓或不做多"
+            },
+            {
+              "condition": "放量跌破区间下沿",
+              "bias": "偏空 → 止损/降风险优先"
+            },
+            {
+              "condition": "ML 测试集 IC 持续为正且信号偏多",
+              "bias": "增强看多（需持续验证，不可单根 K 线决策）"
+            }
+          ]
+        }
+      ],
+      "one_liner": "ETH/USDT：中性（hold）— 价 1,665，震荡，MACD 空头；详见多维拆解。",
+      "markdown": "## 投资方向说明（详细）\n\n> 数据周期：**5m**；时间均为**北京时间**；「近 N 根」指 K 线根数，非自然日。\n\n### 结论：「中性」在说什么\n\n综合研判为 **中性**（操作建议：hold），置信度约 20%。多空证据均不充分或相互抵消，宜观望或维持仓位，等待结构明朗。\n\n技术面 中性，机器学习 未参与，二者 **仅技术面**。\n\n\n### 价格结构\n\n现价约 **1,665.29**，样本区间高/低 **1,714.08 / 1,605.42**。\n\n距区间高点约 **-2.8%**。\n\n价格位于区间中上部，偏强整理或高位回落后的中段。\n\n样本内最大回撤约 **-6.4%**，波动需纳入仓位管理。\n\n\n### 多维度拆解\n\n- **趋势（均线）**：震荡。 无明确顺势做多依据。\n- **动能（MACD）**：MACD 空头，短期卖压仍在，不宜仅凭小幅下跌抄底。\n- **RSI**：32.2（中性）。\n- **布林带**：接近布林下轨（偏弱/超卖）。存在超跌反弹可能，但趋势未扭转时反弹持续性存疑。\n- **短期收益**（近 5/20/60 根 K 线）：-0.15% / -0.48% / -0.56%。\n- **机器学习**：未启用（样本不足（1000 条 K 线），qlib 训练建议至少 2000 根（5m）。请增大 --backfill-days 或等待定时任务累积。）。\n\n### 期权波动率（Binance × Deribit）\n\n- 近月 ATM IV 约 **55.5%**。\n- IV 历史分位 **3.64%**（告警 normal）。\n- 24h IV 变化 **-4.1%**。\n- 参考合约：`ETH-260703-1650-C`。\n- 配置标的横向波动排名 **#4/4**。\n- 综合 IV 最高标的：**BTC**。\n- 现货与期权波动均未给出强方向，宜轻仓或观望。\n- ETH：中性。 IV 分位 3.64%，24h -4.1%。\n- ETH 期权波动未达告警阈值，可维持常规仓位管理。\n- **跨所同到期**（2026-07-03）：Binance vs Deribit IV 差 **+0.8pp**（neutral 偏高）。\n- ETH 同到期 2026-07-03 ATM IV 接近（差 +0.8pp）。\n- **期权策略框架**：维持观望。\n- **买 Call 摘要**：相对更可关注 1550.0 Call：概率与方向尚可、IV 未极端，可小仓评估买方 Call（设止损/限仓）。\n- K=1500.0：可考虑买入 — 概率与方向尚可、IV 未极端，可小仓评估买方 Call（设止损/限仓）。\n- K=1550.0：可考虑买入 — 概率与方向尚可、IV 未极端，可小仓评估买方 Call（设止损/限仓）。\n- K=1600.0：可考虑买入 — 概率与方向尚可、IV 未极端，可小仓评估买方 Call（设止损/限仓）。\n- K=1650.0：可考虑买入 — 概率与方向尚可、IV 未极端，可小仓评估买方 Call（设止损/限仓）。\n- K=1700.0：观望 — 信号混合，宜等待更好入场或改用价差降低权利金。\n\n### 按持仓场景的操作倾向\n\n- **已有多单**：持有但不加仓；止损可设在区间下沿或成本下方固定比例；加仓需 MACD 转多、RSI 回升至 50 上方并站稳均线。\n- **空仓**：不追空、不急于抄底；可等待放量突破均线 + MACD 金叉，或缩量回踩支撑二次确认。\n- **短线/波段**：更适合区间内小仓位高抛低吸，而非重仓赌单边；现价若近布林下轨，偏多等反弹至均线压力再减，而非重仓赌 V 反。\n\n### 何时会改变方向判断\n\n- 若 均线转多头 + MACD 多头 + RSI 回升至 50 上方 → 偏多 → 可考虑分批建多\n- 若 均线空头 + MACD 空头 + RSI 超买 → 偏空 → 减仓或不做多\n- 若 放量跌破区间下沿 → 偏空 → 止损/降风险优先\n- 若 ML 测试集 IC 持续为正且信号偏多 → 增强看多（需持续验证，不可单根 K 线决策）\n\n### 一句话\n\nETH/USDT：中性（hold）— 价 1,665，震荡，MACD 空头；详见多维拆解。\n"
+    },
+    "risks": [
+      "加密货币波动极大，杠杆与合约风险更高。",
+      "短周期（如 5m）信号变化快，需执行纪律，不宜重仓赌方向。",
+      "机器学习在单标的短周期上可能接近随机，勿单独作为开仓依据。",
+      "自动交易可能因滑点、限频、API 故障导致偏离预期。",
+      "不构成投资建议；实盘前请用测试网或 dry-run 验证。",
+      "期权波动与方向可能背离；卖方策略存在尾部风险。",
+      "行权价建议仅综合概率差、现货方向与 IV 环境，未计手续费、滑点与流动性；不构成投资建议。"
+    ],
+    "disclaimer": "仅供量化研究学习，不构成投资建议。"
+  },
+  "options_vol": {
+    "enabled": true,
+    "base": "ETH",
+    "scan_item": {
+      "base": "ETH",
+      "ts": "2026-06-12T05:37:21.168775+00:00",
+      "atm_iv": 0.5555,
+      "underlying_price": 1666.5688,
+      "contract": "ETH-260703-1650-C",
+      "expiry": "2026-07-03T00:00:00+00:00",
+      "dte": 20.77,
+      "iv_percentile": 3.64,
+      "iv_change_24h_pct": -4.08,
+      "alert_level": "normal",
+      "alerts": [],
+      "cold_start": false,
+      "composite_score": 0.0182,
+      "rank": 4,
+      "venue_compare": {
+        "base": "ETH",
+        "binance": {
+          "enabled": true,
+          "venue": "binance",
+          "atm_iv": 0.5555,
+          "contract": "ETH-260703-1650-C",
+          "expiry": "2026-07-03T00:00:00+00:00",
+          "dte": 20.77,
+          "strike": 1650.0,
+          "underlying_price": 1666.5688,
+          "open_interest": null
+        },
+        "deribit": {
+          "enabled": true,
+          "venue": "deribit",
+          "atm_iv": 0.547,
+          "contract": "ETH-3JUL26-1650-C",
+          "expiry": "2026-07-03T00:00:00+00:00",
+          "dte": 20.77,
+          "strike": 1650.0,
+          "underlying_price": 1664.12,
+          "open_interest": 336.0
+        },
+        "comparison": {
+          "available": true,
+          "iv_spread_pp": 0.85,
+          "abs_spread_pp": 0.85,
+          "richer_venue": "neutral",
+          "alert_level": "normal",
+          "index_spread_pct": 0.147,
+          "dte_gap": 0.0,
+          "aligned_expiry": true,
+          "summary": "ETH 同到期 2026-07-03 ATM IV 接近（差 +0.8pp）。",
+          "notes": [
+            "DTE：Binance 20.77d · Deribit 20.77d。"
+          ],
+          "mode": "aligned_expiry",
+          "expiry_date": "2026-07-03",
+          "near_month_iv_spread_pp": 0.85,
+          "near_month_summary": "ETH 两所近月 ATM IV 接近（差 +0.8pp）。"
+        },
+        "aligned": {
+          "base": "ETH",
+          "available": true,
+          "expiry_date": "2026-07-03",
+          "binance_expiry": "2026-07-03T00:00:00+00:00",
+          "deribit_expiry": "2026-07-03T00:00:00+00:00",
+          "dte": 20.77,
+          "binance_spot": 1666.56883721,
+          "deribit_spot": 1664.22,
+          "atm_strike": 1650.0,
+          "atm": {
+            "strike": 1650.0,
+            "binance_iv": 0.5555,
+            "deribit_iv": 0.547,
+            "iv_spread_pp": 0.85,
+            "binance_symbol": "ETH-260703-1650-C",
+            "deribit_symbol": "ETH-3JUL26-1650-C"
+          },
+          "comparison": {
+            "iv_spread_pp": 0.85,
+            "abs_spread_pp": 0.85,
+            "richer_venue": "neutral",
+            "alert_level": "normal",
+            "aligned_expiry": true,
+            "summary": "ETH 同到期 2026-07-03 ATM IV 接近（差 +0.8pp）。",
+            "strike_spread_range_pp": 0.75
+          },
+          "rows": [
+            {
+              "strike": 1400.0,
+              "moneyness_pct": -16.0,
+              "binance_iv": 0.6526,
+              "deribit_iv": 0.6415,
+              "iv_spread_pp": 1.11,
+              "binance_symbol": "ETH-260703-1400-C",
+              "deribit_symbol": "ETH-3JUL26-1400-C"
+            },
+            {
+              "strike": 1500.0,
+              "moneyness_pct": -9.99,
+              "binance_iv": 0.6035,
+              "deribit_iv": 0.5936,
+              "iv_spread_pp": 0.99,
+              "binance_symbol": "ETH-260703-1500-C",
+              "deribit_symbol": "ETH-3JUL26-1500-C"
+            },
+            {
+              "strike": 1550.0,
+              "moneyness_pct": -6.99,
+              "binance_iv": 0.5831,
+              "deribit_iv": 0.5736,
+              "iv_spread_pp": 0.95,
+              "binance_symbol": "ETH-260703-1550-C",
+              "deribit_symbol": "ETH-3JUL26-1550-C"
+            },
+            {
+              "strike": 1600.0,
+              "moneyness_pct": -3.99,
+              "binance_iv": 0.5675,
+              "deribit_iv": 0.5585,
+              "iv_spread_pp": 0.9,
+              "binance_symbol": "ETH-260703-1600-C",
+              "deribit_symbol": "ETH-3JUL26-1600-C"
+            },
+            {
+              "strike": 1650.0,
+              "moneyness_pct": -0.99,
+              "binance_iv": 0.5555,
+              "deribit_iv": 0.547,
+              "iv_spread_pp": 0.85,
+              "binance_symbol": "ETH-260703-1650-C",
+              "deribit_symbol": "ETH-3JUL26-1650-C"
+            },
+            {
+              "strike": 1700.0,
+              "moneyness_pct": 2.01,
+              "binance_iv": 0.5464,
+              "deribit_iv": 0.5379,
+              "iv_spread_pp": 0.85,
+              "binance_symbol": "ETH-260703-1700-C",
+              "deribit_symbol": "ETH-3JUL26-1700-C"
+            },
+            {
+              "strike": 1750.0,
+              "moneyness_pct": 5.01,
+              "binance_iv": 0.54,
+              "deribit_iv": 0.5314,
+              "iv_spread_pp": 0.86,
+              "binance_symbol": "ETH-260703-1750-C",
+              "deribit_symbol": "ETH-3JUL26-1750-C"
+            },
+            {
+              "strike": 1800.0,
+              "moneyness_pct": 8.01,
+              "binance_iv": 0.5374,
+              "deribit_iv": 0.5314,
+              "iv_spread_pp": 0.6,
+              "binance_symbol": "ETH-260703-1800-C",
+              "deribit_symbol": "ETH-3JUL26-1800-C"
+            },
+            {
+              "strike": 2000.0,
+              "moneyness_pct": 20.01,
+              "binance_iv": 0.5481,
+              "deribit_iv": 0.5445,
+              "iv_spread_pp": 0.36,
+              "binance_symbol": "ETH-260703-2000-C",
+              "deribit_symbol": "ETH-3JUL26-2000-C"
+            }
+          ],
+          "common_expiries": [
+            {
+              "expiry_date": "2026-06-26",
+              "binance_expiry": "2026-06-26T00:00:00+00:00",
+              "deribit_expiry": "2026-06-26T00:00:00+00:00",
+              "dte": 13.77,
+              "binance_atm_iv": 0.5421,
+              "deribit_atm_iv": 0.5448,
+              "atm_iv_spread_pp": -0.27,
+              "common_strikes": 56
+            },
+            {
+              "expiry_date": "2026-07-03",
+              "binance_expiry": "2026-07-03T00:00:00+00:00",
+              "deribit_expiry": "2026-07-03T00:00:00+00:00",
+              "dte": 20.77,
+              "binance_atm_iv": 0.5555,
+              "deribit_atm_iv": 0.547,
+              "atm_iv_spread_pp": 0.85,
+              "common_strikes": 9
+            },
+            {
+              "expiry_date": "2026-07-31",
+              "binance_expiry": "2026-07-31T00:00:00+00:00",
+              "deribit_expiry": "2026-07-31T00:00:00+00:00",
+              "dte": 48.77,
+              "binance_atm_iv": 0.5547,
+              "deribit_atm_iv": 0.5545,
+              "atm_iv_spread_pp": 0.02,
+              "common_strikes": 41
+            },
+            {
+              "expiry_date": "2026-08-28",
+              "binance_expiry": "2026-08-28T00:00:00+00:00",
+              "deribit_expiry": "2026-08-28T00:00:00+00:00",
+              "dte": 76.77,
+              "binance_atm_iv": 0.5627,
+              "deribit_atm_iv": 0.5634,
+              "atm_iv_spread_pp": -0.07,
+              "common_strikes": 24
+            },
+            {
+              "expiry_date": "2026-09-25",
+              "binance_expiry": "2026-09-25T00:00:00+00:00",
+              "deribit_expiry": "2026-09-25T00:00:00+00:00",
+              "dte": 104.77,
+              "binance_atm_iv": 0.5641,
+              "deribit_atm_iv": 0.5639,
+              "atm_iv_spread_pp": 0.02,
+              "common_strikes": 50
+            },
+            {
+              "expiry_date": "2026-12-25",
+              "binance_expiry": "2026-12-25T00:00:00+00:00",
+              "deribit_expiry": "2026-12-25T00:00:00+00:00",
+              "dte": 195.77,
+              "binance_atm_iv": 0.5883,
+              "deribit_atm_iv": 0.5888,
+              "atm_iv_spread_pp": -0.05,
+              "common_strikes": 39
+            },
+            {
+              "expiry_date": "2027-03-26",
+              "binance_expiry": "2027-03-26T00:00:00+00:00",
+              "deribit_expiry": "2027-03-26T00:00:00+00:00",
+              "dte": 286.77,
+              "binance_atm_iv": 0.6019,
+              "deribit_atm_iv": 0.6017,
+              "atm_iv_spread_pp": 0.02,
+              "common_strikes": 36
+            }
+          ],
+          "warnings": [
+            "only 9 shared strikes (requested ATM±5)"
+          ],
+          "disclaimer": "跨所 IV 对比基于各交易所 mark IV 与指数价，到期日/合约结构可能不同，仅供研究。"
+        },
+        "near_month": {
+          "available": true,
+          "iv_spread_pp": 0.85,
+          "abs_spread_pp": 0.85,
+          "richer_venue": "neutral",
+          "alert_level": "normal",
+          "index_spread_pct": 0.147,
+          "dte_gap": 0.0,
+          "aligned_expiry": true,
+          "summary": "ETH 两所近月 ATM IV 接近（差 +0.8pp）。",
+          "notes": [
+            "DTE：Binance 20.77d · Deribit 20.77d。"
+          ]
+        },
+        "disclaimer": "跨所 IV 对比基于各交易所 mark IV 与指数价，到期日/合约结构可能不同，仅供研究。",
+        "scanned_at": "2026-06-12T05:37:33.903379+00:00"
+      },
+      "strategy_pack": {
+        "headline": "维持观望",
+        "strategies": [
+          {
+            "id": "wait",
+            "name": "维持观望",
+            "rationale": "ETH 当前 IV 与方向未形成鲜明策略边际，宜轻仓或等待结构明朗。",
+            "legs": [],
+            "risk_level": "低",
+            "score": 0.4,
+            "base": "ETH",
+            "pnl": {
+              "per_contract": {
+                "available": false,
+                "reason": "无期权腿"
+              },
+              "scaled": {
+                "available": false
+              },
+              "stop_loss": {
+                "primary_rule": "观望策略，无期权腿止损线。",
+                "premium_stop_usd": null,
+                "spot_stop_levels": [],
+                "time_stop_dte": null,
+                "notes": []
+              },
+              "disclaimer": "盈亏与止损基于 mark 权利金及简化结构公式，未计手续费、滑点与保证金变动；止损为研究框架，不构成实盘交易指令。"
+            }
+          }
+        ],
+        "disclaimer": "以下为研究性策略框架示意，未计手续费、保证金与流动性；不构成投资建议。"
+      }
+    },
+    "advice": {
+      "base": "ETH",
+      "stance": "中性",
+      "summary": "ETH：中性。 IV 分位 3.64%，24h -4.1%。",
+      "actions": [
+        "ETH 期权波动未达告警阈值，可维持常规仓位管理。"
+      ],
+      "risks": [
+        "以下为基于隐含波动率规则的研究性提示，不构成投资建议。期权交易风险极高，请自行评估并控制仓位。"
+      ],
+      "reasons": [
+        "IV 历史分位约 3.64%（近月 ATM mark IV 0.5555）。",
+        "24 小时 IV 变化约 -4.1%。",
+        "横向波动综合排名 #4。"
+      ],
+      "confidence": 0.45
+    },
+    "alert_level": "normal",
+    "iv_percentile": 3.64,
+    "iv_change_24h_pct": -4.08,
+    "atm_iv": 0.5555,
+    "contract": "ETH-260703-1650-C",
+    "cold_start": false,
+    "peer_rank": 4,
+    "peer_count": 4,
+    "hottest_peer": "BTC",
+    "scanned_at": "2026-06-12T05:37:21.272684+00:00",
+    "cross_view": {
+      "alignment": "补充",
+      "summary": "现货与期权波动均未给出强方向，宜轻仓或观望。",
+      "notes": [
+        "近月 ATM 隐含波动率约 55.5%。",
+        "IV 历史分位约 3.64%。",
+        "24h IV 变化约 -4.1%。",
+        "横向波动排名 #4/4（含 BTC/ETH/SOL/BNB 等配置标的）。"
+      ],
+      "options_stance": "中性",
+      "spot_stance": "中性",
+      "spot_action": "hold"
+    },
+    "strike_ladder": {
+      "base": "ETH",
+      "spot": 1665.5528,
+      "expiry": "2026-07-03T00:00:00+00:00",
+      "dte": 20.77,
+      "n": 3,
+      "model": {
+        "enabled": true,
+        "sigma_ann": 0.255444,
+        "mu_ann": 0.288288,
+        "qlib": {
+          "enabled": true,
+          "signal": "中性",
+          "predicted_return": 0.001144,
+          "mu_ann": 0.288288
+        },
+        "assumptions": "GBM; realized vol + qlib drift; physical approx for model leg"
+      },
+      "rows": [
+        {
+          "strike": 1500.0,
+          "side": "C",
+          "symbol": "ETH-260703-1500-C",
+          "moneyness_pct": -9.94,
+          "mark_iv": 0.6032,
+          "model": {
+            "expiry_itm_call": 0.9748,
+            "touch_call": 1.0,
+            "expiry_itm_put": 0.0252,
+            "touch_put": 1.0
+          },
+          "implied": {
+            "expiry_itm_call": 0.744,
+            "touch_call": null,
+            "expiry_itm_put": 0.256,
+            "touch_put": null
+          },
+          "edge_expiry": 0.2308,
+          "edge_expiry_put": -0.2308,
+          "purchase": {
+            "verdict": "可考虑买入",
+            "summary": "概率与方向尚可、IV 未极端，可小仓评估买方 Call（设止损/限仓）。",
+            "reasons": [
+              "模型到期 ITM 概率高于隐含约 23.1pp，定价偏保守。",
+              "模型估计到期 ITM 概率约 97%。",
+              "现货方向中性，买 Call 需依赖波动或突破。"
+            ],
+            "strike": 1500.0,
+            "symbol": "ETH-260703-1500-C"
+          },
+          "purchase_put": {
+            "verdict": "不建议买入",
+            "summary": "IV 偏贵或方向不支持，优先永续/现货对冲或卖 Put 结构。",
+            "reasons": [
+              "深度虚值 Put（现货高于行权价约 9.9%），博弈成本高。",
+              "隐含 Put 概率高于模型约 23.1pp，Put 偏贵。",
+              "方向中性，买 Put 需依赖下跌或对冲需求。"
+            ],
+            "strike": 1500.0,
+            "symbol": "ETH-260703-1500-P",
+            "side": "put"
+          }
+        },
+        {
+          "strike": 1550.0,
+          "side": "C",
+          "symbol": "ETH-260703-1550-C",
+          "moneyness_pct": -6.94,
+          "mark_iv": 0.583,
+          "model": {
+            "expiry_itm_call": 0.922,
+            "touch_call": 1.0,
+            "expiry_itm_put": 0.078,
+            "touch_put": 1.0
+          },
+          "implied": {
+            "expiry_itm_call": 0.6727,
+            "touch_call": null,
+            "expiry_itm_put": 0.3273,
+            "touch_put": null
+          },
+          "edge_expiry": 0.2493,
+          "edge_expiry_put": -0.2493,
+          "purchase": {
+            "verdict": "可考虑买入",
+            "summary": "概率与方向尚可、IV 未极端，可小仓评估买方 Call（设止损/限仓）。",
+            "reasons": [
+              "模型到期 ITM 概率高于隐含约 24.9pp，定价偏保守。",
+              "模型估计到期 ITM 概率约 92%。",
+              "现货方向中性，买 Call 需依赖波动或突破。"
+            ],
+            "strike": 1550.0,
+            "symbol": "ETH-260703-1550-C"
+          },
+          "purchase_put": {
+            "verdict": "不建议买入",
+            "summary": "IV 偏贵或方向不支持，优先永续/现货对冲或卖 Put 结构。",
+            "reasons": [
+              "虚值 Put 约 6.9%，需明显下跌才实质 ITM。",
+              "隐含 Put 概率高于模型约 24.9pp，Put 偏贵。",
+              "方向中性，买 Put 需依赖下跌或对冲需求。"
+            ],
+            "strike": 1550.0,
+            "symbol": "ETH-260703-1550-P",
+            "side": "put"
+          }
+        },
+        {
+          "strike": 1600.0,
+          "side": "C",
+          "symbol": "ETH-260703-1600-C",
+          "moneyness_pct": -3.94,
+          "mark_iv": 0.5674,
+          "model": {
+            "expiry_itm_call": 0.8153,
+            "touch_call": 1.0,
+            "expiry_itm_put": 0.1847,
+            "touch_put": 1.0
+          },
+          "implied": {
+            "expiry_itm_call": 0.5906,
+            "touch_call": null,
+            "expiry_itm_put": 0.4094,
+            "touch_put": null
+          },
+          "edge_expiry": 0.2248,
+          "edge_expiry_put": -0.2248,
+          "purchase": {
+            "verdict": "可考虑买入",
+            "summary": "概率与方向尚可、IV 未极端，可小仓评估买方 Call（设止损/限仓）。",
+            "reasons": [
+              "模型到期 ITM 概率高于隐含约 22.5pp，定价偏保守。",
+              "模型估计到期 ITM 概率约 82%。",
+              "现货方向中性，买 Call 需依赖波动或突破。"
+            ],
+            "strike": 1600.0,
+            "symbol": "ETH-260703-1600-C"
+          },
+          "purchase_put": {
+            "verdict": "不建议买入",
+            "summary": "IV 偏贵或方向不支持，优先永续/现货对冲或卖 Put 结构。",
+            "reasons": [
+              "虚值 Put 约 3.9%，需明显下跌才实质 ITM。",
+              "隐含 Put 概率高于模型约 22.5pp，Put 偏贵。",
+              "方向中性，买 Put 需依赖下跌或对冲需求。"
+            ],
+            "strike": 1600.0,
+            "symbol": "ETH-260703-1600-P",
+            "side": "put"
+          }
+        },
+        {
+          "strike": 1650.0,
+          "side": "C",
+          "symbol": "ETH-260703-1650-C",
+          "moneyness_pct": -0.93,
+          "mark_iv": 0.5555,
+          "model": {
+            "expiry_itm_call": 0.6527,
+            "touch_call": 1.0,
+            "expiry_itm_put": 0.3473,
+            "touch_put": 1.0
+          },
+          "implied": {
+            "expiry_itm_call": 0.5018,
+            "touch_call": null,
+            "expiry_itm_put": 0.4982,
+            "touch_put": null
+          },
+          "edge_expiry": 0.1509,
+          "edge_expiry_put": -0.1509,
+          "purchase": {
+            "verdict": "可考虑买入",
+            "summary": "概率与方向尚可、IV 未极端，可小仓评估买方 Call（设止损/限仓）。",
+            "reasons": [
+              "接近 ATM，Delta 与 Gamma 暴露适中。",
+              "模型到期 ITM 概率高于隐含约 15.1pp，定价偏保守。",
+              "模型估计到期 ITM 概率约 65%。",
+              "现货方向中性，买 Call 需依赖波动或突破。"
+            ],
+            "strike": 1650.0,
+            "symbol": "ETH-260703-1650-C"
+          },
+          "purchase_put": {
+            "verdict": "观望",
+            "summary": "信号混合，宜等待更好入场或改用 Put 价差。",
+            "reasons": [
+              "接近 ATM Put，对下行敏感。",
+              "隐含 Put 概率高于模型约 15.1pp，Put 偏贵。",
+              "方向中性，买 Put 需依赖下跌或对冲需求。"
+            ],
+            "strike": 1650.0,
+            "symbol": "ETH-260703-1650-P",
+            "side": "put"
+          }
+        },
+        {
+          "strike": 1700.0,
+          "side": "C",
+          "symbol": "ETH-260703-1700-C",
+          "moneyness_pct": 2.07,
+          "mark_iv": 0.5464,
+          "model": {
+            "expiry_itm_call": 0.4613,
+            "touch_call": 0.7932,
+            "expiry_itm_put": 0.5387,
+            "touch_put": 1.0
+          },
+          "implied": {
+            "expiry_itm_call": 0.4121,
+            "touch_call": null,
+            "expiry_itm_put": 0.5879,
+            "touch_put": null
+          },
+          "edge_expiry": 0.0492,
+          "edge_expiry_put": -0.0492,
+          "purchase": {
+            "verdict": "观望",
+            "summary": "信号混合，宜等待更好入场或改用价差降低权利金。",
+            "reasons": [
+              "模型略高于隐含（+4.9pp）。",
+              "现货方向中性，买 Call 需依赖波动或突破。"
+            ],
+            "strike": 1700.0,
+            "symbol": "ETH-260703-1700-C"
+          },
+          "purchase_put": {
+            "verdict": "观望",
+            "summary": "信号混合，宜等待更好入场或改用 Put 价差。",
+            "reasons": [
+              "方向中性，买 Put 需依赖下跌或对冲需求。"
+            ],
+            "strike": 1700.0,
+            "symbol": "ETH-260703-1700-P",
+            "side": "put"
+          }
+        },
+        {
+          "strike": 1750.0,
+          "side": "C",
+          "symbol": "ETH-260703-1750-C",
+          "moneyness_pct": 5.07,
+          "mark_iv": 0.5402,
+          "model": {
+            "expiry_itm_call": 0.2834,
+            "touch_call": 0.4996,
+            "expiry_itm_put": 0.7166,
+            "touch_put": 1.0
+          },
+          "implied": {
+            "expiry_itm_call": 0.327,
+            "touch_call": null,
+            "expiry_itm_put": 0.673,
+            "touch_put": null
+          },
+          "edge_expiry": -0.0436,
+          "edge_expiry_put": 0.0436,
+          "purchase": {
+            "verdict": "不建议买入",
+            "summary": "IV 偏贵或概率/方向不支持，优先现货/永续或卖波动结构。",
+            "reasons": [
+              "虚值约 5.1%，需较大涨幅才能实质 ITM。",
+              "现货方向中性，买 Call 需依赖波动或突破。"
+            ],
+            "strike": 1750.0,
+            "symbol": "ETH-260703-1750-C"
+          },
+          "purchase_put": {
+            "verdict": "观望",
+            "summary": "信号混合，宜等待更好入场或改用 Put 价差。",
+            "reasons": [
+              "模型估计到期 ITM Put 概率约 72%。",
+              "方向中性，买 Put 需依赖下跌或对冲需求。"
+            ],
+            "strike": 1750.0,
+            "symbol": "ETH-260703-1750-P",
+            "side": "put"
+          }
+        },
+        {
+          "strike": 1800.0,
+          "side": "C",
+          "symbol": "ETH-260703-1800-C",
+          "moneyness_pct": 8.07,
+          "mark_iv": 0.5375,
+          "model": {
+            "expiry_itm_call": 0.1503,
+            "touch_call": 0.27,
+            "expiry_itm_put": 0.8497,
+            "touch_put": 1.0
+          },
+          "implied": {
+            "expiry_itm_call": 0.2516,
+            "touch_call": null,
+            "expiry_itm_put": 0.7484,
+            "touch_put": null
+          },
+          "edge_expiry": -0.1013,
+          "edge_expiry_put": 0.1013,
+          "purchase": {
+            "verdict": "不建议买入",
+            "summary": "IV 偏贵或概率/方向不支持，优先现货/永续或卖波动结构。",
+            "reasons": [
+              "深度虚值约 8.1%，到期 ITM 概率偏低，属高杠杆博弈。",
+              "隐含概率高于模型约 10.1pp，Call 偏贵。",
+              "模型到期 ITM 仅约 15%，赔率差。",
+              "现货方向中性，买 Call 需依赖波动或突破。"
+            ],
+            "strike": 1800.0,
+            "symbol": "ETH-260703-1800-C"
+          },
+          "purchase_put": {
+            "verdict": "可考虑买入",
+            "summary": "概率与对冲/方向尚可，可小仓评估买方 Put（设止损/限仓）。",
+            "reasons": [
+              "模型 Put ITM 概率高于隐含约 10.1pp。",
+              "模型估计到期 ITM Put 概率约 85%。",
+              "方向中性，买 Put 需依赖下跌或对冲需求。"
+            ],
+            "strike": 1800.0,
+            "symbol": "ETH-260703-1800-P",
+            "side": "put"
+          }
+        }
+      ],
+      "warnings": [],
+      "disclaimer": "研究用途。模型概率（历史波动 + qlib 漂移，GBM）与期权隐含概率（风险中性）口径不同，不构成投资建议。",
+      "purchase_summary": {
+        "headline": "相对更可关注 1550.0 Call：概率与方向尚可、IV 未极端，可小仓评估买方 Call（设止损/限仓）。",
+        "spot_stance": "中性",
+        "iv_alert_level": "normal",
+        "consider_count": 4,
+        "avoid_count": 2,
+        "best_strike": 1550.0,
+        "best_contract": "ETH-260703-1550-C"
+      },
+      "purchase_disclaimer": "行权价建议仅综合概率差、现货方向与 IV 环境，未计手续费、滑点与流动性；不构成投资建议。",
+      "strategy_pack": {
+        "headline": "观望",
+        "strategies": [
+          {
+            "id": "wait",
+            "name": "观望",
+            "rationale": "ETH 期权数据不可用，暂不建议新建期权仓位。",
+            "legs": [],
+            "risk_level": "低",
+            "score": 0.0,
+            "base": "ETH",
+            "pnl": {
+              "per_contract": {
+                "available": false,
+                "reason": "无期权腿"
+              },
+              "scaled": {
+                "available": false
+              },
+              "stop_loss": {
+                "primary_rule": "观望策略，无期权腿止损线。",
+                "premium_stop_usd": null,
+                "spot_stop_levels": [],
+                "time_stop_dte": null,
+                "notes": []
+              },
+              "disclaimer": "盈亏与止损基于 mark 权利金及简化结构公式，未计手续费、滑点与保证金变动；止损为研究框架，不构成实盘交易指令。"
+            }
+          }
+        ],
+        "disclaimer": "以下为研究性策略框架示意，未计手续费、保证金与流动性；不构成投资建议。"
+      }
+    },
+    "strategy_pack": {
+      "headline": "维持观望",
+      "strategies": [
+        {
+          "id": "wait",
+          "name": "维持观望",
+          "rationale": "ETH 当前 IV 与方向未形成鲜明策略边际，宜轻仓或等待结构明朗。",
+          "legs": [],
+          "risk_level": "低",
+          "score": 0.4,
+          "base": "ETH",
+          "pnl": {
+            "per_contract": {
+              "available": false,
+              "reason": "无期权腿"
+            },
+            "scaled": {
+              "available": false
+            },
+            "stop_loss": {
+              "primary_rule": "观望策略，无期权腿止损线。",
+              "premium_stop_usd": null,
+              "spot_stop_levels": [],
+              "time_stop_dte": null,
+              "notes": []
+            },
+            "disclaimer": "盈亏与止损基于 mark 权利金及简化结构公式，未计手续费、滑点与保证金变动；止损为研究框架，不构成实盘交易指令。"
+          }
+        }
+      ],
+      "disclaimer": "以下为研究性策略框架示意，未计手续费、保证金与流动性；不构成投资建议。"
+    },
+    "venue_compare": {
+      "base": "ETH",
+      "binance": {
+        "enabled": true,
+        "venue": "binance",
+        "atm_iv": 0.5555,
+        "contract": "ETH-260703-1650-C",
+        "expiry": "2026-07-03T00:00:00+00:00",
+        "dte": 20.77,
+        "strike": 1650.0,
+        "underlying_price": 1665.5528,
+        "open_interest": null
+      },
+      "deribit": {
+        "enabled": true,
+        "venue": "deribit",
+        "atm_iv": 0.547,
+        "contract": "ETH-3JUL26-1650-C",
+        "expiry": "2026-07-03T00:00:00+00:00",
+        "dte": 20.77,
+        "strike": 1650.0,
+        "underlying_price": 1663.42,
+        "open_interest": 336.0
+      },
+      "comparison": {
+        "available": true,
+        "iv_spread_pp": 0.85,
+        "abs_spread_pp": 0.85,
+        "richer_venue": "neutral",
+        "alert_level": "normal",
+        "index_spread_pct": 0.128,
+        "dte_gap": 0.0,
+        "aligned_expiry": true,
+        "summary": "ETH 同到期 2026-07-03 ATM IV 接近（差 +0.8pp）。",
+        "notes": [
+          "DTE：Binance 20.77d · Deribit 20.77d。"
+        ],
+        "mode": "aligned_expiry",
+        "expiry_date": "2026-07-03",
+        "near_month_iv_spread_pp": 0.85,
+        "near_month_summary": "ETH 两所近月 ATM IV 接近（差 +0.8pp）。"
+      },
+      "aligned": {
+        "base": "ETH",
+        "available": true,
+        "expiry_date": "2026-07-03",
+        "binance_expiry": "2026-07-03T00:00:00+00:00",
+        "deribit_expiry": "2026-07-03T00:00:00+00:00",
+        "dte": 20.77,
+        "binance_spot": 1665.5527907,
+        "deribit_spot": 1663.29,
+        "atm_strike": 1650.0,
+        "atm": {
+          "strike": 1650.0,
+          "binance_iv": 0.5555,
+          "deribit_iv": 0.547,
+          "iv_spread_pp": 0.85,
+          "binance_symbol": "ETH-260703-1650-C",
+          "deribit_symbol": "ETH-3JUL26-1650-C"
+        },
+        "comparison": {
+          "iv_spread_pp": 0.85,
+          "abs_spread_pp": 0.85,
+          "richer_venue": "neutral",
+          "alert_level": "normal",
+          "aligned_expiry": true,
+          "summary": "ETH 同到期 2026-07-03 ATM IV 接近（差 +0.8pp）。",
+          "strike_spread_range_pp": 0.84
+        },
+        "rows": [
+          {
+            "strike": 1400.0,
+            "moneyness_pct": -15.94,
+            "binance_iv": 0.6531,
+            "deribit_iv": 0.6415,
+            "iv_spread_pp": 1.16,
+            "binance_symbol": "ETH-260703-1400-C",
+            "deribit_symbol": "ETH-3JUL26-1400-C"
+          },
+          {
+            "strike": 1500.0,
+            "moneyness_pct": -9.94,
+            "binance_iv": 0.6032,
+            "deribit_iv": 0.5937,
+            "iv_spread_pp": 0.95,
+            "binance_symbol": "ETH-260703-1500-C",
+            "deribit_symbol": "ETH-3JUL26-1500-C"
+          },
+          {
+            "strike": 1550.0,
+            "moneyness_pct": -6.94,
+            "binance_iv": 0.583,
+            "deribit_iv": 0.5737,
+            "iv_spread_pp": 0.93,
+            "binance_symbol": "ETH-260703-1550-C",
+            "deribit_symbol": "ETH-3JUL26-1550-C"
+          },
+          {
+            "strike": 1600.0,
+            "moneyness_pct": -3.94,
+            "binance_iv": 0.5674,
+            "deribit_iv": 0.5586,
+            "iv_spread_pp": 0.88,
+            "binance_symbol": "ETH-260703-1600-C",
+            "deribit_symbol": "ETH-3JUL26-1600-C"
+          },
+          {
+            "strike": 1650.0,
+            "moneyness_pct": -0.93,
+            "binance_iv": 0.5555,
+            "deribit_iv": 0.547,
+            "iv_spread_pp": 0.85,
+            "binance_symbol": "ETH-260703-1650-C",
+            "deribit_symbol": "ETH-3JUL26-1650-C"
+          },
+          {
+            "strike": 1700.0,
+            "moneyness_pct": 2.07,
+            "binance_iv": 0.5464,
+            "deribit_iv": 0.5379,
+            "iv_spread_pp": 0.85,
+            "binance_symbol": "ETH-260703-1700-C",
+            "deribit_symbol": "ETH-3JUL26-1700-C"
+          },
+          {
+            "strike": 1750.0,
+            "moneyness_pct": 5.07,
+            "binance_iv": 0.5402,
+            "deribit_iv": 0.5314,
+            "iv_spread_pp": 0.88,
+            "binance_symbol": "ETH-260703-1750-C",
+            "deribit_symbol": "ETH-3JUL26-1750-C"
+          },
+          {
+            "strike": 1800.0,
+            "moneyness_pct": 8.07,
+            "binance_iv": 0.5375,
+            "deribit_iv": 0.5314,
+            "iv_spread_pp": 0.61,
+            "binance_symbol": "ETH-260703-1800-C",
+            "deribit_symbol": "ETH-3JUL26-1800-C"
+          },
+          {
+            "strike": 2000.0,
+            "moneyness_pct": 20.08,
+            "binance_iv": 0.5477,
+            "deribit_iv": 0.5445,
+            "iv_spread_pp": 0.32,
+            "binance_symbol": "ETH-260703-2000-C",
+            "deribit_symbol": "ETH-3JUL26-2000-C"
+          }
+        ],
+        "common_expiries": [
+          {
+            "expiry_date": "2026-06-26",
+            "binance_expiry": "2026-06-26T00:00:00+00:00",
+            "deribit_expiry": "2026-06-26T00:00:00+00:00",
+            "dte": 13.77,
+            "binance_atm_iv": 0.5424,
+            "deribit_atm_iv": 0.545,
+            "atm_iv_spread_pp": -0.26,
+            "common_strikes": 56
+          },
+          {
+            "expiry_date": "2026-07-03",
+            "binance_expiry": "2026-07-03T00:00:00+00:00",
+            "deribit_expiry": "2026-07-03T00:00:00+00:00",
+            "dte": 20.77,
+            "binance_atm_iv": 0.5555,
+            "deribit_atm_iv": 0.547,
+            "atm_iv_spread_pp": 0.85,
+            "common_strikes": 9
+          },
+          {
+            "expiry_date": "2026-07-31",
+            "binance_expiry": "2026-07-31T00:00:00+00:00",
+            "deribit_expiry": "2026-07-31T00:00:00+00:00",
+            "dte": 48.77,
+            "binance_atm_iv": 0.5546,
+            "deribit_atm_iv": 0.5546,
+            "atm_iv_spread_pp": 0.0,
+            "common_strikes": 41
+          },
+          {
+            "expiry_date": "2026-08-28",
+            "binance_expiry": "2026-08-28T00:00:00+00:00",
+            "deribit_expiry": "2026-08-28T00:00:00+00:00",
+            "dte": 76.77,
+            "binance_atm_iv": 0.5629,
+            "deribit_atm_iv": 0.5636,
+            "atm_iv_spread_pp": -0.07,
+            "common_strikes": 24
+          },
+          {
+            "expiry_date": "2026-09-25",
+            "binance_expiry": "2026-09-25T00:00:00+00:00",
+            "deribit_expiry": "2026-09-25T00:00:00+00:00",
+            "dte": 104.77,
+            "binance_atm_iv": 0.5639,
+            "deribit_atm_iv": 0.5639,
+            "atm_iv_spread_pp": 0.0,
+            "common_strikes": 50
+          },
+          {
+            "expiry_date": "2026-12-25",
+            "binance_expiry": "2026-12-25T00:00:00+00:00",
+            "deribit_expiry": "2026-12-25T00:00:00+00:00",
+            "dte": 195.77,
+            "binance_atm_iv": 0.5882,
+            "deribit_atm_iv": 0.5889,
+            "atm_iv_spread_pp": -0.07,
+            "common_strikes": 39
+          },
+          {
+            "expiry_date": "2027-03-26",
+            "binance_expiry": "2027-03-26T00:00:00+00:00",
+            "deribit_expiry": "2027-03-26T00:00:00+00:00",
+            "dte": 286.77,
+            "binance_atm_iv": 0.6019,
+            "deribit_atm_iv": 0.6017,
+            "atm_iv_spread_pp": 0.02,
+            "common_strikes": 36
+          }
+        ],
+        "warnings": [
+          "only 9 shared strikes (requested ATM±5)"
+        ],
+        "disclaimer": "跨所 IV 对比基于各交易所 mark IV 与指数价，到期日/合约结构可能不同，仅供研究。"
+      },
+      "near_month": {
+        "available": true,
+        "iv_spread_pp": 0.85,
+        "abs_spread_pp": 0.85,
+        "richer_venue": "neutral",
+        "alert_level": "normal",
+        "index_spread_pct": 0.128,
+        "dte_gap": 0.0,
+        "aligned_expiry": true,
+        "summary": "ETH 两所近月 ATM IV 接近（差 +0.8pp）。",
+        "notes": [
+          "DTE：Binance 20.77d · Deribit 20.77d。"
+        ]
+      },
+      "disclaimer": "跨所 IV 对比基于各交易所 mark IV 与指数价，到期日/合约结构可能不同，仅供研究。",
+      "scanned_at": "2026-06-12T05:38:13.670457+00:00"
+    }
+  },
+  "news_digest": null,
+  "report_path": "/Users/worldunion/projects/pythonprojects/claudedemo/quant_rd_tool/data/crypto/CRYPTO_ETH/report.json"
+}

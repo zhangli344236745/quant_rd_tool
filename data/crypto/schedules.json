@@ -17,8 +17,8 @@
       "job_type": "analysis",
       "created_at": "2026-05-27T05:12:25.749481+00:00",
       "status": "stopped",
-      "run_count": 31,
-      "last_run_at": "2026-06-08T09:12:44.255173+00:00",
+      "run_count": 32,
+      "last_run_at": "2026-06-12T05:35:20.694593+00:00",
       "last_error": null,
       "started_at": null,
       "next_run_at": null,
@@ -28,22 +28,22 @@
           "pair": "BTC/USDT",
           "stance": "中性",
           "action": "hold",
-          "new_bars": 1,
+          "new_bars": 1020,
           "iv_alert_level": "normal",
           "options_stance": "中性",
-          "iv_percentile": 10.71,
-          "iv_change_24h_pct": -3.68
+          "iv_percentile": 3.77,
+          "iv_change_24h_pct": -5.48
         },
         {
           "symbol": "ETH",
           "pair": "ETH/USDT",
-          "stance": "中性",
-          "action": "hold",
-          "new_bars": 1,
+          "stance": "看跌",
+          "action": "sell",
+          "new_bars": 1020,
           "iv_alert_level": "normal",
           "options_stance": "中性",
-          "iv_percentile": 78.57,
-          "iv_change_24h_pct": 0.53
+          "iv_percentile": 3.77,
+          "iv_change_24h_pct": -4.04
         }
       ]
     }

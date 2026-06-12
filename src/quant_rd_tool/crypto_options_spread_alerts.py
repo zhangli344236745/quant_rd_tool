@@ -162,18 +162,28 @@ def _deliver_notification(
     if not cfg.get("bark_on_alert", True):
         return
     try:
+        from quant_rd_tool.notification_format import format_schedule_alert_bark
         from quant_rd_tool.schedule_alerts import get_alert_rules
         from quant_rd_tool.bark_push import post_bark
 
         rules = get_alert_rules()
-        bark = rules.get("bark") if isinstance(rules.get("bark"), dict) else {}
-        if not bark.get("enabled") or not bark.get("device_key"):
+        bark_cfg = rules.get("bark") if isinstance(rules.get("bark"), dict) else {}
+        if not bark_cfg.get("enabled") or not bark_cfg.get("device_key"):
             return
+        base = str(detail.get("base") or "")
+        bark = format_schedule_alert_bark(
+            job_id=base or "options",
+            rule="options_spread_alert",
+            message=message,
+            detail={"headline": title, **detail},
+        )
         post_bark(
-            str(bark["device_key"]),
-            title=title[:200],
-            body=message[:4000],
-            server=str(bark.get("server") or "https://api.day.app"),
+            str(bark_cfg["device_key"]),
+            title=bark["title"],
+            body=bark["body"],
+            subtitle=bark.get("subtitle"),
+            level=bark.get("level"),
+            server=str(bark_cfg.get("server") or "https://api.day.app"),
             group="options-spread",
         )
     except Exception:

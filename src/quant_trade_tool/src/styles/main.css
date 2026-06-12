@@ -180,3 +180,35 @@ body {
   --el-tag-border-color: rgba(240, 113, 120, 0.35);
   --el-tag-text-color: var(--danger);
 }
+
+.el-notification.qrd-notify {
+  border: 1px solid var(--border);
+  border-left-width: 4px;
+  border-radius: 10px;
+  background: var(--bg-panel);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  min-width: 300px;
+}
+
+.el-notification.qrd-notify.el-notification--success {
+  border-left-color: var(--el-color-success);
+}
+.el-notification.qrd-notify.el-notification--warning {
+  border-left-color: var(--el-color-warning);
+}
+.el-notification.qrd-notify.el-notification--error {
+  border-left-color: var(--el-color-danger);
+}
+.el-notification.qrd-notify.el-notification--info {
+  border-left-color: var(--el-color-info);
+}
+
+.el-notification.qrd-notify .el-notification__title {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.el-notification.qrd-notify .el-notification__content {
+  color: var(--text-muted);
+  line-height: 1.45;
+}

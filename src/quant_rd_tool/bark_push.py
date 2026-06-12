@@ -17,6 +17,8 @@ def post_bark(
     body: str,
     server: str = DEFAULT_BARK_SERVER,
     group: str = "quant-rd",
+    subtitle: str | None = None,
+    level: str | None = None,
     timeout: float = 10.0,
 ) -> dict[str, Any]:
     """Send a Bark notification. Raises on HTTP or config errors."""
@@ -26,13 +28,15 @@ def post_bark(
 
     base = str(server or DEFAULT_BARK_SERVER).strip().rstrip("/")
     url = f"{base}/{key}"
-    payload = {
+    payload: dict[str, Any] = {
         "title": (title or "quant-rd")[:200],
         "body": (body or "")[:4000],
         "group": group[:50],
         "isArchive": "1",
-        "level": "active",
+        "level": (level or "active"),
     }
+    if subtitle:
+        payload["subtitle"] = str(subtitle)[:100]
     try:
         with httpx.Client(timeout=timeout) as client:
             resp = client.post(url, json=payload)

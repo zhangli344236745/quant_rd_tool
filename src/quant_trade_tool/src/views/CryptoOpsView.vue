@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useRouter } from "vue-router";
-import { ElMessage } from "element-plus";
 import { cryptoApi, type PortfolioVarReport } from "@/api/crypto";
 import { extractError } from "@/api/http";
+import AlertFeedPanel from "@/components/AlertFeedPanel.vue";
+import { useNotify } from "@/composables/useNotify";
 
 const router = useRouter();
+const notify = useNotify();
 const dataDir = "data/crypto";
 const logDir = "data/crypto/perp_logs";
 
@@ -93,12 +95,12 @@ async function cancelOne() {
   canceling.value = true;
   try {
     await cryptoApi.perpCancelOrder({ base: ordersBase.value, order_id: cancelOrderId.value.trim() });
-    ElMessage.success("已提交取消");
+    notify.success("已提交取消");
     cancelOrderId.value = "";
     await loadOpenOrders();
     await refreshAll();
   } catch (e) {
-    ElMessage.error(extractError(e));
+    notify.error("取消失败", extractError(e));
   } finally {
     canceling.value = false;
   }
@@ -109,11 +111,11 @@ async function cancelAll() {
   cancelAllLoading.value = true;
   try {
     await cryptoApi.perpCancelAllOrders({ base: ordersBase.value });
-    ElMessage.success("已提交一键取消挂单");
+    notify.success("已提交一键取消挂单");
     await loadOpenOrders();
     await refreshAll();
   } catch (e) {
-    ElMessage.error(extractError(e));
+    notify.error("取消失败", extractError(e));
   } finally {
     cancelAllLoading.value = false;
   }
@@ -124,11 +126,11 @@ async function closePosition() {
   closingLoading.value = true;
   try {
     await cryptoApi.perpClosePosition({ base: ordersBase.value });
-    ElMessage.success("已提交平仓");
+    notify.success("已提交平仓");
     await loadOpenOrders();
     await refreshAll();
   } catch (e) {
-    ElMessage.error(extractError(e));
+    notify.error("取消失败", extractError(e));
   } finally {
     closingLoading.value = false;
   }
@@ -139,11 +141,11 @@ async function reconcileProtection() {
   reconciling.value = true;
   try {
     await cryptoApi.perpReconcileProtection({ base: ordersBase.value, data_dir: dataDir });
-    ElMessage.success("已提交保护单对账/重建（best-effort）");
+    notify.success("保护单对账已提交", "best-effort 重建");
     await loadOpenOrders();
     await refreshAll();
   } catch (e) {
-    ElMessage.error(extractError(e));
+    notify.error("取消失败", extractError(e));
   } finally {
     reconciling.value = false;
   }
@@ -170,10 +172,10 @@ async function saveControl() {
       webhook_on_error: webhookOnError.value,
       webhook_on_circuit_breaker: webhookOnCb.value,
     });
-    ElMessage.success("运营控制已保存");
+    notify.success("运营控制已保存");
     await loadSummary();
   } catch (e) {
-    ElMessage.error(extractError(e));
+    notify.error("取消失败", extractError(e));
   } finally {
     controlSaving.value = false;
   }
@@ -182,9 +184,9 @@ async function saveControl() {
 async function testWebhook() {
   try {
     await cryptoApi.opsTestWebhook();
-    ElMessage.success("测试 Webhook 已发送");
+    notify.success("Webhook 测试已发送");
   } catch (e) {
-    ElMessage.error(extractError(e));
+    notify.error("取消失败", extractError(e));
   }
 }
 
@@ -219,7 +221,7 @@ async function loadTelemetry() {
     });
     telemetryItems.value = [...data.items].reverse();
   } catch (e) {
-    ElMessage.error(extractError(e));
+    notify.error("取消失败", extractError(e));
   }
 }
 
@@ -273,7 +275,7 @@ async function reloadTrades() {
     const { data } = await cryptoApi.perpAccountTrades({ base: acctTradeBase.value, limit: 20, testnet: false });
     acctTrades.value = (data.items as Record<string, unknown>[]) || [];
   } catch (e) {
-    ElMessage.error(extractError(e));
+    notify.error("取消失败", extractError(e));
   }
 }
 
@@ -300,10 +302,10 @@ async function quickSignalOnly(base: string) {
       testnet: false,
       signal_only: true,
     });
-    ElMessage.success(`${base} signal-only 已执行`);
+    notify.success(`${base} 信号轮询完成`, "signal-only dry-run");
     await refreshAll();
   } catch (e) {
-    ElMessage.error(extractError(e));
+    notify.error("取消失败", extractError(e));
   }
 }
 
@@ -542,14 +544,13 @@ onUnmounted(() => {
         </el-card>
 
         <el-card v-if="summary?.schedule_alert_recent?.length" shadow="never" class="panel-card mt">
-          <template #header>调度告警（最近）</template>
-          <el-table :data="summary.schedule_alert_recent" size="small" max-height="160">
-            <el-table-column prop="ts" label="时间" width="170" show-overflow-tooltip />
-            <el-table-column prop="job_id" label="任务" width="110" />
-            <el-table-column prop="rule" label="规则" width="130" />
-            <el-table-column prop="message" label="说明" min-width="160" show-overflow-tooltip />
-          </el-table>
-          <el-button link type="primary" class="mt" @click="router.push('/schedules')">配置规则 →</el-button>
+          <template #header>
+            <span>调度告警（最近）</span>
+            <el-button link type="primary" size="small" @click="router.push('/schedules')">
+              配置规则 →
+            </el-button>
+          </template>
+          <AlertFeedPanel :items="summary.schedule_alert_recent" :max-height="200" />
         </el-card>
 
         <el-card shadow="never" class="panel-card mt">

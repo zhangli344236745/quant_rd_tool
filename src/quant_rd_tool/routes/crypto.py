@@ -63,6 +63,61 @@ class CryptoBotRequest(BaseModel):
     testnet: bool = False
     signal_only: bool = False
 
+    # Risk / sizing
+    sizing_mode: str = "hybrid"  # fixed | atr | hybrid
+    risk_fraction: float = 0.5
+    min_signal_confidence: float = 0.0
+    use_atr_sl_tp: bool = True
+    sl_pct: float = 0.03
+    tp_pct: float = 0.06
+    sl_atr: float = 1.5
+    tp_atr: float = 2.5
+
+    # Signal enhancement
+    use_enhanced_signal: bool = True
+    require_htf_confirm: bool = True
+    require_volume_confirm: bool = False
+    min_atr_pct: float = 0.0
+    max_atr_pct: float = 0.0
+    volume_min_ratio: float = 1.0
+
+    # Paper trading
+    paper_mode: bool = False
+    paper_initial_cash: float = 10_000.0
+    fee_pct: float = 0.001
+    slippage_pct: float = 0.0005
+
+
+def _build_bot_config(req: CryptoBotRequest) -> BotConfig:
+    return BotConfig(
+        symbol=req.symbol,
+        quote=req.quote,
+        quote_amount=req.quote_amount,
+        timeframe=req.timeframe,
+        dry_run=req.dry_run,
+        testnet=req.testnet or settings.binance_testnet,
+        api_key=settings.binance_api_key,
+        api_secret=settings.binance_api_secret,
+        sizing_mode=req.sizing_mode,  # type: ignore[arg-type]
+        risk_fraction=req.risk_fraction,
+        min_signal_confidence=req.min_signal_confidence,
+        use_atr_sl_tp=req.use_atr_sl_tp,
+        sl_pct=req.sl_pct,
+        tp_pct=req.tp_pct,
+        sl_atr=req.sl_atr,
+        tp_atr=req.tp_atr,
+        use_enhanced_signal=req.use_enhanced_signal,
+        require_htf_confirm=req.require_htf_confirm,
+        require_volume_confirm=req.require_volume_confirm,
+        min_atr_pct=req.min_atr_pct,
+        max_atr_pct=req.max_atr_pct,
+        volume_min_ratio=req.volume_min_ratio,
+        paper_mode=req.paper_mode,
+        paper_initial_cash=req.paper_initial_cash,
+        fee_pct=req.fee_pct,
+        slippage_pct=req.slippage_pct,
+    )
+
 
 class CryptoPerpPortfolioRequest(BaseModel):
     symbols: list[str] = Field(default_factory=lambda: ["BTC", "ETH"])
@@ -177,19 +232,13 @@ def crypto_ml(req: CryptoMlRequest) -> dict[str, Any]:
 
 @router.post("/bot/run")
 def crypto_bot_run(req: CryptoBotRequest) -> dict[str, Any]:
-    if not req.dry_run and not (settings.binance_api_key and settings.binance_api_secret):
-        raise HTTPException(status_code=400, detail="实盘需配置 BINANCE_API_KEY / BINANCE_API_SECRET")
-    cfg = BotConfig(
-        symbol=req.symbol,
-        quote=req.quote,
-        quote_amount=req.quote_amount,
-        timeframe=req.timeframe,
-        dry_run=req.dry_run,
-        testnet=req.testnet or settings.binance_testnet,
-        api_key=settings.binance_api_key,
-        api_secret=settings.binance_api_secret,
-    )
-    bot = BinanceBot(cfg)
+    if not req.dry_run and not req.paper_mode and not (
+        settings.binance_api_key and settings.binance_api_secret
+    ):
+        raise HTTPException(
+            status_code=400, detail="实盘需配置 BINANCE_API_KEY / BINANCE_API_SECRET"
+        )
+    bot = BinanceBot(_build_bot_config(req))
     try:
         if req.signal_only:
             return bot.fetch_signal()
@@ -200,11 +249,28 @@ def crypto_bot_run(req: CryptoBotRequest) -> dict[str, Any]:
         raise HTTPException(status_code=503, detail=str(e)) from e
 
 
-@router.post("/perp-bot/run")
-def crypto_perp_bot_run(req: CryptoPerpBotRequest) -> dict[str, Any]:
-    if not req.dry_run and not (settings.binance_api_key and settings.binance_api_secret):
-        raise HTTPException(status_code=400, detail="实盘需配置 BINANCE_API_KEY / BINANCE_API_SECRET")
-    cfg = PerpBotConfig(
+@router.get("/bot/paper/performance")
+def crypto_bot_paper_performance(
+    symbol: str = "BTC",
+    quote: str = "USDT",
+    paper_initial_cash: float = 10_000.0,
+) -> dict[str, Any]:
+    bot = BinanceBot(
+        BotConfig(
+            symbol=symbol, quote=quote, paper_mode=True, paper_initial_cash=paper_initial_cash
+        )
+    )
+    return bot.paper_performance()
+
+
+@router.post("/bot/paper/reset")
+def crypto_bot_paper_reset(req: CryptoBotRequest) -> dict[str, Any]:
+    bot = BinanceBot(_build_bot_config(req))
+    return bot.reset_paper()
+
+
+def _build_perp_bot_config(req: CryptoPerpBotRequest) -> PerpBotConfig:
+    return PerpBotConfig(
         base=req.base,
         quote=req.quote,
         timeframe=req.timeframe,
@@ -228,8 +294,107 @@ def crypto_perp_bot_run(req: CryptoPerpBotRequest) -> dict[str, Any]:
         api_key=settings.binance_api_key,
         api_secret=settings.binance_api_secret,
         ccxt_symbol=req.ccxt_symbol,
+        interval_minutes=10,
     )
-    bot = BinancePerpBot(cfg)
+
+
+class BotScheduleRequest(BaseModel):
+    bot_id: str = ""
+    kind: str = "spot"  # spot | perp
+    interval_minutes: int = 60
+    spot: CryptoBotRequest | None = None
+    perp: CryptoPerpBotRequest | None = None
+
+
+@router.get("/bot/scheduler/status")
+def crypto_bot_scheduler_status() -> dict[str, Any]:
+    from quant_rd_tool.crypto_bot_scheduler import get_scheduler
+
+    return {"bots": get_scheduler().status()}
+
+
+@router.post("/bot/scheduler/register")
+def crypto_bot_scheduler_register(req: BotScheduleRequest) -> dict[str, Any]:
+    from quant_rd_tool.crypto_bot_scheduler import get_scheduler
+
+    kind = (req.kind or "spot").strip().lower()
+    if kind not in ("spot", "perp"):
+        raise HTTPException(status_code=400, detail="kind 须为 spot 或 perp")
+
+    sched = get_scheduler()
+    try:
+        if kind == "spot":
+            if req.spot is None:
+                raise HTTPException(status_code=400, detail="spot 调度需提供 spot 配置")
+            spot_req = req.spot
+            if not spot_req.dry_run and not spot_req.paper_mode and not (
+                settings.binance_api_key and settings.binance_api_secret
+            ):
+                raise HTTPException(status_code=400, detail="实盘调度需配置 API Key")
+            bot_id = req.bot_id.strip() or f"spot-{spot_req.symbol.upper()}-{spot_req.timeframe}"
+            cfg = _build_bot_config(spot_req)
+            managed = sched.register(
+                bot_id=bot_id,
+                kind="spot",
+                config=cfg.__dict__,
+                interval_minutes=req.interval_minutes,
+            )
+        else:
+            if req.perp is None:
+                raise HTTPException(status_code=400, detail="perp 调度需提供 perp 配置")
+            perp_req = req.perp
+            if not perp_req.dry_run and not (
+                settings.binance_api_key and settings.binance_api_secret
+            ):
+                raise HTTPException(status_code=400, detail="永续实盘调度需配置 API Key")
+            bot_id = req.bot_id.strip() or f"perp-{perp_req.base.upper()}-{perp_req.timeframe}"
+            cfg = _build_perp_bot_config(perp_req)
+            managed = sched.register(
+                bot_id=bot_id,
+                kind="perp",
+                config=cfg.__dict__,
+                interval_minutes=req.interval_minutes,
+            )
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e)) from e
+    return managed.public()
+
+
+@router.post("/bot/scheduler/start")
+def crypto_bot_scheduler_start(bot_id: str = Query(...)) -> dict[str, Any]:
+    from quant_rd_tool.crypto_bot_scheduler import get_scheduler
+
+    try:
+        return get_scheduler().start(bot_id)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+
+
+@router.post("/bot/scheduler/stop")
+def crypto_bot_scheduler_stop(bot_id: str = Query(...)) -> dict[str, Any]:
+    from quant_rd_tool.crypto_bot_scheduler import get_scheduler
+
+    try:
+        return get_scheduler().stop(bot_id)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+
+
+@router.post("/bot/scheduler/remove")
+def crypto_bot_scheduler_remove(bot_id: str = Query(...)) -> dict[str, Any]:
+    from quant_rd_tool.crypto_bot_scheduler import get_scheduler
+
+    try:
+        return get_scheduler().remove(bot_id)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+
+
+@router.post("/perp-bot/run")
+def crypto_perp_bot_run(req: CryptoPerpBotRequest) -> dict[str, Any]:
+    if not req.dry_run and not (settings.binance_api_key and settings.binance_api_secret):
+        raise HTTPException(status_code=400, detail="实盘需配置 BINANCE_API_KEY / BINANCE_API_SECRET")
+    bot = BinancePerpBot(_build_perp_bot_config(req))
     try:
         if req.signal_only:
             return bot.fetch_signal()

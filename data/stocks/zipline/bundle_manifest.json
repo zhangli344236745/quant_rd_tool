@@ -1,0 +1,12 @@
+{
+  "fingerprint": "ad674e36f7dea0d012a1f4fa",
+  "symbol": "600519",
+  "timeframe": "1d",
+  "bars": 524,
+  "bar_minutes": 1440,
+  "ingest_start": "2024-04-02 00:00:00",
+  "ingest_end": "2026-06-03 00:00:00",
+  "ingested_at": "2026-06-11T09:47:52.224588+00:00",
+  "bundle": "stock_ashare_1d",
+  "market": "stock"
+}

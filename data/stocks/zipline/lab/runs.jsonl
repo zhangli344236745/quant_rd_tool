@@ -1,0 +1,3 @@
+{"run_id": "b6d96820-73de-41c4-a16e-9385cea4e1a7", "symbol": "SH600519", "strategy": "ma_crossover", "engine": "zipline", "start": "2024-01-01", "end": "2026-06-03", "total_return": -0.285174, "generated_at": "2026-06-11T09:47:57.817338+00:00"}
+{"run_id": "b1920684-f79a-4370-8519-df5e236a9528", "symbol": "SH600519", "strategy": "heikin_ashi_trend", "engine": "zipline", "start": "2024-01-01", "end": "2026-06-03", "total_return": -0.137268, "generated_at": "2026-06-11T09:49:32.304338+00:00"}
+{"run_id": "205b9556-6c45-4049-9cda-4699f5bd7077", "symbol": "SH600519", "strategy": "ema_rsi_filter", "engine": "zipline", "start": "2024-01-01", "end": "2026-06-03", "total_return": -0.282652, "generated_at": "2026-06-11T09:53:37.795829+00:00"}

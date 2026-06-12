@@ -64,20 +64,19 @@ def is_kill_switch_active() -> bool:
 def post_webhook(url: str, payload: dict[str, Any], *, timeout: float = 8.0) -> None:
     if not url:
         return
-    body = {"text": _format_webhook_text(payload), **payload}
+    from quant_rd_tool.notification_format import format_webhook_text
+
+    text = format_webhook_text(payload)
+    body = {"text": text, "content": text, **payload}
     with httpx.Client(timeout=timeout) as client:
         client.post(url, json=body)
 
 
 def _format_webhook_text(payload: dict[str, Any]) -> str:
-    kind = payload.get("kind") or "perp"
-    base = payload.get("base") or payload.get("symbol") or ""
-    decision = payload.get("decision") or ""
-    err = payload.get("error_category") or payload.get("error") or ""
-    parts = [f"[quant-rd] {kind}", f"base={base}", f"decision={decision}"]
-    if err:
-        parts.append(f"error={err}")
-    return " ".join(parts)
+    """Backward-compatible alias; prefer ``notification_format.format_webhook_text``."""
+    from quant_rd_tool.notification_format import format_webhook_text
+
+    return format_webhook_text(payload)
 
 
 def should_notify_webhook(record: dict[str, Any], ops: dict[str, Any]) -> bool:

@@ -340,6 +340,29 @@ export const cryptoApi = {
 
   spotBotRun: (body: Record<string, unknown>) => http.post("/crypto/bot/run", body),
 
+  spotBotPaperPerformance: (params: {
+    symbol: string;
+    quote?: string;
+    paper_initial_cash?: number;
+  }) => http.get("/crypto/bot/paper/performance", { params }),
+
+  spotBotPaperReset: (body: Record<string, unknown>) =>
+    http.post("/crypto/bot/paper/reset", body),
+
+  botSchedulerStatus: () => http.get("/crypto/bot/scheduler/status"),
+
+  botSchedulerRegister: (body: Record<string, unknown>) =>
+    http.post("/crypto/bot/scheduler/register", body),
+
+  botSchedulerStart: (botId: string) =>
+    http.post("/crypto/bot/scheduler/start", null, { params: { bot_id: botId } }),
+
+  botSchedulerStop: (botId: string) =>
+    http.post("/crypto/bot/scheduler/stop", null, { params: { bot_id: botId } }),
+
+  botSchedulerRemove: (botId: string) =>
+    http.post("/crypto/bot/scheduler/remove", null, { params: { bot_id: botId } }),
+
   perpBotRun: (body: PerpBotRequest) => http.post("/crypto/perp-bot/run", body),
 
   perpPortfolioRun: (body: PerpPortfolioRequest) =>

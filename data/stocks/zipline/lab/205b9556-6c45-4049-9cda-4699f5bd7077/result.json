@@ -1,0 +1,42 @@
+{
+  "run_id": "205b9556-6c45-4049-9cda-4699f5bd7077",
+  "symbol": "SH600519",
+  "code": "600519",
+  "strategy": "ema_rsi_filter",
+  "timeframe": "1d",
+  "start": "2024-01-01",
+  "end": "2026-06-03",
+  "capital_base": 100000.0,
+  "market": "stock",
+  "generated_at": "2026-06-11T09:53:37.795829+00:00",
+  "engine": "zipline",
+  "metrics": {
+    "total_return": -0.282652,
+    "sharpe": -1.5254,
+    "max_drawdown": -0.284684,
+    "trade_count": 40
+  },
+  "final_signal": {
+    "position": "flat",
+    "target_pct": 0.0,
+    "bar_time": "2026-06-03 20:00:00+00:00"
+  },
+  "strategy_params": {
+    "fast": 12,
+    "slow": 26,
+    "rsi_period": 14,
+    "rsi_min": 45,
+    "rsi_max": 75
+  },
+  "disclaimer": "回测结果仅供参考，不构成投资建议。",
+  "bundle": "stock_ashare_1d",
+  "asset": "SH600519",
+  "bar_minutes": 1440,
+  "bar_count": 524,
+  "backtest_start": "2024-04-02 00:00:00",
+  "backtest_end": "2026-06-03 00:00:00",
+  "ingest_skipped": true,
+  "fingerprint": "ad674e36f7dea0d012a1f4fa",
+  "bars": 524,
+  "trade_count": 40
+}
