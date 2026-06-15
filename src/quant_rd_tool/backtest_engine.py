@@ -16,6 +16,12 @@ from quant_rd_tool import akshare_data as ak_data
 from quant_rd_tool import market_data as mkt
 from quant_rd_tool.market_data import DataProvider
 from quant_rd_tool.advisor import build_advice
+from quant_rd_tool.stock_ashare_execution import (
+    AShareBoardRules,
+    AShareFeeSchedule,
+    execution_rules_payload,
+    run_topk_backtest_ashare,
+)
 from quant_rd_tool.qlib_dump import QlibDataDumper
 from quant_rd_tool.qlib_init import init_qlib
 from quant_rd_tool.qlib_ml import MlAlgorithm, build_ml_score_panel
@@ -133,6 +139,8 @@ def run_backtest(
     signal_mode: str = "momentum",
     ml_algorithm: MlAlgorithm = "lgb",
     data_provider: DataProvider = "auto",
+    use_ashare_rules: bool = True,
+    fee_schedule: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """
     End-to-end: market data → qlib-format dump → Top-K backtest → advice.
@@ -210,12 +218,30 @@ def run_backtest(
         scores = scores.reindex(close.index)
 
         topk_eff = min(topk, len(stock_frames))
-        report, weights = _topk_backtest(
-            scores,
-            close,
-            topk=topk_eff,
-            initial_cash=initial_cash,
-        )
+        fees = AShareFeeSchedule(**fee_schedule) if fee_schedule else AShareFeeSchedule()
+        board = AShareBoardRules()
+        trades_sample: list[dict[str, Any]] = []
+        cost_summary: dict[str, Any] | None = None
+        execution_rules: dict[str, Any] | None = None
+
+        if use_ashare_rules:
+            report, weights, trades_sample, exec_stats = run_topk_backtest_ashare(
+                scores,
+                close,
+                topk=topk_eff,
+                initial_cash=initial_cash,
+                fees=fees,
+                board=board,
+            )
+            cost_summary = exec_stats.to_dict()
+            execution_rules = execution_rules_payload(fees=fees, board=board)
+        else:
+            report, weights = _topk_backtest(
+                scores,
+                close,
+                topk=topk_eff,
+                initial_cash=initial_cash,
+            )
         if not report.empty:
             bench = _benchmark_returns(frames, bench_code, report.index)
             report["bench"] = bench.reindex(report.index).fillna(0.0)
@@ -245,6 +271,28 @@ def run_backtest(
         except Exception:
             openbb_context = None
 
+        from quant_rd_tool.research_audit import record_research_run
+
+        audit_record = record_research_run(
+            "portfolio_backtest",
+            inputs={
+                "symbols": symbols,
+                "start_date": start_date,
+                "end_date": end_date,
+                "signal_mode": signal_mode,
+                "topk": topk,
+                "use_ashare_rules": use_ashare_rules,
+            },
+            outputs_summary={
+                "total_return": metrics.get("total_return"),
+                "sharpe": metrics.get("sharpe"),
+                "max_drawdown": metrics.get("max_drawdown"),
+                "oos_gate_pass_rate": (ml_summary or {}).get("oos_summary", {}).get("gate_pass_rate")
+                if ml_summary
+                else None,
+            },
+        )
+
         return {
             "universe": universe,
             "qlib_codes": sorted(stock_frames),
@@ -255,12 +303,18 @@ def run_backtest(
             "signal_mode": signal_mode,
             "ml_algorithm": ml_algorithm if signal_mode == "ml" else None,
             "ml_summary": ml_summary,
+            "oos_summary": (ml_summary or {}).get("oos_summary") if ml_summary else None,
             "metrics": metrics,
             "holdings": latest_holdings,
             "factor_scores": latest_scores,
             "advice": advice,
             "openbb": openbb_context,
             "report_tail": _report_tail(report),
+            "use_ashare_rules": use_ashare_rules,
+            "execution_rules": execution_rules,
+            "cost_summary": cost_summary,
+            "trades_sample": trades_sample[:20] if trades_sample else [],
+            "audit_record": audit_record,
         }
     finally:
         if owns_dir and work_dir.exists():

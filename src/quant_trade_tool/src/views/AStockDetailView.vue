@@ -21,6 +21,12 @@ const report = ref<{
   report_mtime?: string;
   macro?: { summary?: string };
   technical?: Record<string, unknown>;
+  compliance?: {
+    run_id?: string;
+    entry_hash?: string;
+    content_hash?: string;
+    integrity?: { valid?: boolean; locked?: boolean };
+  };
 } | null>(null);
 const analyzeSubmitting = ref(false);
 const profile = ref<StockProfile | null>(null);
@@ -33,7 +39,10 @@ const reportDiff = ref<{
   summary?: string;
   changes?: { field: string; from: unknown; to: unknown }[];
 } | null>(null);
-const versions = ref<{ version_id: string; stance?: string; report_mtime?: string }[]>([]);
+const versions = ref<
+  { version_id: string; stance?: string; report_mtime?: string; locked?: boolean; content_hash?: string }[]
+>([]);
+const lockingVersion = ref<string | null>(null);
 
 async function loadProfile() {
   const { data } = await stocksApi.profile(code.value);
@@ -75,6 +84,20 @@ async function loadReport() {
     report.value = null;
   } finally {
     reportLoading.value = false;
+  }
+}
+
+async function lockVersion(versionId: string) {
+  if (versionId === "latest") return;
+  lockingVersion.value = versionId;
+  try {
+    await stocksApi.reportsLock(code.value, versionId, { reason: "manual sign-off" });
+    ElMessage.success(`已锁定版本 ${versionId}`);
+    await loadReport();
+  } catch (e) {
+    ElMessage.error(extractError(e));
+  } finally {
+    lockingVersion.value = null;
   }
 }
 
@@ -273,7 +296,24 @@ function newsLink(row: Record<string, unknown>) {
               <div class="analysis-head">
                 <el-tag v-if="report.stance" type="success" size="large">{{ report.stance }}</el-tag>
                 <span v-if="report.report_mtime" class="mono muted">{{ report.report_mtime }}</span>
+                <el-tag
+                  v-if="report.compliance?.integrity?.valid === false"
+                  type="danger"
+                  size="small"
+                >
+                  完整性异常
+                </el-tag>
+                <el-tag
+                  v-else-if="report.compliance?.run_id"
+                  type="info"
+                  size="small"
+                >
+                  审计 {{ report.compliance.run_id.slice(0, 8) }}
+                </el-tag>
               </div>
+              <p v-if="report.compliance?.entry_hash" class="muted small mono">
+                链哈希 {{ report.compliance.entry_hash.slice(0, 16) }}…
+              </p>
               <el-alert
                 v-if="reportDiff?.summary"
                 type="success"
@@ -293,7 +333,22 @@ function newsLink(row: Record<string, unknown>) {
                 <el-table-column prop="to" label="新值" min-width="100" show-overflow-tooltip />
               </el-table>
               <p v-if="versions.length" class="muted small">
-                版本：{{ versions.map((v) => v.version_id).join(", ") }}
+                版本：
+                <template v-for="(v, idx) in versions" :key="v.version_id">
+                  <span>{{ v.version_id }}</span>
+                  <el-tag v-if="v.locked" type="warning" size="small" class="ver-tag">已锁定</el-tag>
+                  <el-button
+                    v-else-if="v.version_id !== 'latest'"
+                    link
+                    type="primary"
+                    size="small"
+                    :loading="lockingVersion === v.version_id"
+                    @click="lockVersion(v.version_id)"
+                  >
+                    锁定
+                  </el-button>
+                  <span v-if="idx < versions.length - 1">, </span>
+                </template>
               </p>
               <p v-if="report.summary" class="analysis-summary">{{ report.summary }}</p>
               <el-scrollbar v-if="report.markdown" max-height="480" class="md-box">
@@ -404,6 +459,11 @@ function newsLink(row: Record<string, unknown>) {
   align-items: center;
   gap: 12px;
   margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.ver-tag {
+  margin-left: 4px;
 }
 
 .analysis-summary {

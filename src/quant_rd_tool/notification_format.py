@@ -18,6 +18,7 @@ RULE_META: dict[str, dict[str, str]] = {
     "consecutive_failures": {"label": "连续失败", "emoji": "🔁", "severity": "critical"},
     "stale_running": {"label": "任务卡住", "emoji": "⏳", "severity": "warning"},
     "cycle_complete": {"label": "分析完成", "emoji": "📊", "severity": "success"},
+    "stance_changed": {"label": "立场变化", "emoji": "🔀", "severity": "warning"},
     "custom_signal": {"label": "自定义信号", "emoji": "🎯", "severity": "warning"},
     "var_breach": {"label": "VaR 超限", "emoji": "⚠️", "severity": "warning"},
     "news_high_impact": {"label": "高影响舆情", "emoji": "📰", "severity": "warning"},

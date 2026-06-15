@@ -294,6 +294,64 @@ def build_symbol_var_report(
     return report
 
 
+def build_symbol_var_report_from_df(
+    df: pd.DataFrame,
+    symbol: str,
+    *,
+    notional_cny: float,
+    lookback_bars: int = 252,
+    confidence_levels: list[float] | None = None,
+    horizon_days: int = 1,
+    data_dir: str = DEFAULT_DATA_DIR,
+    mc_n_sims: int = DEFAULT_MC_SIMS,
+    mc_seed: int = 42,
+) -> dict[str, Any]:
+    """VaR from an in-memory OHLCV frame (workflow step)."""
+    confidence_levels = confidence_levels or [0.95, 0.99]
+    code = to_ak_code(symbol)
+    qlib = to_qlib_code(code)
+    work = df.tail(lookback_bars + 1).copy()
+    close = _close_series(work)
+    rets = returns_from_close(close)
+    latest_price = float(close.iloc[-1])
+    effective_notional = float(notional_cny) if float(notional_cny) > 0 else latest_price * 100.0
+    stats = summarize_returns(rets)
+    metrics = _remap_metrics_to_cny(
+        _metrics_block(
+            rets,
+            notional_usdt=effective_notional,
+            confidence_levels=confidence_levels,
+            horizon_days=horizon_days,
+            mc_n_sims=mc_n_sims,
+            mc_seed=mc_seed,
+        )
+    )
+    report = {
+        "market": "stock",
+        "symbol": qlib,
+        "code": code,
+        "method": "historical_simulation",
+        "params": {
+            "lookback_bars": lookback_bars,
+            "horizon_days": horizon_days,
+            "confidence_levels": confidence_levels,
+            "timeframe": "1d",
+            "data_dir": data_dir,
+            "mc_n_sims": min(max(int(mc_n_sims), 1000), 100_000),
+            "mc_seed": mc_seed,
+        },
+        "notional_cny": effective_notional,
+        "latest_price": latest_price,
+        "observations": int(len(rets)),
+        "return_stats": stats,
+        "return_histogram": return_histogram(rets),
+        "stress_scenarios": _remap_stress_to_cny(stress_scenarios(effective_notional)),
+        "metrics": metrics,
+    }
+    report["narrative"] = build_symbol_narrative(report, stats=stats)
+    return report
+
+
 def build_portfolio_var_report(
     holdings: list[dict[str, Any]],
     *,

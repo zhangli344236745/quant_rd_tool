@@ -58,6 +58,7 @@ def get_alert_rules() -> dict[str, Any]:
     out["var"] = var if isinstance(var, dict) else {}
     out["webhook_on_alert"] = raw.get("webhook_on_alert", True) is not False
     out["on_cycle_complete"] = raw.get("on_cycle_complete", True) is not False
+    out["on_stance_changed"] = raw.get("on_stance_changed", True) is not False
     bark = raw.get("bark")
     out["bark"] = _public_bark_config(bark if isinstance(bark, dict) else {})
     crypto_news = raw.get("crypto_news")
@@ -168,6 +169,7 @@ def save_alert_rules(
     bark: dict[str, Any] | None = None,
     webhook_on_alert: bool | None = None,
     on_cycle_complete: bool | None = None,
+    on_stance_changed: bool | None = None,
     crypto_news: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     data = load_settings(settings_json_path())
@@ -214,6 +216,8 @@ def save_alert_rules(
         raw["webhook_on_alert"] = webhook_on_alert
     if on_cycle_complete is not None:
         raw["on_cycle_complete"] = on_cycle_complete
+    if on_stance_changed is not None:
+        raw["on_stance_changed"] = on_stance_changed
     if crypto_news is not None:
         if not isinstance(crypto_news, dict):
             raise ValueError("crypto_news must be an object")
@@ -250,6 +254,57 @@ def _job_state(state: dict[str, Any], job_id: str) -> dict[str, Any]:
     if job_id not in jobs or not isinstance(jobs[job_id], dict):
         jobs[job_id] = {"failure_streak": 0, "last_alerts": {}}
     return jobs[job_id]
+
+
+def evaluate_stance_changes(
+    job_id: str,
+    *,
+    last_cycle_summary: list[dict[str, Any]],
+    state_path: Path = _DEFAULT_STATE,
+    rules: ScheduleAlertRules | None = None,
+    raw: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    """Fire when a symbol stance changes vs previous successful cycle."""
+    raw = raw or get_alert_rules()
+    if raw.get("on_stance_changed", True) is False:
+        return []
+    rules = rules or ScheduleAlertRules(
+        **{k: v for k, v in raw.items() if k in ScheduleAlertRules.__dataclass_fields__}
+    )
+    if not rules.enabled:
+        return []
+
+    state = _load_state(state_path)
+    job_st = _job_state(state, job_id)
+    prev = job_st.setdefault("last_stances", {})
+    if not isinstance(prev, dict):
+        prev = {}
+        job_st["last_stances"] = prev
+
+    fired: list[dict[str, Any]] = []
+    for row in last_cycle_summary:
+        if row.get("error"):
+            continue
+        sym = str(row.get("symbol") or row.get("code") or "").strip()
+        stance = row.get("stance")
+        if not sym or not stance:
+            continue
+        old = prev.get(sym)
+        prev[sym] = stance
+        if old and old != stance:
+            msg = f"{sym}: {old} → {stance}"
+            if _fire_alert(
+                job_id=job_id,
+                rule="stance_changed",
+                message=f"[{job_id}] 立场变化 {msg}",
+                detail={"symbol": sym, "from": old, "to": stance},
+                state_path=state_path,
+                rules=rules,
+            ):
+                fired.append({"rule": "stance_changed", "message": msg})
+
+    _save_state(state, state_path)
+    return fired
 
 
 def append_alert_log(
@@ -520,6 +575,15 @@ def evaluate_after_cycle(
     )
     fired.extend(
         evaluate_var_breaches(
+            job_id,
+            last_cycle_summary=last_cycle_summary or [],
+            state_path=state_path,
+            rules=rules,
+            raw=raw,
+        )
+    )
+    fired.extend(
+        evaluate_stance_changes(
             job_id,
             last_cycle_summary=last_cycle_summary or [],
             state_path=state_path,

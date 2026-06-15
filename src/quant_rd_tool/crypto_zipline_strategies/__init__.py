@@ -28,10 +28,20 @@ def _run_with_target_col(
     capital_base: float,
     warmup: int,
 ) -> dict[str, Any]:
-    from quant_rd_tool.crypto_zipline_pandas import run_bar_backtest
-
     work = df.copy()
     work["target"] = target.fillna(0.0).astype(float)
+    from quant_rd_tool.stock_ashare_pandas import get_ashare_ctx, run_ashare_bar_backtest
+
+    ctx = get_ashare_ctx()
+    if ctx is not None:
+        return run_ashare_bar_backtest(
+            work,
+            capital_base=capital_base,
+            warmup=warmup,
+            symbol=str(ctx.get("symbol") or ""),
+        )
+    from quant_rd_tool.crypto_zipline_pandas import run_bar_backtest
+
     return run_bar_backtest(work, capital_base=capital_base, warmup=warmup)
 
 

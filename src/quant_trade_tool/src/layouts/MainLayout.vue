@@ -29,7 +29,10 @@ const groups: MenuGroup[] = [
     items: [
       { path: "/astocks", icon: "OfficeBuilding", label: "A 股公司" },
       { path: "/astocks-reports", icon: "FolderOpened", label: "报告库" },
+      { path: "/astocks-compare", icon: "ScaleToOriginal", label: "报告对比" },
       { path: "/astocks-screener", icon: "Filter", label: "选股器" },
+      { path: "/stock-workflow", icon: "Connection", label: "Workflow 分析" },
+      { path: "/stock-announcements", icon: "Bell", label: "公告雷达" },
       { path: "/stock-analyze", icon: "Document", label: "个股分析" },
       { path: "/stock-zipline", icon: "DataLine", label: "策略实验室" },
       { path: "/stock-var", icon: "Warning", label: "风险 VaR" },

@@ -61,27 +61,11 @@ def _ts_fmt(ts: pd.Timestamp, *, intraday: bool) -> str:
 def _time_segments(
     start: str, end: str, *, min_span_days: int = 365, intraday: bool = False
 ) -> dict[str, tuple[str, str]]:
-    s = pd.Timestamp(start)
-    e = pd.Timestamp(end)
-    span = (e - s).days
-    if span < min_span_days:
-        raise ValueError(
-            f"机器学习分段需要至少约 {min_span_days} 天样本，当前约 {span} 天。"
-            "请延长历史回填或继续累积定时任务数据。"
-        )
-    t1 = s + pd.Timedelta(days=int(span * 0.6))
-    t2 = s + pd.Timedelta(days=int(span * 0.8))
-    return {
-        "train": (_ts_fmt(s, intraday=intraday), _ts_fmt(t1, intraday=intraday)),
-        "valid": (
-            _ts_fmt(t1 + pd.Timedelta(days=1), intraday=intraday),
-            _ts_fmt(t2, intraday=intraday),
-        ),
-        "test": (
-            _ts_fmt(t2 + pd.Timedelta(days=1), intraday=intraday),
-            _ts_fmt(e, intraday=intraday),
-        ),
-    }
+    from quant_rd_tool.oos_protocol import build_fixed_split_segments
+
+    return build_fixed_split_segments(
+        start, end, min_span_days=min_span_days, intraday=intraday
+    )
 
 
 def _extract_label(dataset: DatasetH, segment: str) -> pd.Series:
@@ -422,6 +406,8 @@ def run_ml_analysis(
 
     algos: list[MlAlgorithm] = ["xgb", "lgb"] if algorithm == "both" else [algorithm]
     results: dict[str, Any] = {}
+    from quant_rd_tool.oos_protocol import build_fixed_split_report
+
     for algo in algos:
         try:
             one = _run_one_model(
@@ -430,6 +416,14 @@ def run_ml_analysis(
                 algo,
                 num_boost_round=num_boost_round,
                 early_stopping_rounds=early_stopping_rounds,
+            )
+            one["oos_protocol"] = build_fixed_split_report(
+                segments=segments,
+                segment_counts=segment_counts,
+                valid_metrics=one.get("valid_metrics"),
+                test_metrics=one.get("test_metrics"),
+                algorithm=algo,
+                instrument=qlib_code,
             )
             if not include_oos_scores:
                 one.pop("oos_score_series", None)
@@ -457,12 +451,17 @@ def run_ml_analysis(
                 results[algo] = {"enabled": False, "skipped": True, "reason": err}
 
     if algorithm == "both":
+        preferred = _compare_models(results).get("preferred_by_ic")
+        oos_protocol = None
+        if preferred and results.get(preferred, {}).get("oos_protocol"):
+            oos_protocol = results[preferred]["oos_protocol"]
         return {
             "enabled": any(r.get("enabled") for r in results.values()),
             "algorithm": "both",
             "segments": segments,
             "models": results,
             "comparison": _compare_models(results),
+            "oos_protocol": oos_protocol,
         }
 
     single = results[algorithm]
@@ -560,6 +559,7 @@ def build_ml_score_panel(
             per_stock[code] = {
                 "test_ic": res.get("test_metrics", {}).get("ic"),
                 "signal": res.get("latest", {}).get("signal"),
+                "oos_protocol": res.get("oos_protocol"),
             }
         except Exception as e:
             per_stock[code] = {"skipped": True, "reason": str(e)}
@@ -569,10 +569,13 @@ def build_ml_score_panel(
 
     wide = pd.concat(pieces, axis=1).sort_index()
     wide = wide.loc[:, ~wide.columns.duplicated()]
+    from quant_rd_tool.oos_protocol import summarize_panel_oos
+
     meta = {
         "algorithm": alg,
         "stocks": per_stock,
         "score_start": str(wide.index.min().date()),
+        "oos_summary": summarize_panel_oos(per_stock),
     }
     return wide, meta
 

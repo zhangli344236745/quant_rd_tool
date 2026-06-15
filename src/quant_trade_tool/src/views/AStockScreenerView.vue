@@ -10,7 +10,9 @@ const q = ref("");
 const hasReport = ref<boolean | undefined>(undefined);
 const stanceIn = ref<string[]>([]);
 const watchlistOnly = ref(false);
-const jobType = ref<"qlib_analyze" | "analyze_stock">("qlib_analyze");
+const highImpactOnly = ref(false);
+const noticeKeyword = ref("");
+const jobType = ref<"qlib_analyze" | "analyze_stock" | "stock_workflow">("qlib_analyze");
 const limit = ref(20);
 const loading = ref(false);
 const enqueueing = ref(false);
@@ -26,6 +28,8 @@ async function search() {
       has_report: hasReport.value ?? null,
       stance_in: stanceIn.value,
       watchlist_only: watchlistOnly.value,
+      high_impact_only: highImpactOnly.value,
+      notice_keyword: noticeKeyword.value.trim(),
       page: 1,
       page_size: 100,
     });
@@ -69,6 +73,8 @@ async function enqueueFiltered() {
       has_report: hasReport.value ?? null,
       stance_in: stanceIn.value,
       watchlist_only: watchlistOnly.value,
+      high_impact_only: highImpactOnly.value,
+      notice_keyword: noticeKeyword.value.trim(),
       limit: limit.value,
       job_type: jobType.value,
       max_attempts: 2,
@@ -86,7 +92,7 @@ async function enqueueFiltered() {
 <template>
   <div>
     <h1 class="page-title">选股器</h1>
-    <p class="page-desc">按条件筛选 A 股并批量提交后台分析任务（C+ P0）。</p>
+    <p class="page-desc">按条件筛选 A 股并批量提交后台分析任务；支持高影响公告与关键词过滤。</p>
 
     <el-card shadow="never" class="panel-card">
       <el-form :inline="true" size="small">
@@ -110,10 +116,17 @@ async function enqueueFiltered() {
         <el-form-item label="仅自选">
           <el-switch v-model="watchlistOnly" />
         </el-form-item>
+        <el-form-item label="高影响公告">
+          <el-switch v-model="highImpactOnly" />
+        </el-form-item>
+        <el-form-item label="公告关键词">
+          <el-input v-model="noticeKeyword" placeholder="如 减持" clearable style="width: 120px" />
+        </el-form-item>
         <el-form-item label="任务类型">
-          <el-select v-model="jobType" style="width: 140px">
+          <el-select v-model="jobType" style="width: 150px">
             <el-option label="Qlib 快分析" value="qlib_analyze" />
             <el-option label="完整分析" value="analyze_stock" />
+            <el-option label="Workflow 分析" value="stock_workflow" />
           </el-select>
         </el-form-item>
         <el-form-item>
@@ -145,6 +158,9 @@ async function enqueueFiltered() {
         <el-table-column prop="stance" label="立场" width="80" />
         <el-table-column prop="has_report" label="报告" width="70">
           <template #default="{ row }">{{ row.has_report ? "有" : "—" }}</template>
+        </el-table-column>
+        <el-table-column prop="high_impact" label="高影响" width="72">
+          <template #default="{ row }">{{ row.high_impact ? "是" : "—" }}</template>
         </el-table-column>
         <el-table-column prop="report_mtime" label="报告时间" width="180" show-overflow-tooltip />
       </el-table>

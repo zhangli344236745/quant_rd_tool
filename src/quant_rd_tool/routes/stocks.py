@@ -24,6 +24,7 @@ class QlibAnalyzeRequest(BaseModel):
     with_ml: bool = True
     ml_algorithm: str = Field("both", description="xgb | lgb | both")
     include_full_report: bool = Field(False, description="是否在响应中包含完整 report 对象")
+    with_openbb_enrichment: bool = Field(False, description="是否启用 OpenBB 宏观/行业 enrichment")
 
 
 def _qlib_analyze_handler(code: str, body: QlibAnalyzeRequest) -> dict:
@@ -35,6 +36,7 @@ def _qlib_analyze_handler(code: str, body: QlibAnalyzeRequest) -> dict:
             data_dir=body.data_dir,
             with_ml=body.with_ml,
             ml_algorithm=body.ml_algorithm,
+            with_openbb_enrichment=body.with_openbb_enrichment,
         )
         if not body.include_full_report:
             out = {**out, "report": None}
@@ -90,10 +92,11 @@ def stocks_reports_list(
 @router.get("/reports/export")
 def stocks_reports_export(
     codes: str = Query("", description="逗号分隔代码，空=全部有报告标的"),
+    watermark: bool = Query(True, description="导出 MD 加水印与 compliance manifest"),
 ) -> Response:
     code_list = [c.strip() for c in codes.split(",") if c.strip()] or None
     try:
-        payload = rpt.build_reports_zip(codes=code_list)
+        payload = rpt.build_reports_zip(codes=code_list, watermark=watermark)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
     if not payload:
@@ -103,6 +106,65 @@ def stocks_reports_export(
         media_type="application/zip",
         headers={"Content-Disposition": 'attachment; filename="astock-reports.zip"'},
     )
+
+
+@router.get("/compliance/audit")
+def stocks_compliance_audit_tail(
+    limit: int = Query(50, ge=1, le=500),
+    run_type: str | None = Query(None),
+    code: str | None = Query(None),
+) -> dict[str, Any]:
+    from quant_rd_tool.research_audit import tail_research_audit
+
+    items = tail_research_audit(limit=limit, run_type=run_type, code=code)
+    return {"items": items, "count": len(items)}
+
+
+@router.get("/compliance/audit/verify")
+def stocks_compliance_audit_verify() -> dict[str, Any]:
+    from quant_rd_tool.research_audit import verify_audit_chain
+
+    return verify_audit_chain()
+
+
+@router.get("/compliance/audit/{run_id}")
+def stocks_compliance_audit_get(run_id: str) -> dict[str, Any]:
+    from quant_rd_tool.research_audit import get_audit_entry
+
+    row = get_audit_entry(run_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Audit entry not found")
+    return row
+
+
+class ReportLockRequest(BaseModel):
+    locked_by: str = "user"
+    reason: str = ""
+
+
+@router.post("/{code}/reports/{version_id}/lock")
+def stocks_report_lock(code: str, version_id: str, body: ReportLockRequest) -> dict[str, Any]:
+    from quant_rd_tool.research_audit import lock_report_version
+
+    try:
+        row = lock_report_version(
+            code,
+            version_id,
+            locked_by=body.locked_by,
+            reason=body.reason,
+        )
+        return {"locked": row}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+
+
+@router.get("/{code}/reports/{version_id}/verify")
+def stocks_report_verify(code: str, version_id: str) -> dict[str, Any]:
+    from quant_rd_tool.report_versions import verify_report_version
+
+    return verify_report_version(code, version_id)
 
 
 @router.get("/reports/compare")
@@ -152,6 +214,8 @@ class ScreenerRequest(BaseModel):
     stance_in: list[str] = Field(default_factory=list)
     watchlist_only: bool = False
     codes: list[str] = Field(default_factory=list)
+    high_impact_only: bool = False
+    notice_keyword: str = ""
     page: int = Field(1, ge=1)
     page_size: int = Field(50, ge=1, le=200)
 
@@ -165,6 +229,8 @@ def stocks_screener(req: ScreenerRequest) -> dict[str, Any]:
             stance_in=req.stance_in,
             watchlist_only=req.watchlist_only,
             codes=req.codes,
+            high_impact_only=req.high_impact_only,
+            notice_keyword=req.notice_keyword,
             page=req.page,
             page_size=req.page_size,
         )
@@ -196,6 +262,120 @@ def stocks_list(
         return astk.list_a_stocks(q=q, page=page, page_size=page_size)
     except Exception as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+@router.post("/list/refresh")
+def stocks_list_refresh() -> dict[str, Any]:
+    try:
+        return astk.refresh_a_stock_list()
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+class StockScheduleCreateRequest(BaseModel):
+    symbols: list[str] = Field(default_factory=list, description="A 股代码列表；自选模式可留空")
+    name: str = ""
+    id: str = ""
+    interval_minutes: int = Field(1440, ge=5, le=10080, description="调度间隔（分钟），默认 1440=每日")
+    years: int = Field(2, ge=1, le=10)
+    data_dir: str = "data/stocks"
+    with_ml: bool = True
+    ml_algorithm: str = "both"
+    with_openbb: bool = False
+    use_watchlist: bool = Field(False, description="True 时分析自选列表全部标的")
+    auto_start: bool = False
+
+
+@router.get("/schedules")
+def stocks_schedules_list(data_dir: str = "data/stocks") -> dict[str, Any]:
+    from quant_rd_tool.scheduler_manager import get_scheduler_manager
+
+    mgr = get_scheduler_manager(data_dir)
+    jobs = mgr.list_jobs()
+    return {"count": len(jobs), "jobs": jobs}
+
+
+@router.get("/schedules/{job_id}")
+def stocks_schedules_get(job_id: str, data_dir: str = "data/stocks") -> dict[str, Any]:
+    from quant_rd_tool.scheduler_manager import get_scheduler_manager
+
+    mgr = get_scheduler_manager(data_dir)
+    job = mgr.get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail=f"未找到任务: {job_id}")
+    return job
+
+
+@router.post("/schedules")
+def stocks_schedules_create(req: StockScheduleCreateRequest) -> dict[str, Any]:
+    from quant_rd_tool.scheduler_manager import ScheduleJobConfig, get_scheduler_manager
+
+    job_type = "stock_watchlist" if req.use_watchlist else "stock_qlib"
+    mgr = get_scheduler_manager(req.data_dir)
+    cfg = ScheduleJobConfig(
+        symbols=req.symbols,
+        name=req.name,
+        id=req.id,
+        timeframe="1d",
+        interval_minutes=req.interval_minutes,
+        data_dir=req.data_dir,
+        with_ml=req.with_ml,
+        ml_algorithm=req.ml_algorithm,
+        job_type=job_type,
+        years=req.years,
+        with_openbb=req.with_openbb,
+        use_watchlist=req.use_watchlist,
+    )
+    try:
+        return mgr.add_job(cfg, auto_start=req.auto_start)
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e)) from e
+
+
+@router.post("/schedules/{job_id}/start")
+def stocks_schedules_start(job_id: str, data_dir: str = "data/stocks") -> dict[str, Any]:
+    from quant_rd_tool.scheduler_manager import get_scheduler_manager
+
+    mgr = get_scheduler_manager(data_dir)
+    try:
+        return mgr.start_job(job_id)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+
+
+@router.post("/schedules/{job_id}/stop")
+def stocks_schedules_stop(job_id: str, data_dir: str = "data/stocks") -> dict[str, Any]:
+    from quant_rd_tool.scheduler_manager import get_scheduler_manager
+
+    mgr = get_scheduler_manager(data_dir)
+    try:
+        return mgr.stop_job(job_id)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+
+
+@router.post("/schedules/{job_id}/run-once")
+def stocks_schedules_run_once(job_id: str, data_dir: str = "data/stocks") -> dict[str, Any]:
+    from quant_rd_tool.scheduler_manager import get_scheduler_manager
+
+    mgr = get_scheduler_manager(data_dir)
+    try:
+        return mgr.run_once(job_id, precheck_connectivity=False)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except ValueError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+@router.delete("/schedules/{job_id}")
+def stocks_schedules_delete(job_id: str, data_dir: str = "data/stocks") -> dict[str, Any]:
+    from quant_rd_tool.scheduler_manager import get_scheduler_manager
+
+    mgr = get_scheduler_manager(data_dir)
+    try:
+        return mgr.remove_job(job_id)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
 
 
 @router.get("/{code}/profile")
@@ -404,6 +584,193 @@ def stock_var_portfolio_get(
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+class StockWorkflowStep(BaseModel):
+    id: str
+    enabled: bool = True
+    order: int = 0
+    params: dict[str, Any] = Field(default_factory=dict)
+
+
+class StockWorkflowTemplateBody(BaseModel):
+    id: str | None = None
+    name: str = "A股 Workflow"
+    symbol_default: str = "600519"
+    timeframe: str = "1d"
+    data_dir: str = "data/stocks"
+    steps: list[StockWorkflowStep] = Field(default_factory=list)
+
+
+class StockWorkflowRunRequest(BaseModel):
+    symbol: str | None = None
+    timeframe: str | None = None
+    template_id: str | None = None
+    template: StockWorkflowTemplateBody | None = None
+    steps: list[StockWorkflowStep] | None = None
+    data_dir: str = "data/stocks"
+    refresh_ohlcv: bool = True
+
+
+class AnnouncementScanRequest(BaseModel):
+    symbols: list[str] = Field(default_factory=list)
+    use_watchlist: bool = True
+    notice_limit: int = Field(15, ge=5, le=50)
+    min_score: int = Field(40, ge=0, le=100)
+
+
+@router.get("/workflow/steps")
+def stock_workflow_steps_get() -> dict[str, Any]:
+    from quant_rd_tool.stock_workflow import list_step_catalog
+
+    return {"steps": list_step_catalog()}
+
+
+@router.get("/workflow/templates")
+def stock_workflow_templates_get(data_dir: str = "data/stocks") -> dict[str, Any]:
+    from quant_rd_tool.stock_workflow_storage import list_templates
+
+    items = list_templates(data_dir)
+    return {"count": len(items), "templates": items}
+
+
+@router.post("/workflow/templates")
+def stock_workflow_templates_post(
+    body: StockWorkflowTemplateBody,
+    data_dir: str = "data/stocks",
+) -> dict[str, Any]:
+    from quant_rd_tool.stock_workflow import normalize_template_steps
+    from quant_rd_tool.stock_workflow_storage import upsert_template
+
+    payload = body.model_dump()
+    payload["data_dir"] = data_dir
+    payload["steps"] = normalize_template_steps([s.model_dump() for s in body.steps] or [])
+    tpl = upsert_template(data_dir, payload)
+    return {"ok": True, "template": tpl}
+
+
+@router.put("/workflow/templates/{template_id}")
+def stock_workflow_templates_put(
+    template_id: str,
+    body: StockWorkflowTemplateBody,
+    data_dir: str = "data/stocks",
+) -> dict[str, Any]:
+    from quant_rd_tool.stock_workflow import normalize_template_steps
+    from quant_rd_tool.stock_workflow_storage import upsert_template
+
+    payload = body.model_dump()
+    payload["id"] = template_id
+    payload["data_dir"] = data_dir
+    payload["steps"] = normalize_template_steps([s.model_dump() for s in body.steps] or [])
+    tpl = upsert_template(data_dir, payload)
+    return {"ok": True, "template": tpl}
+
+
+@router.delete("/workflow/templates/{template_id}")
+def stock_workflow_templates_delete(template_id: str, data_dir: str = "data/stocks") -> dict[str, Any]:
+    from quant_rd_tool.stock_workflow_storage import delete_template
+
+    ok = delete_template(data_dir, template_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Template not found")
+    return {"ok": True}
+
+
+@router.post("/workflow/templates/{template_id}/duplicate")
+def stock_workflow_templates_duplicate(
+    template_id: str,
+    data_dir: str = "data/stocks",
+    name: str | None = None,
+) -> dict[str, Any]:
+    from quant_rd_tool.stock_workflow_storage import duplicate_template
+
+    tpl = duplicate_template(data_dir, template_id, name=name)
+    if not tpl:
+        raise HTTPException(status_code=404, detail="Template not found")
+    return {"ok": True, "template": tpl}
+
+
+@router.post("/workflow/run")
+def stock_workflow_run_post(req: StockWorkflowRunRequest) -> dict[str, Any]:
+    from quant_rd_tool.stock_workflow import resolve_template_for_run, run_workflow
+
+    data_dir = req.data_dir
+    try:
+        tpl = resolve_template_for_run(
+            data_dir=data_dir,
+            template_id=req.template_id,
+            template=req.template.model_dump() if req.template else None,
+            timeframe=req.timeframe,
+            steps=[s.model_dump() for s in req.steps] if req.steps else None,
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    sym = (req.symbol or tpl.get("symbol_default") or "600519").strip()
+    try:
+        return run_workflow(
+            symbol=sym,
+            template=tpl,
+            data_dir=data_dir,
+            refresh_ohlcv=req.refresh_ohlcv,
+            save=True,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+@router.get("/workflow/runs")
+def stock_workflow_runs_get(data_dir: str = "data/stocks", limit: int = Query(20, ge=1, le=100)) -> dict[str, Any]:
+    from quant_rd_tool.stock_workflow_storage import list_runs
+
+    runs = list_runs(data_dir, limit=limit)
+    return {"count": len(runs), "runs": runs}
+
+
+@router.get("/workflow/runs/{run_id}")
+def stock_workflow_run_get(run_id: str, data_dir: str = "data/stocks") -> dict[str, Any]:
+    from quant_rd_tool.stock_workflow_storage import load_run
+
+    run = load_run(data_dir, run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+    return run
+
+
+@router.get("/announcements/digest")
+def stock_announcements_digest_get(data_dir: str = "data/stocks") -> dict[str, Any]:
+    from quant_rd_tool.stock_announcement_radar import load_digest
+
+    digest = load_digest(data_dir)
+    return {"digest": digest}
+
+
+@router.get("/announcements/items")
+def stock_announcements_items_get(
+    data_dir: str = "data/stocks",
+    limit: int = Query(50, ge=1, le=200),
+) -> dict[str, Any]:
+    from quant_rd_tool.stock_announcement_radar import tail_items
+
+    items = tail_items(data_dir=data_dir, limit=limit)
+    return {"count": len(items), "items": items}
+
+
+@router.post("/announcements/scan")
+def stock_announcements_scan_post(req: AnnouncementScanRequest) -> dict[str, Any]:
+    from quant_rd_tool.stock_announcement_radar import run_announcement_scan
+
+    try:
+        return run_announcement_scan(
+            data_dir="data/stocks",
+            symbols=req.symbols,
+            use_watchlist=req.use_watchlist,
+            notice_limit=req.notice_limit,
+            min_score=req.min_score,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
 
 
 @router.get("/zipline/status")

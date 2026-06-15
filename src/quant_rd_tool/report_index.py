@@ -173,6 +173,10 @@ def latest_report(code: str, *, data_dir: str | Path = "data/stocks") -> dict[st
         markdown = text[:65536]
 
     mtime = datetime.fromtimestamp(rjson.stat().st_mtime, tz=UTC).isoformat()
+    from quant_rd_tool.report_versions import verify_report_version
+
+    verify = verify_report_version(bare, "latest", data_dir=data_dir)
+    compliance = data.get("_compliance") if isinstance(data.get("_compliance"), dict) else None
     return {
         "code": bare,
         "qlib_code": qlib_code,
@@ -187,6 +191,10 @@ def latest_report(code: str, *, data_dir: str | Path = "data/stocks") -> dict[st
         if isinstance(data.get("analysis"), dict)
         else None,
         "ml": _ml_compact(data.get("ml_analysis")),
+        "compliance": {
+            **(compliance or {}),
+            "integrity": verify,
+        },
     }
 
 
@@ -194,10 +202,19 @@ def build_reports_zip(
     *,
     data_dir: str | Path = "data/stocks",
     codes: list[str] | None = None,
+    watermark: bool = True,
 ) -> bytes:
     """Zip report.json + report.md per symbol (read-only share bundle)."""
+    from quant_rd_tool.research_audit import (
+        build_export_manifest,
+        verify_audit_chain,
+        watermark_markdown,
+    )
+    from quant_rd_tool.report_versions import verify_report_version
+
     listed = list_reports(data_dir=data_dir, page=1, page_size=10_000)
     code_set = {c.strip() for c in (codes or []) if c.strip()}
+    manifest_items: list[dict[str, Any]] = []
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as zf:
         for row in listed["items"]:
@@ -207,10 +224,41 @@ def build_reports_zip(
             rjson = report_json_path(root)
             rmd = report_md_path(root)
             prefix = row["qlib_code"]
+            verify = verify_report_version(row["code"], "latest", data_dir=data_dir)
+            manifest_items.append(
+                {
+                    "code": row["code"],
+                    "qlib_code": row["qlib_code"],
+                    "version_id": "latest",
+                    "content_hash": verify.get("content_hash"),
+                    "locked": verify.get("locked"),
+                }
+            )
             if rjson.is_file():
                 zf.writestr(f"{prefix}/report.json", rjson.read_bytes())
             if rmd.is_file():
-                zf.writestr(f"{prefix}/report.md", rmd.read_bytes())
+                md_text = rmd.read_text(encoding="utf-8")
+                if watermark:
+                    md_text = watermark_markdown(
+                        md_text,
+                        meta={
+                            "content_hash": verify.get("content_hash"),
+                            "exported_at": datetime.now(UTC).isoformat(),
+                        },
+                    )
+                zf.writestr(f"{prefix}/report.md", md_text.encode("utf-8"))
+        if watermark and manifest_items:
+            zf.writestr(
+                "compliance/manifest.json",
+                json.dumps(
+                    build_export_manifest(
+                        items=manifest_items,
+                        chain_verify=verify_audit_chain(data_dir=data_dir),
+                    ),
+                    ensure_ascii=False,
+                    indent=2,
+                ).encode("utf-8"),
+            )
         if not zf.namelist():
             raise FileNotFoundError("No reports to export")
     return buf.getvalue()

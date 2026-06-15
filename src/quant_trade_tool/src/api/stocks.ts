@@ -403,6 +403,12 @@ export const stocksApi = {
       macro?: { summary?: string; china?: Record<string, unknown>; global?: unknown[] };
       technical?: Record<string, unknown>;
       ml?: Record<string, unknown> | null;
+      compliance?: {
+        run_id?: string;
+        entry_hash?: string;
+        content_hash?: string;
+        integrity?: { valid?: boolean; locked?: boolean };
+      };
     }>(`/stocks/${code}/reports/latest`),
 
   reportsCompare: (codeA: string, codeB: string) =>
@@ -425,6 +431,8 @@ export const stocksApi = {
         summary?: string;
         report_mtime?: string;
         is_latest?: boolean;
+        locked?: boolean;
+        content_hash?: string;
       }[];
     }>(`/stocks/${code}/reports/history`),
 
@@ -438,12 +446,31 @@ export const stocksApi = {
       compare_stance?: string;
     }>(`/stocks/${code}/reports/diff`, { params }),
 
+  reportsLock: (code: string, versionId: string, body?: { locked_by?: string; reason?: string }) =>
+    http.post<{ locked: Record<string, unknown> }>(`/stocks/${code}/reports/${versionId}/lock`, body ?? {}),
+
+  reportsVerify: (code: string, versionId: string) =>
+    http.get<{ valid: boolean; content_hash?: string; locked?: boolean; message?: string }>(
+      `/stocks/${code}/reports/${versionId}/verify`,
+    ),
+
+  complianceAudit: (params?: { limit?: number; run_type?: string; code?: string }) =>
+    http.get<{ items: Record<string, unknown>[]; count: number }>("/stocks/compliance/audit", { params }),
+
+  complianceAuditVerify: () =>
+    http.get<{ valid: boolean; entries: number; errors?: string[] }>("/stocks/compliance/audit/verify"),
+
+  complianceAuditGet: (runId: string) =>
+    http.get<Record<string, unknown>>(`/stocks/compliance/audit/${runId}`),
+
   screener: (body: {
     q?: string;
     has_report?: boolean | null;
     stance_in?: string[];
     watchlist_only?: boolean;
     codes?: string[];
+    high_impact_only?: boolean;
+    notice_keyword?: string;
     page?: number;
     page_size?: number;
   }) => http.post<{ total: number; items: Record<string, unknown>[] }>("/stocks/screener", body),
@@ -583,4 +610,200 @@ export const stocksApi = {
     http.get<StockPortfolioVarReport>("/stocks/var/portfolio", {
       params: { data_dir: "data/stocks", ...params },
     }),
+
+  listRefresh: () => http.post<{ count: number; refreshed_at: string }>("/stocks/list/refresh"),
+
+  schedulesList: (data_dir = "data/stocks") =>
+    http.get<{ count: number; jobs: Record<string, unknown>[] }>("/stocks/schedules", {
+      params: { data_dir },
+    }),
+
+  scheduleGet: (jobId: string, data_dir = "data/stocks") =>
+    http.get(`/stocks/schedules/${jobId}`, { params: { data_dir } }),
+
+  scheduleCreate: (body: {
+    symbols?: string[];
+    name?: string;
+    id?: string;
+    interval_minutes?: number;
+    years?: number;
+    data_dir?: string;
+    with_ml?: boolean;
+    ml_algorithm?: string;
+    with_openbb?: boolean;
+    use_watchlist?: boolean;
+    auto_start?: boolean;
+  }) => http.post("/stocks/schedules", body),
+
+  scheduleStart: (jobId: string, data_dir = "data/stocks") =>
+    http.post(`/stocks/schedules/${jobId}/start`, null, { params: { data_dir } }),
+
+  scheduleStop: (jobId: string, data_dir = "data/stocks") =>
+    http.post(`/stocks/schedules/${jobId}/stop`, null, { params: { data_dir } }),
+
+  scheduleRunOnce: (jobId: string, data_dir = "data/stocks") =>
+    http.post(`/stocks/schedules/${jobId}/run-once`, null, { params: { data_dir } }),
+
+  scheduleDelete: (jobId: string, data_dir = "data/stocks") =>
+    http.delete(`/stocks/schedules/${jobId}`, { params: { data_dir } }),
+
+  workflowSteps: () => http.get<{ steps: StockWorkflowStepDef[] }>("/stocks/workflow/steps"),
+
+  workflowTemplates: (data_dir = "data/stocks") =>
+    http.get<{ count: number; templates: StockWorkflowTemplate[] }>("/stocks/workflow/templates", {
+      params: { data_dir },
+    }),
+
+  workflowTemplateSave: (body: StockWorkflowTemplate, data_dir = "data/stocks") =>
+    body.id
+      ? http.put<{ ok: boolean; template: StockWorkflowTemplate }>(
+          `/stocks/workflow/templates/${body.id}`,
+          body,
+          { params: { data_dir } },
+        )
+      : http.post<{ ok: boolean; template: StockWorkflowTemplate }>("/stocks/workflow/templates", body, {
+          params: { data_dir },
+        }),
+
+  workflowTemplateDuplicate: (templateId: string, data_dir = "data/stocks", name?: string) =>
+    http.post<{ ok: boolean; template: StockWorkflowTemplate }>(
+      `/stocks/workflow/templates/${templateId}/duplicate`,
+      null,
+      { params: { data_dir, name } },
+    ),
+
+  workflowRun: (body: Record<string, unknown>) =>
+    http.post<StockWorkflowRunResult>("/stocks/workflow/run", {
+      data_dir: "data/stocks",
+      refresh_ohlcv: true,
+      ...body,
+    }),
+
+  workflowRuns: (data_dir = "data/stocks", limit = 20) =>
+    http.get<{ count: number; runs: StockWorkflowRunSummary[] }>("/stocks/workflow/runs", {
+      params: { data_dir, limit },
+    }),
+
+  workflowRunGet: (run_id: string, data_dir = "data/stocks") =>
+    http.get<StockWorkflowRunResult>(`/stocks/workflow/runs/${run_id}`, { params: { data_dir } }),
+
+  announcementsDigest: (data_dir = "data/stocks") =>
+    http.get<{ digest: StockAnnouncementDigest }>("/stocks/announcements/digest", { params: { data_dir } }),
+
+  announcementsItems: (params?: { data_dir?: string; limit?: number }) =>
+    http.get<{ count: number; items: StockAnnouncementItem[] }>("/stocks/announcements/items", {
+      params: { data_dir: params?.data_dir ?? "data/stocks", limit: params?.limit ?? 50 },
+    }),
+
+  announcementsScan: (body?: {
+    symbols?: string[];
+    use_watchlist?: boolean;
+    notice_limit?: number;
+    min_score?: number;
+  }) =>
+    http.post<StockAnnouncementScanResult>("/stocks/announcements/scan", {
+      use_watchlist: true,
+      notice_limit: 15,
+      min_score: 40,
+      ...body,
+    }),
 };
+
+export interface StockWorkflowStepDef {
+  id: string;
+  name: string;
+  description: string;
+  params_schema?: Record<string, unknown>;
+  required?: boolean;
+}
+
+export interface StockWorkflowStepConfig {
+  id: string;
+  enabled: boolean;
+  order: number;
+  params: Record<string, unknown>;
+}
+
+export interface StockWorkflowTemplate {
+  id?: string;
+  name: string;
+  symbol_default?: string;
+  timeframe?: string;
+  data_dir?: string;
+  steps: StockWorkflowStepConfig[];
+}
+
+export interface StockWorkflowStepResult {
+  id: string;
+  status: string;
+  summary?: string;
+  error?: string;
+  elapsed_s?: number;
+  output?: Record<string, unknown>;
+}
+
+export interface StockWorkflowAdvice {
+  headline?: string;
+  stance?: string;
+  advice?: string;
+  bullets?: string[];
+  markdown?: string;
+  disclaimer?: string;
+  suggested_position_pct?: number;
+  risk_level?: string;
+  confidence?: number;
+  signal_agreement?: string;
+  var_gate_triggered?: boolean;
+  price_guidance?: Record<string, unknown> & { available?: boolean };
+}
+
+export interface StockWorkflowRunResult {
+  run_id: string;
+  symbol: string;
+  code?: string;
+  timeframe: string;
+  template_id?: string;
+  template_name?: string;
+  bars?: number;
+  steps: StockWorkflowStepResult[];
+  advice?: StockWorkflowAdvice | null;
+  generated_at?: string;
+  generated_at_beijing?: string;
+}
+
+export interface StockWorkflowRunSummary {
+  run_id: string;
+  symbol?: string;
+  code?: string;
+  stance?: string;
+  risk_level?: string;
+  generated_at?: string;
+}
+
+export interface StockAnnouncementItem {
+  ts?: string;
+  code?: string;
+  title?: string;
+  published?: string;
+  score?: number;
+  keywords?: string[];
+  source?: string;
+  category?: string;
+}
+
+export interface StockAnnouncementDigest {
+  generated_at?: string;
+  symbols_scanned?: number;
+  items_new?: number;
+  top_items?: StockAnnouncementItem[];
+  errors?: Array<{ code?: string; error?: string }>;
+}
+
+export interface StockAnnouncementScanResult {
+  items_processed?: number;
+  items_new?: number;
+  symbols?: string[];
+  digest?: StockAnnouncementDigest;
+  fetch_errors?: Array<{ code?: string; error?: string }>;
+  error?: string;
+}

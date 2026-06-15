@@ -36,6 +36,9 @@ def compute_walk_forward_targets(
     targets = pd.Series(0.0, index=df.index)
     last_model: xgb.XGBRegressor | None = None
     last_metrics: dict[str, Any] = {}
+    oos_preds: list[float] = []
+    oos_labels: list[float] = []
+    n_retrains = 0
 
     for t in range(n):
         if t < train_bars:
@@ -61,6 +64,7 @@ def compute_walk_forward_targets(
             )
             model.fit(x_clean, y_clean)
             last_model = model
+            n_retrains += 1
             pred = model.predict(x_clean)
             ic = float(np.corrcoef(pred, y_clean)[0, 1]) if len(y_clean) > 10 else None
             direction = float((np.sign(pred) == np.sign(y_clean)).mean()) if len(y_clean) > 10 else None
@@ -77,6 +81,32 @@ def compute_walk_forward_targets(
             continue
         pred = float(last_model.predict(x_row)[0])
         targets.iloc[t] = 1.0 if pred > float(params.get("xgb_threshold", 0.0)) else 0.0
+        if t >= train_bars and not np.isnan(labels.iloc[t]):
+            oos_preds.append(pred)
+            oos_labels.append(float(labels.iloc[t]))
+
+    from quant_rd_tool.oos_protocol import build_walk_forward_report, metrics_from_pairs
+
+    oos_metrics = metrics_from_pairs(oos_preds, oos_labels)
+    oos_metrics.update(last_metrics)
+    last_metrics = {
+        **last_metrics,
+        **oos_metrics,
+        "n_retrains": n_retrains,
+        "n_oos_bars": max(0, len(oos_preds)),
+        "oos_protocol": build_walk_forward_report(
+            timeframe=timeframe,
+            params={
+                "train_bars": train_bars,
+                "retrain_every": retrain_every,
+                "label_horizon": label_horizon,
+                "min_train_samples": min_train,
+            },
+            oos_metrics=oos_metrics,
+            n_oos_bars=max(0, len(oos_preds)),
+            n_retrains=n_retrains,
+        ),
+    }
 
     return targets, last_metrics
 
@@ -176,7 +206,19 @@ def run_ml_strategy(
     )
     work = df.copy()
     work["target"] = targets
-    out = run_bar_backtest(work, capital_base=capital_base, warmup=warmup)
+    from quant_rd_tool.stock_ashare_pandas import get_ashare_ctx, run_ashare_bar_backtest
+
+    ctx = get_ashare_ctx()
+    if ctx is not None:
+        out = run_ashare_bar_backtest(
+            work,
+            capital_base=capital_base,
+            warmup=warmup,
+            symbol=str(ctx.get("symbol") or ""),
+        )
+    else:
+        out = run_bar_backtest(work, capital_base=capital_base, warmup=warmup)
     out["ml_metrics"] = ml_metrics
+    out["oos_protocol"] = ml_metrics.get("oos_protocol")
     out["strategy_id"] = strategy_id
     return out

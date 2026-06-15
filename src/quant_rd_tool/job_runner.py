@@ -129,6 +129,7 @@ class JobRunner:
                 "advice": out.get("advice"),
                 "metrics": out.get("metrics"),
                 "strategy_desc": out.get("strategy_desc"),
+                "audit_record": out.get("audit_record"),
             }
             return save_job_result(job_id, snap), out
 
@@ -215,6 +216,45 @@ class JobRunner:
                 "kind": "crypto_workflow",
                 "run_id": out.get("run_id"),
                 "symbol": out.get("symbol"),
+                "timeframe": out.get("timeframe"),
+                "template_id": out.get("template_id"),
+                "stance": advice.get("stance"),
+                "risk_level": advice.get("risk_level"),
+                "headline": advice.get("headline"),
+                "data_dir": data_dir,
+            }
+            return save_job_result(job_id, snap), out
+
+        if jtype == "stock_workflow":
+            from quant_rd_tool.stock_workflow import resolve_template_for_run, run_workflow
+
+            data_dir = str(payload.get("data_dir", "data/stocks"))
+            tpl = resolve_template_for_run(
+                data_dir=data_dir,
+                template_id=payload.get("template_id"),
+                template=payload.get("template"),
+                timeframe=payload.get("timeframe"),
+                steps=payload.get("steps"),
+            )
+            sym = str(payload.get("symbol") or tpl.get("symbol_default") or "600519").strip()
+
+            def _on_progress(progress: float, message: str) -> None:
+                self.store.mark_progress(job_id, progress, message=message)
+
+            out = run_workflow(
+                symbol=sym,
+                template=tpl,
+                data_dir=data_dir,
+                refresh_ohlcv=bool(payload.get("refresh_ohlcv", True)),
+                save=True,
+                progress_cb=_on_progress,
+            )
+            advice = out.get("advice") or {}
+            snap = {
+                "kind": "stock_workflow",
+                "run_id": out.get("run_id"),
+                "symbol": out.get("symbol"),
+                "code": out.get("code"),
                 "timeframe": out.get("timeframe"),
                 "template_id": out.get("template_id"),
                 "stance": advice.get("stance"),

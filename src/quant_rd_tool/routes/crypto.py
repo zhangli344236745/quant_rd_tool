@@ -483,6 +483,7 @@ class ScheduleAlertRulesRequest(BaseModel):
     bark: dict[str, Any] | None = None
     webhook_on_alert: bool | None = None
     on_cycle_complete: bool | None = None
+    on_stance_changed: bool | None = None
     crypto_news: dict[str, Any] | None = None
 
 
@@ -579,6 +580,7 @@ def schedule_alerts_rules_save(req: ScheduleAlertRulesRequest) -> dict[str, Any]
             bark=req.bark,
             webhook_on_alert=req.webhook_on_alert,
             on_cycle_complete=req.on_cycle_complete,
+            on_stance_changed=req.on_stance_changed,
             crypto_news=req.crypto_news,
         )
     except ValueError as e:

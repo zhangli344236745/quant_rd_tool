@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref, watch } from "vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
 import { ElMessageBox } from "element-plus";
 import { cryptoApi } from "@/api/crypto";
+import { stocksApi } from "@/api/stocks";
 import { extractError } from "@/api/http";
 import AlertFeedPanel from "@/components/AlertFeedPanel.vue";
 import ResultPanel from "@/components/ResultPanel.vue";
@@ -9,7 +10,10 @@ import { useNotify } from "@/composables/useNotify";
 
 const notify = useNotify();
 
-const dataDir = "data/crypto";
+const marketTab = ref<"crypto" | "astock">("crypto");
+const dataDir = computed(() => (marketTab.value === "astock" ? "data/stocks" : "data/crypto"));
+const scheduleApi = computed(() => (marketTab.value === "astock" ? stocksApi : cryptoApi));
+
 const jobs = ref<Record<string, unknown>[]>([]);
 const loading = ref(false);
 const actionLoading = ref("");
@@ -24,6 +28,7 @@ const alertRules = reactive({
   cooldown_minutes: 15,
   webhook_on_alert: true,
   on_cycle_complete: true,
+  on_stance_changed: true,
 });
 const bark = reactive({
   enabled: false,
@@ -49,6 +54,21 @@ const createForm = reactive({
   job_type: "analysis" as "analysis" | "news",
 });
 
+const stockCreateForm = reactive({
+  symbols: ["600519"],
+  name: "茅台 qlib",
+  id: "",
+  interval_minutes: 1440,
+  years: 2,
+  with_openbb: false,
+  use_watchlist: false,
+  auto_start: false,
+});
+
+watch(marketTab, () => {
+  load();
+});
+
 watch(
   () => createForm.job_type,
   (t) => {
@@ -66,6 +86,8 @@ watch(
 
 function jobTypeLabel(t: string) {
   if (t === "news") return "舆论扫描";
+  if (t === "stock_watchlist") return "自选刷新";
+  if (t === "stock_qlib") return "A股 qlib";
   return "行情分析";
 }
 
@@ -73,7 +95,7 @@ async function load() {
   loading.value = true;
   error.value = "";
   try {
-    const { data } = await cryptoApi.schedulesList(dataDir);
+    const { data } = await scheduleApi.value.schedulesList(dataDir.value);
     jobs.value = (data as { jobs?: Record<string, unknown>[] }).jobs || [];
   } catch (e) {
     error.value = extractError(e);
@@ -84,7 +106,21 @@ async function load() {
 
 async function createJob() {
   try {
-    await cryptoApi.scheduleCreate({ ...createForm, data_dir: dataDir, with_ml: true, ml_algorithm: "both" });
+    if (marketTab.value === "astock") {
+      await stocksApi.scheduleCreate({
+        ...stockCreateForm,
+        data_dir: dataDir.value,
+        with_ml: true,
+        ml_algorithm: "both",
+      });
+    } else {
+      await cryptoApi.scheduleCreate({
+        ...createForm,
+        data_dir: dataDir.value,
+        with_ml: true,
+        ml_algorithm: "both",
+      });
+    }
     notify.success("任务已创建");
     await load();
   } catch (e) {
@@ -95,15 +131,17 @@ async function createJob() {
 async function runAction(jobId: string, action: "start" | "stop" | "run-once" | "delete") {
   actionLoading.value = `${jobId}-${action}`;
   try {
-    if (action === "start") await cryptoApi.scheduleStart(jobId, dataDir);
-    else if (action === "stop") await cryptoApi.scheduleStop(jobId, dataDir);
+    const api = scheduleApi.value;
+    const dir = dataDir.value;
+    if (action === "start") await api.scheduleStart(jobId, dir);
+    else if (action === "stop") await api.scheduleStop(jobId, dir);
     else if (action === "run-once") {
-      const { data } = await cryptoApi.scheduleRunOnce(jobId, dataDir);
+      const { data } = await api.scheduleRunOnce(jobId, dir);
       lastRun.value = data;
       notify.success("已执行一轮");
     } else {
       await ElMessageBox.confirm(`删除任务 ${jobId}?`, "确认");
-      await cryptoApi.scheduleDelete(jobId, dataDir);
+      await api.scheduleDelete(jobId, dir);
       notify.success("已删除");
     }
     if (action !== "run-once") await load();
@@ -129,6 +167,7 @@ async function loadAlertRules() {
     }
     alertRules.webhook_on_alert = data.webhook_on_alert !== false;
     alertRules.on_cycle_complete = data.on_cycle_complete !== false;
+    alertRules.on_stance_changed = data.on_stance_changed !== false;
     customRulesJson.value = JSON.stringify(data.custom_rules || [], null, 2);
   } catch {
     /* optional */
@@ -218,7 +257,7 @@ async function testBark() {
 
 async function checkStale() {
   try {
-    const { data } = await cryptoApi.scheduleAlertsCheckStale(dataDir);
+    const { data } = await cryptoApi.scheduleAlertsCheckStale(dataDir.value);
     notify.info(
       data.count ? `检测到 ${data.count} 条卡住任务` : "无卡住任务",
       data.count ? "已写入告警日志" : undefined,
@@ -244,14 +283,19 @@ onMounted(async () => {
   <div>
     <h1 class="page-title">定时任务</h1>
     <p class="page-desc">
-      管理 data/crypto/schedules.json 中的调度任务：K 线 + 分析，或独立「舆论扫描」RSS 舆情任务。
+      管理 Crypto / A股 调度任务：Crypto 为 K 线 + 分析或舆论扫描；A股 为 qlib 日线分析（支持自选列表）。
     </p>
+
+    <el-tabs v-model="marketTab" class="market-tabs">
+      <el-tab-pane label="Crypto" name="crypto" />
+      <el-tab-pane label="A股" name="astock" />
+    </el-tabs>
 
     <el-row :gutter="20">
       <el-col :span="8">
         <el-card shadow="never" class="panel-card">
-          <template #header>新建任务</template>
-          <el-form label-width="100px" size="small">
+          <template #header>新建任务 · {{ marketTab === "astock" ? "A股" : "Crypto" }}</template>
+          <el-form v-if="marketTab === 'crypto'" label-width="100px" size="small">
             <el-form-item label="任务类型">
               <el-select v-model="createForm.job_type" style="width: 100%">
                 <el-option label="行情分析" value="analysis" />
@@ -272,6 +316,28 @@ onMounted(async () => {
             <router-link v-if="createForm.job_type === 'news'" to="/crypto-news" class="news-link">
               舆论雷达配置 →
             </router-link>
+          </el-form>
+          <el-form v-else label-width="100px" size="small">
+            <el-form-item label="名称"><el-input v-model="stockCreateForm.name" /></el-form-item>
+            <el-form-item label="ID"><el-input v-model="stockCreateForm.id" placeholder="留空自动生成" /></el-form-item>
+            <el-form-item label="自选模式">
+              <el-switch v-model="stockCreateForm.use_watchlist" />
+              <span class="hint">开启后分析 watchlist 全部标的</span>
+            </el-form-item>
+            <el-form-item v-if="!stockCreateForm.use_watchlist" label="代码">
+              <el-select v-model="stockCreateForm.symbols" multiple filterable allow-create default-first-option>
+                <el-option label="600519 茅台" value="600519" />
+                <el-option label="000001 平安" value="000001" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="回溯(年)"><el-input-number v-model="stockCreateForm.years" :min="1" :max="10" /></el-form-item>
+            <el-form-item label="OpenBB"><el-switch v-model="stockCreateForm.with_openbb" /></el-form-item>
+            <el-form-item label="间隔(分)">
+              <el-input-number v-model="stockCreateForm.interval_minutes" :min="60" :step="60" />
+              <span class="hint">建议 1440（收盘后每日）</span>
+            </el-form-item>
+            <el-form-item label="自动启动"><el-switch v-model="stockCreateForm.auto_start" /></el-form-item>
+            <el-button type="primary" @click="createJob">创建</el-button>
           </el-form>
         </el-card>
       </el-col>
@@ -344,6 +410,10 @@ onMounted(async () => {
             <el-form-item label="周期完成推送">
               <el-switch v-model="alertRules.on_cycle_complete" :disabled="!bark.enabled || !bark.device_key_configured" />
               <span class="hint">每轮分析成功跑完后推送到 Bark（需开启下方 Bark 推送）</span>
+            </el-form-item>
+            <el-form-item label="立场变化">
+              <el-switch v-model="alertRules.on_stance_changed" />
+              <span class="hint">报告 stance 变化时告警（A股/Crypto 均适用）</span>
             </el-form-item>
             <el-form-item label="Bark 推送">
               <el-switch
@@ -428,6 +498,9 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+.market-tabs {
+  margin-bottom: 12px;
+}
 .mt {
   margin-top: 12px;
 }

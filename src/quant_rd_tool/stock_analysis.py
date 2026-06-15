@@ -400,17 +400,36 @@ def analyze_stock(
     report["markdown"] = _render_markdown(report)
 
     from quant_rd_tool.report_versions import archive_report_if_exists
+    from quant_rd_tool.research_audit import hash_payload, record_research_run
 
     archive_report_if_exists(root)
 
+    report_body = {k: v for k, v in report.items() if k != "markdown"}
+    content_hash = hash_payload(report_body)
+    compliance = record_research_run(
+        "analyze_stock",
+        code=ak_data.to_ak_code(symbol),
+        inputs={
+            "start_date": start_date,
+            "end_date": end_date,
+            "with_ml": with_ml,
+            "ml_algorithm": ml_algorithm,
+            "data_provider": data_provider,
+        },
+        outputs_summary={
+            "stance": narrative.get("stance"),
+            "content_hash": content_hash,
+            "qlib_code": qlib_code,
+        },
+        data_dir=data_dir,
+    )
+    report_body["_compliance"] = compliance
+
     report_json_path(root).write_text(
-        json.dumps(
-            {k: v for k, v in report.items() if k != "markdown"},
-            ensure_ascii=False,
-            indent=2,
-        ),
+        json.dumps(report_body, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
     report_md_path(root).write_text(report["markdown"], encoding="utf-8")
 
+    report["_compliance"] = compliance
     return report

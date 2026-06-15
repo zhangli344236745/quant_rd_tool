@@ -7,7 +7,8 @@ export type JobType =
   | "macro_panel"
   | "crypto_analyze"
   | "crypto_options_vol_scan"
-  | "crypto_workflow";
+  | "crypto_workflow"
+  | "stock_workflow";
 
 export interface JobRecord {
   id: string;
@@ -30,6 +31,7 @@ export const JOB_TYPE_LABELS: Record<string, string> = {
   crypto_analyze: "Crypto 分析",
   crypto_options_vol_scan: "期权 IV 扫描",
   crypto_workflow: "Crypto Workflow",
+  stock_workflow: "A股 Workflow",
 };
 
 export const jobsApi = {
@@ -59,6 +61,9 @@ export const jobsApi = {
   cryptoWorkflow: (body: Record<string, unknown>) =>
     http.post<{ job_id: string }>("/jobs/crypto-workflow", body),
 
+  stockWorkflow: (body: Record<string, unknown>) =>
+    http.post<{ job_id: string }>("/jobs/stock-workflow", body),
+
   batchQlib: (body: { codes: string[]; years?: number; with_ml?: boolean }) =>
     http.post<{ job_ids: string[] }>("/jobs/batch-qlib", body),
 
@@ -80,9 +85,14 @@ export const jobsApi = {
     watchlist_only?: boolean;
     codes?: string[];
     limit?: number;
-    job_type?: "qlib_analyze" | "analyze_stock";
+    job_type?: "qlib_analyze" | "analyze_stock" | "stock_workflow";
     years?: number;
     max_attempts?: number;
+    high_impact_only?: boolean;
+    notice_keyword?: string;
+    template_id?: string;
+    workflow_steps?: Record<string, unknown>[];
+    refresh?: boolean;
   }) =>
     http.post<{ job_ids: string[]; matched: number; enqueued: number }>(
       "/jobs/screener-enqueue",

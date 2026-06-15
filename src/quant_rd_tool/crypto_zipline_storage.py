@@ -66,6 +66,34 @@ def save_run(data_dir: str | Path, result: dict[str, Any]) -> dict[str, Any]:
         "generated_at": result.get("generated_at"),
     }
     append_run_index(data_dir, index_row)
+
+    if result.get("market") == "stock":
+        from quant_rd_tool.research_audit import record_research_run
+
+        metrics = result.get("metrics") or {}
+        audit = record_research_run(
+            "zipline_lab",
+            code=result.get("code") or result.get("symbol"),
+            inputs={
+                "strategy": result.get("strategy"),
+                "start": result.get("start"),
+                "end": result.get("end"),
+                "engine": result.get("engine"),
+                "capital_base": result.get("capital_base"),
+            },
+            outputs_summary={
+                "total_return": metrics.get("total_return"),
+                "sharpe": metrics.get("sharpe"),
+                "run_id": run_id,
+                "oos_passed": (result.get("oos_protocol") or {}).get("gate", {}).get("passed"),
+            },
+            data_dir=data_dir,
+            run_id=run_id,
+        )
+        payload["audit_record"] = audit
+        (rd / "result.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        result["audit_record"] = audit
+
     return result
 
 

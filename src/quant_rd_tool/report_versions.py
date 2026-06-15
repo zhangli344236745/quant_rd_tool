@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from quant_rd_tool.stock_storage import report_json_path, report_md_path, stock_root
+from quant_rd_tool.research_audit import hash_payload, is_report_locked
 
 
 def _version_id_from_path(path: Path) -> str:
@@ -39,8 +40,10 @@ def archive_report_if_exists(root: Path) -> str | None:
     try:
         old = json.loads(rjson.read_text(encoding="utf-8"))
         stance = (old.get("narrative") or {}).get("stance")
+        content_hash = hash_payload({k: v for k, v in old.items() if k != "_compliance"})
     except Exception:
         stance = None
+        content_hash = None
     meta_path = reports_dir(root) / f"{vid}.meta.json"
     meta_path.write_text(
         json.dumps(
@@ -49,6 +52,7 @@ def archive_report_if_exists(root: Path) -> str | None:
                 "archived_at": datetime.now(UTC).isoformat(),
                 "source_mtime": mtime.isoformat(),
                 "stance": stance,
+                "content_hash": content_hash,
             },
             ensure_ascii=False,
             indent=2,
@@ -70,6 +74,8 @@ def list_report_versions(code: str, *, data_dir: str | Path = "data/stocks") -> 
                 "version_id": "latest",
                 "report_mtime": datetime.fromtimestamp(latest_json.stat().st_mtime, tz=UTC).isoformat(),
                 "is_latest": True,
+                "locked": is_report_locked(code, "latest", data_dir=data_dir),
+                "content_hash": _report_content_hash(latest_json),
                 **summary,
             }
         )
@@ -79,11 +85,14 @@ def list_report_versions(code: str, *, data_dir: str | Path = "data/stocks") -> 
                 continue
             vid = _version_id_from_path(p)
             summary = _read_summary(p)
+            meta = _read_version_meta(root, vid)
             rows.append(
                 {
                     "version_id": vid,
                     "report_mtime": datetime.fromtimestamp(p.stat().st_mtime, tz=UTC).isoformat(),
                     "is_latest": False,
+                    "locked": is_report_locked(code, vid, data_dir=data_dir),
+                    "content_hash": meta.get("content_hash"),
                     **summary,
                 }
             )
@@ -100,6 +109,58 @@ def _read_summary(path: Path) -> dict[str, Any]:
         "stance": narrative.get("stance") if isinstance(narrative, dict) else None,
         "summary": narrative.get("summary") if isinstance(narrative, dict) else None,
         "generated_at": data.get("generated_at"),
+    }
+
+
+def _read_version_meta(root: Path, version_id: str) -> dict[str, Any]:
+    path = reports_dir(root) / f"{version_id}.meta.json"
+    if not path.is_file():
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _report_content_hash(path: Path) -> str | None:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    return hash_payload({k: v for k, v in data.items() if k != "_compliance"})
+
+
+def verify_report_version(
+    code: str,
+    version_id: str,
+    *,
+    data_dir: str | Path = "data/stocks",
+) -> dict[str, Any]:
+    root = stock_root(data_dir, code)
+    if version_id == "latest":
+        path = report_json_path(root)
+        stored_meta = {}
+    else:
+        path = reports_dir(root) / f"{version_id}.json"
+        stored_meta = _read_version_meta(root, version_id)
+    if not path.is_file():
+        return {"valid": False, "message": f"Version not found: {version_id}"}
+    current = _report_content_hash(path)
+    expected = stored_meta.get("content_hash")
+    if version_id != "latest" and expected and current != expected:
+        return {
+            "valid": False,
+            "version_id": version_id,
+            "content_hash": current,
+            "expected_hash": expected,
+            "message": "content hash mismatch — file may have been tampered",
+        }
+    return {
+        "valid": True,
+        "version_id": version_id,
+        "content_hash": current,
+        "expected_hash": expected,
+        "locked": is_report_locked(code, version_id, data_dir=data_dir),
     }
 
 

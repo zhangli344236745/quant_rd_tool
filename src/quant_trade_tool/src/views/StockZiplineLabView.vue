@@ -752,7 +752,16 @@ onMounted(async () => {
         <el-tag type="info">总收益 {{ pct(result.metrics?.total_return) }}</el-tag>
         <el-tag type="info">Sharpe {{ result.metrics?.sharpe ?? "—" }}</el-tag>
         <el-tag type="warning">最大回撤 {{ pct(result.metrics?.max_drawdown) }}</el-tag>
-        <el-tag>交易 {{ result.metrics?.trade_count ?? 0 }} 次</el-tag>
+        <el-tag v-if="result.cost_model?.market === 'ashare'" type="success">A股规则</el-tag>
+        <el-tag v-if="result.cost_model?.total_fees != null" type="info">
+          费用 {{ result.cost_model.total_fees }}
+        </el-tag>
+        <el-tag v-if="result.oos_protocol?.gate" :type="result.oos_protocol.gate.passed ? 'success' : 'warning'">
+          OOS {{ result.oos_protocol.gate.passed ? "通过" : "未通过" }}
+        </el-tag>
+        <el-tag v-if="result.audit_record?.run_id" type="info">
+          审计 {{ String(result.audit_record.run_id).slice(0, 8) }}
+        </el-tag>
         <el-tag v-if="result.final_signal" type="success">
           末 bar {{ result.final_signal.position }} ({{ Math.round((result.final_signal.target_pct ?? 0) * 100) }}%)
         </el-tag>
@@ -765,6 +774,11 @@ onMounted(async () => {
           方向命中 {{ (result.ml_metrics.direction_accuracy * 100).toFixed(1) }}%
         </el-tag>
       </div>
+      <el-collapse v-if="result.oos_protocol?.markdown" class="mt">
+        <el-collapse-item title="OOS 协议报告" name="oos">
+          <pre class="oos-md">{{ result.oos_protocol.markdown }}</pre>
+        </el-collapse-item>
+      </el-collapse>
       <EquityCurveChart
         v-if="result.equity_curve?.length"
         :data="result.equity_curve"
@@ -834,6 +848,11 @@ onMounted(async () => {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+.oos-md {
+  font-size: 12px;
+  white-space: pre-wrap;
+  margin: 0;
 }
 .mb {
   margin-bottom: 12px;

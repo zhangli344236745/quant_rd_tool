@@ -46,12 +46,16 @@ class ScreenerEnqueueRequest(BaseModel):
     watchlist_only: bool = False
     codes: list[str] = Field(default_factory=list)
     limit: int = Field(20, ge=1, le=50)
-    job_type: Literal["qlib_analyze", "analyze_stock"] = "qlib_analyze"
+    job_type: Literal["qlib_analyze", "analyze_stock", "stock_workflow"] = "qlib_analyze"
     years: int = Field(2, ge=1, le=10)
     refresh: bool = True
     with_ml: bool = True
     ml_algorithm: str = "both"
     max_attempts: int = Field(2, ge=1, le=5)
+    high_impact_only: bool = False
+    notice_keyword: str = ""
+    template_id: str | None = None
+    workflow_steps: list[dict[str, Any]] | None = None
 
 
 class BatchQlibRequest(BaseModel):
@@ -100,6 +104,16 @@ class CryptoOptionsVolScanJobRequest(BaseModel):
     data_dir: str = "data/crypto"
     symbols: list[str] | None = None
     lookback_days: int | None = None
+
+
+class StockWorkflowJobRequest(BaseModel):
+    symbol: str | None = None
+    timeframe: str | None = None
+    template_id: str | None = None
+    template: dict[str, Any] | None = None
+    steps: list[dict[str, Any]] | None = None
+    data_dir: str = "data/stocks"
+    refresh_ohlcv: bool = True
 
 
 class CryptoWorkflowJobRequest(BaseModel):
@@ -186,6 +200,17 @@ def enqueue_crypto_workflow(req: CryptoWorkflowJobRequest, request: Request) -> 
     return {"job_id": job["id"]}
 
 
+@router.post("/stock-workflow", status_code=202)
+def enqueue_stock_workflow(req: StockWorkflowJobRequest, request: Request) -> dict[str, str]:
+    store = _store(request)
+    job = store.create(
+        type="stock_workflow",
+        code=(req.symbol or "600519").strip(),
+        payload=req.model_dump(),
+    )
+    return {"job_id": job["id"]}
+
+
 @router.post("/crypto-options-vol-scan", status_code=202)
 def enqueue_crypto_options_vol_scan(
     req: CryptoOptionsVolScanJobRequest,
@@ -211,13 +236,26 @@ def enqueue_screener(req: ScreenerEnqueueRequest, request: Request) -> dict[str,
         stance_in=req.stance_in,
         watchlist_only=req.watchlist_only,
         codes=req.codes,
+        high_impact_only=req.high_impact_only,
+        notice_keyword=req.notice_keyword,
         page=1,
         page_size=req.limit,
     )
     job_ids: list[str] = []
     for row in screened["items"]:
         code = row["code"]
-        if req.job_type == "qlib_analyze":
+        if req.job_type == "stock_workflow":
+            payload = {
+                "symbol": code,
+                "data_dir": "data/stocks",
+                "template_id": req.template_id,
+                "steps": req.workflow_steps,
+                "refresh_ohlcv": req.refresh,
+                "max_attempts": req.max_attempts,
+                "_attempt": 1,
+            }
+            job = store.create(type="stock_workflow", code=code, payload=payload)
+        elif req.job_type == "qlib_analyze":
             payload = {
                 "years": req.years,
                 "refresh": req.refresh,

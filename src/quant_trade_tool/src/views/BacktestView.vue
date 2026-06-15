@@ -82,6 +82,38 @@ async function run(wait: boolean) {
       </el-col>
       <el-col :span="14">
         <ResultPanel :loading="polling" :result="result" :error="error" title="回测摘要" />
+        <el-card v-if="result?.oos_summary && form.signal_mode === 'ml'" shadow="never" class="panel-card mt">
+          <template #header>OOS 协议摘要（ML Top-K）</template>
+          <el-descriptions :column="2" size="small" border>
+            <el-descriptions-item label="覆盖标的">{{ result.oos_summary.instruments_with_oos ?? "—" }}</el-descriptions-item>
+            <el-descriptions-item label="门控通过">{{ result.oos_summary.gate_pass_count ?? "—" }} / {{ result.oos_summary.instruments_with_oos ?? "—" }}</el-descriptions-item>
+            <el-descriptions-item label="平均测试 IC">{{ result.oos_summary.mean_test_ic ?? "—" }}</el-descriptions-item>
+            <el-descriptions-item label="通过率">{{ result.oos_summary.gate_pass_rate != null ? (result.oos_summary.gate_pass_rate * 100).toFixed(1) + '%' : "—" }}</el-descriptions-item>
+          </el-descriptions>
+        </el-card>
+        <el-card v-if="result?.execution_rules" shadow="never" class="panel-card mt">
+          <template #header>A 股执行规则</template>
+          <el-descriptions :column="2" size="small" border>
+            <el-descriptions-item label="T+1">{{ result.execution_rules.t_plus_one ? "是" : "否" }}</el-descriptions-item>
+            <el-descriptions-item label="整手">{{ result.execution_rules.lot_size }} 股</el-descriptions-item>
+            <el-descriptions-item label="涨跌停模型">{{ result.execution_rules.limit_model }}</el-descriptions-item>
+            <el-descriptions-item label="印花税">{{ ((result.execution_rules.fee_schedule?.stamp_duty_rate ?? 0) * 100).toFixed(2) }}%（卖）</el-descriptions-item>
+          </el-descriptions>
+          <div v-if="result?.cost_summary" class="cost-tags mt">
+            <el-tag type="info">佣金 {{ result.cost_summary.total_commission?.toFixed?.(2) ?? result.cost_summary.total_commission }}</el-tag>
+            <el-tag type="warning">印花税 {{ result.cost_summary.total_stamp_duty?.toFixed?.(2) ?? result.cost_summary.total_stamp_duty }}</el-tag>
+            <el-tag v-if="result.cost_summary.blocked_limit_up">涨停阻断 {{ result.cost_summary.blocked_limit_up }}</el-tag>
+            <el-tag v-if="result.cost_summary.blocked_t_plus_one">T+1 阻断 {{ result.cost_summary.blocked_t_plus_one }}</el-tag>
+          </div>
+        </el-card>
+        <el-card v-if="result?.audit_record" shadow="never" class="panel-card mt">
+          <template #header>合规审计</template>
+          <el-descriptions :column="1" size="small" border>
+            <el-descriptions-item label="run_id">{{ result.audit_record.run_id }}</el-descriptions-item>
+            <el-descriptions-item label="链哈希">{{ result.audit_record.entry_hash }}</el-descriptions-item>
+            <el-descriptions-item label="内容哈希">{{ result.audit_record.content_hash }}</el-descriptions-item>
+          </el-descriptions>
+        </el-card>
         <el-card v-if="result?.advice" shadow="never" class="panel-card mt">
           <template #header>投资建议</template>
           <pre class="advice">{{ JSON.stringify(result.advice, null, 2) }}</pre>
@@ -99,5 +131,10 @@ async function run(wait: boolean) {
   margin: 0;
   font-size: 12px;
   white-space: pre-wrap;
+}
+.cost-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 </style>

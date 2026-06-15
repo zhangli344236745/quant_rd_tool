@@ -7,8 +7,10 @@ import { jobsApi } from "@/api/jobs";
 import { openJobDrawer } from "@/composables/jobDrawer";
 import { stocksApi, type StockListItem } from "@/api/stocks";
 import { extractError } from "@/api/http";
+import { useNotify } from "@/composables/useNotify";
 
 const router = useRouter();
+const notify = useNotify();
 const listMode = ref<"all" | "watch" | "reports">("all");
 const watchCodes = ref<Set<string>>(new Set());
 const reportCodes = ref<Set<string>>(new Set());
@@ -22,6 +24,20 @@ const total = ref(0);
 const items = ref<StockListItem[]>([]);
 const loading = ref(false);
 const error = ref("");
+const listRefreshing = ref(false);
+
+async function refreshListCache() {
+  listRefreshing.value = true;
+  try {
+    const { data } = await stocksApi.listRefresh();
+    notify.success("列表已更新", `共 ${data.count} 家上市公司`);
+    await load();
+  } catch (e) {
+    notify.error("更新失败", extractError(e));
+  } finally {
+    listRefreshing.value = false;
+  }
+}
 
 async function loadWatchlist() {
   try {
@@ -155,6 +171,7 @@ onMounted(async () => {
           </template>
         </el-input>
         <el-button type="primary" :loading="loading" @click="load">刷新</el-button>
+        <el-button :loading="listRefreshing" @click="refreshListCache">更新列表缓存</el-button>
         <el-button type="warning" :disabled="!selected.length" @click="batchQlib">
           批量 Qlib（{{ selected.length }}）
         </el-button>

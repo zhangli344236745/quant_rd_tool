@@ -29,6 +29,10 @@ class BacktestRequest(BaseModel):
         "auto",
         description="auto | akshare | openbb",
     )
+    use_ashare_rules: bool = Field(
+        True,
+        description="启用 A 股 T+1/涨跌停/整手/印花税 等执行规则",
+    )
 
 
 @router.post("/run")
@@ -48,6 +52,7 @@ def run(req: BacktestRequest) -> dict[str, Any]:
             signal_mode=req.signal_mode,
             ml_algorithm=req.ml_algorithm,  # type: ignore[arg-type]
             data_provider=provider,
+            use_ashare_rules=req.use_ashare_rules,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e

@@ -137,8 +137,6 @@ def run_combo_pandas(
     combo_spec: dict[str, Any],
     capital_base: float,
 ) -> dict[str, Any]:
-    from quant_rd_tool.crypto_zipline_pandas import run_bar_backtest
-
     work = df.copy()
     leg_cols: list[pd.Series] = []
     weights: list[float] = []
@@ -155,7 +153,20 @@ def run_combo_pandas(
 
     work["target"] = pd.Series(combined, index=work.index)
     warmup = combo_min_bars(combo_spec)
-    out = run_bar_backtest(work, capital_base=capital_base, warmup=warmup)
+    from quant_rd_tool.stock_ashare_pandas import get_ashare_ctx, run_ashare_bar_backtest
+
+    ctx = get_ashare_ctx()
+    if ctx is not None:
+        out = run_ashare_bar_backtest(
+            work,
+            capital_base=capital_base,
+            warmup=warmup,
+            symbol=str(ctx.get("symbol") or ""),
+        )
+    else:
+        from quant_rd_tool.crypto_zipline_pandas import run_bar_backtest
+
+        out = run_bar_backtest(work, capital_base=capital_base, warmup=warmup)
     out["strategy_params"] = combo_spec
     out["combo_legs"] = [leg["strategy"] for leg in combo_spec["legs"]]
     return out

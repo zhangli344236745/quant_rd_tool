@@ -6,14 +6,13 @@ import json
 import logging
 import re
 import time
+from datetime import UTC, date, datetime, timedelta
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
 import akshare as ak
 import pandas as pd
-
-from datetime import date, timedelta
 
 from quant_rd_tool.akshare_data import _retry, to_ak_code, to_qlib_code
 
@@ -76,6 +75,15 @@ def _fetch_a_stock_list_raw() -> list[dict[str, str]]:
         )
     _save_list_cache(items)
     return items
+
+
+def refresh_a_stock_list() -> dict[str, Any]:
+    """Clear cached A-share universe and fetch fresh list from akshare."""
+    _fetch_a_stock_list_raw.cache_clear()
+    if _LIST_CACHE_FILE.exists():
+        _LIST_CACHE_FILE.unlink(missing_ok=True)
+    items = _fetch_a_stock_list_raw()
+    return {"count": len(items), "refreshed_at": datetime.now(UTC).isoformat()}
 
 
 def list_a_stocks(
@@ -349,6 +357,7 @@ def run_qlib_stock_analysis(
     data_dir: str = "data/stocks",
     with_ml: bool = True,
     ml_algorithm: str = "both",
+    with_openbb_enrichment: bool = False,
 ) -> dict[str, Any]:
     """
     Pull ~N years of daily bars, dump qlib bins, run technical + qlib risk + optional ML.
@@ -369,7 +378,7 @@ def run_qlib_stock_analysis(
         benchmark="sh000300",
         with_ml=with_ml,
         ml_algorithm=ml_algorithm,  # type: ignore[arg-type]
-        with_openbb_enrichment=False,
+        with_openbb_enrichment=with_openbb_enrichment,
     )
     summary = summarize_qlib_report(report)
     return {

@@ -31,6 +31,16 @@ const router = createRouter({
           component: () => import("@/views/AStockScreenerView.vue"),
         },
         {
+          path: "stock-workflow",
+          name: "stock-workflow",
+          component: () => import("@/views/StockWorkflowView.vue"),
+        },
+        {
+          path: "stock-announcements",
+          name: "stock-announcements",
+          component: () => import("@/views/StockAnnouncementRadarView.vue"),
+        },
+        {
           path: "stock-zipline",
           name: "stock-zipline",
           component: () => import("@/views/StockZiplineLabView.vue"),

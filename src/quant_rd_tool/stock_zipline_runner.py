@@ -37,32 +37,38 @@ def run_pandas_backtest(
     timeframe: str = DEFAULT_TIMEFRAME,
     symbol: str = "600519",
     data_dir: str = "data/stocks",
+    use_ashare_rules: bool = True,
 ) -> dict[str, Any]:
-    if combo_spec:
-        out = run_combo_pandas(df, combo_spec, capital_base)
-        out["engine"] = "pandas"
-        out["market"] = "stock"
-        return out
+    from quant_rd_tool.stock_ashare_pandas import ashare_backtest_context
 
-    spec = get_strategy(strategy_id)
-    if not spec:
-        raise ValueError(f"Unknown strategy: {strategy_id}")
-    if not is_stock_strategy(strategy_id):
-        raise ValueError(f"Strategy {strategy_id} is not available for A-share lab")
-    params = {**spec["default_params"], **(strategy_params or {})}
-    if strategy_id.startswith("xgb_"):
-        params["_timeframe"] = normalize_timeframe(timeframe)
-    min_bars = int(spec.get("min_bars", 20))
-    if len(df) < min_bars:
-        raise ValueError(f"Need at least {min_bars} bars, got {len(df)}")
-    runner = get_runner(strategy_id)
-    if not runner:
-        raise ValueError(f"No runner for strategy: {strategy_id}")
-    out = runner(df, params, capital_base)
-    out["engine"] = "pandas"
-    out["strategy_params"] = params
-    out["market"] = "stock"
-    return out
+    with ashare_backtest_context(symbol=symbol, use_ashare=use_ashare_rules):
+        if combo_spec:
+            out = run_combo_pandas(df, combo_spec, capital_base)
+            out["engine"] = "pandas"
+            out["market"] = "stock"
+            return out
+
+        spec = get_strategy(strategy_id)
+        if not spec:
+            raise ValueError(f"Unknown strategy: {strategy_id}")
+        if not is_stock_strategy(strategy_id):
+            raise ValueError(f"Strategy {strategy_id} is not available for A-share lab")
+        params = {**spec["default_params"], **(strategy_params or {})}
+        if strategy_id.startswith("xgb_"):
+            params["_timeframe"] = normalize_timeframe(timeframe)
+        min_bars = int(spec.get("min_bars", 20))
+        if len(df) < min_bars:
+            raise ValueError(f"Need at least {min_bars} bars, got {len(df)}")
+        runner = get_runner(strategy_id)
+        if not runner:
+            raise ValueError(f"No runner for strategy: {strategy_id}")
+        out = runner(df, params, capital_base)
+        out["engine"] = "pandas"
+        out["strategy_params"] = params
+        out["market"] = "stock"
+        if use_ashare_rules:
+            out["execution_engine"] = "ashare_pandas"
+        return out
 
 
 def run_zipline_subprocess(
@@ -183,6 +189,7 @@ def run_backtest(
     force_reingest: bool = False,
     timeframe: str = DEFAULT_TIMEFRAME,
     combo_spec: dict[str, Any] | None = None,
+    use_ashare_rules: bool = True,
 ) -> dict[str, Any]:
     tf = normalize_timeframe(timeframe)
     if not is_stock_strategy(strategy_id) and not combo_spec:
@@ -209,6 +216,7 @@ def run_backtest(
             timeframe=tf,
             symbol=symbol,
             data_dir=data_dir,
+            use_ashare_rules=use_ashare_rules,
         )
 
     spec = get_strategy(strategy_id)
@@ -235,12 +243,17 @@ def run_backtest(
             timeframe=tf,
             symbol=symbol,
             data_dir=data_dir,
+            use_ashare_rules=use_ashare_rules,
         )
         out["engine"] = "pandas"
         out["ml_preferred_engine"] = True
         return out
 
     z_ok, z_err = zipline_installed()
+    if use_ashare_rules and engine in ("zipline", "auto") and z_ok:
+        engine = "pandas"
+        z_err = z_err or "ashare_execution_rules_require_pandas"
+
     if engine == "zipline" and not z_ok:
         raise RuntimeError(
             f"zipline-reloaded not available. Use POST /stocks/zipline/setup-venv. Error: {z_err}"
@@ -287,6 +300,9 @@ def run_backtest(
         timeframe=tf,
         symbol=symbol,
         data_dir=data_dir,
+        use_ashare_rules=use_ashare_rules,
     )
     out["zipline_fallback_reason"] = z_err if not z_ok else "zipline_run_failed"
+    if use_ashare_rules and z_ok:
+        out["zipline_fallback_reason"] = "ashare_execution_rules_require_pandas"
     return out
