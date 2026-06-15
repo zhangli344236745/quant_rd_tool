@@ -485,6 +485,7 @@ class ScheduleAlertRulesRequest(BaseModel):
     on_cycle_complete: bool | None = None
     on_stance_changed: bool | None = None
     crypto_news: dict[str, Any] | None = None
+    stock_announcements: dict[str, Any] | None = None
 
 
 @router.get("/schedules/alerts/rules")
@@ -582,6 +583,7 @@ def schedule_alerts_rules_save(req: ScheduleAlertRulesRequest) -> dict[str, Any]
             on_cycle_complete=req.on_cycle_complete,
             on_stance_changed=req.on_stance_changed,
             crypto_news=req.crypto_news,
+            stock_announcements=req.stock_announcements,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e

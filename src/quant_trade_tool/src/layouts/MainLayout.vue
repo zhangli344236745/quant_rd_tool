@@ -33,6 +33,7 @@ const groups: MenuGroup[] = [
       { path: "/astocks-screener", icon: "Filter", label: "选股器" },
       { path: "/stock-workflow", icon: "Connection", label: "Workflow 分析" },
       { path: "/stock-announcements", icon: "Bell", label: "公告雷达" },
+      { path: "/stock-ops", icon: "Monitor", label: "A股 运营" },
       { path: "/stock-analyze", icon: "Document", label: "个股分析" },
       { path: "/stock-zipline", icon: "DataLine", label: "策略实验室" },
       { path: "/stock-var", icon: "Warning", label: "风险 VaR" },

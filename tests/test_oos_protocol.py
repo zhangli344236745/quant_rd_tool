@@ -85,3 +85,18 @@ def test_summarize_panel_oos():
     summary = summarize_panel_oos(panel)
     assert summary["instruments_with_oos"] == 1
     assert summary["gate_pass_count"] == 1
+
+
+def test_compact_oos_for_ui():
+    from quant_rd_tool.oos_protocol import compact_oos_for_ui
+
+    proto = build_fixed_split_report(
+        segments=build_fixed_split_segments("2020-01-01", "2024-01-01"),
+        test_metrics={"samples": 40, "ic": 0.03, "direction_accuracy": 0.55},
+        valid_metrics={"samples": 30, "ic": 0.02, "direction_accuracy": 0.53},
+    )
+    ui = compact_oos_for_ui(proto)
+    assert ui is not None
+    assert ui["protocol_type"] == "fixed_split"
+    assert ui["gate_passed"] is True
+    assert ui["markdown"]

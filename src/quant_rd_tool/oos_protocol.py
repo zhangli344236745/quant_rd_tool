@@ -261,3 +261,22 @@ def summarize_panel_oos(per_item: dict[str, dict[str, Any]]) -> dict[str, Any]:
         "gate_pass_rate": round(passed / total, 4) if total else None,
         "mean_test_ic": round(float(np.mean(ics)), 6) if ics else None,
     }
+
+
+def compact_oos_for_ui(oos_protocol: dict[str, Any] | None) -> dict[str, Any] | None:
+    """Lightweight OOS block for workflow steps and API summaries."""
+    if not oos_protocol:
+        return None
+    gate = oos_protocol.get("gate") or {}
+    test = oos_protocol.get("test_metrics") or oos_protocol.get("oos_metrics") or {}
+    return {
+        "protocol_type": oos_protocol.get("protocol_type"),
+        "protocol_version": oos_protocol.get("protocol_version"),
+        "gate_passed": gate.get("passed"),
+        "gate_reasons": gate.get("reasons") or [],
+        "test_ic": test.get("ic"),
+        "direction_accuracy": test.get("direction_accuracy"),
+        "test_samples": test.get("samples"),
+        "headline": oos_protocol.get("headline"),
+        "markdown": oos_protocol.get("markdown"),
+    }

@@ -250,6 +250,16 @@ function statusTagType(status: string) {
   return "info";
 }
 
+function stepOosSummary(step: { output?: Record<string, unknown> }) {
+  return step.output?.oos_summary as
+    | { gate_passed?: boolean; test_ic?: number; direction_accuracy?: number; headline?: string }
+    | undefined;
+}
+
+function stepOosMarkdown(step: { output?: Record<string, unknown> }) {
+  return step.output?.oos_markdown as string | undefined;
+}
+
 async function copyMarkdown() {
   const md = result.value?.advice?.markdown;
   if (!md) return;
@@ -409,6 +419,9 @@ onMounted(async () => {
             </el-tag>
             <el-tag v-if="result.advice.var_gate_triggered" type="danger">VaR 门控</el-tag>
             <el-tag type="info">置信 {{ pct(result.advice.confidence) }}</el-tag>
+            <el-tag v-if="result.audit_record?.run_id" type="info">
+              审计 {{ String(result.audit_record.run_id).slice(0, 8) }}
+            </el-tag>
           </div>
           <p class="mt">{{ result.advice.advice }}</p>
           <el-card v-if="priceGuidance?.available" shadow="never" class="price-card mt">
@@ -455,9 +468,31 @@ onMounted(async () => {
               <div class="step-row">
                 <strong>{{ stepName(step.id) }}</strong>
                 <el-tag size="small" :type="statusTagType(step.status)">{{ step.status }}</el-tag>
+                <el-tag
+                  v-if="stepOosSummary(step)?.gate_passed === true"
+                  size="small"
+                  type="success"
+                >
+                  OOS 通过
+                </el-tag>
+                <el-tag
+                  v-else-if="stepOosSummary(step)?.gate_passed === false"
+                  size="small"
+                  type="warning"
+                >
+                  OOS 未通过
+                </el-tag>
                 <span v-if="step.elapsed_s != null" class="muted small">{{ step.elapsed_s }}s</span>
               </div>
               <p class="step-summary">{{ step.summary || step.error }}</p>
+              <p v-if="stepOosSummary(step)?.headline" class="muted small">
+                {{ stepOosSummary(step)?.headline }}
+              </p>
+              <el-collapse v-if="stepOosMarkdown(step)" class="step-oos">
+                <el-collapse-item title="OOS 协议报告" :name="`${step.id}-oos`">
+                  <pre class="oos-md">{{ stepOosMarkdown(step) }}</pre>
+                </el-collapse-item>
+              </el-collapse>
               <el-collapse v-if="step.output && step.status !== 'error'">
                 <el-collapse-item title="详情" :name="step.id">
                   <pre class="step-json">{{ JSON.stringify(step.output, null, 2) }}</pre>
@@ -555,6 +590,14 @@ onMounted(async () => {
   margin: 4px 0 0;
   font-size: 13px;
   color: var(--text-muted);
+}
+.step-oos {
+  margin-top: 8px;
+}
+.oos-md {
+  font-size: 12px;
+  white-space: pre-wrap;
+  margin: 0;
 }
 .header-btn {
   float: right;

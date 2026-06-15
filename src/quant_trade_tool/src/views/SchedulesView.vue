@@ -62,7 +62,13 @@ const stockCreateForm = reactive({
   years: 2,
   with_openbb: false,
   use_watchlist: false,
+  job_type: "stock_qlib" as "stock_qlib" | "stock_watchlist" | "stock_announcements",
   auto_start: false,
+});
+
+const stockAnnouncementsAlerts = reactive({
+  on_high_impact: true,
+  min_score: 70,
 });
 
 watch(marketTab, () => {
@@ -84,9 +90,28 @@ watch(
   },
 );
 
+watch(
+  () => stockCreateForm.job_type,
+  (t) => {
+    if (t === "stock_announcements") {
+      stockCreateForm.use_watchlist = true;
+      stockCreateForm.interval_minutes = 360;
+      if (!stockCreateForm.name || stockCreateForm.name === "茅台 qlib") {
+        stockCreateForm.name = "公告扫描";
+      }
+    } else if (t === "stock_watchlist") {
+      stockCreateForm.use_watchlist = true;
+    } else if (stockCreateForm.interval_minutes === 360 && stockCreateForm.name === "公告扫描") {
+      stockCreateForm.interval_minutes = 1440;
+      stockCreateForm.name = "茅台 qlib";
+    }
+  },
+);
+
 function jobTypeLabel(t: string) {
   if (t === "news") return "舆论扫描";
   if (t === "stock_watchlist") return "自选刷新";
+  if (t === "stock_announcements") return "公告扫描";
   if (t === "stock_qlib") return "A股 qlib";
   return "行情分析";
 }
@@ -110,7 +135,7 @@ async function createJob() {
       await stocksApi.scheduleCreate({
         ...stockCreateForm,
         data_dir: dataDir.value,
-        with_ml: true,
+        with_ml: stockCreateForm.job_type !== "stock_announcements",
         ml_algorithm: "both",
       });
     } else {
@@ -168,6 +193,9 @@ async function loadAlertRules() {
     alertRules.webhook_on_alert = data.webhook_on_alert !== false;
     alertRules.on_cycle_complete = data.on_cycle_complete !== false;
     alertRules.on_stance_changed = data.on_stance_changed !== false;
+    const sa = data.stock_announcements || {};
+    stockAnnouncementsAlerts.on_high_impact = sa.on_high_impact !== false;
+    stockAnnouncementsAlerts.min_score = Number(sa.min_score ?? 70);
     customRulesJson.value = JSON.stringify(data.custom_rules || [], null, 2);
   } catch {
     /* optional */
@@ -205,6 +233,10 @@ async function saveAlertRules() {
       custom_rules,
       bark: barkPayload(),
       webhook_on_alert: alertRules.webhook_on_alert,
+      stock_announcements: {
+        on_high_impact: stockAnnouncementsAlerts.on_high_impact,
+        min_score: stockAnnouncementsAlerts.min_score,
+      },
     });
     notify.success("告警规则已保存");
     await loadAlertLog();
@@ -283,7 +315,7 @@ onMounted(async () => {
   <div>
     <h1 class="page-title">定时任务</h1>
     <p class="page-desc">
-      管理 Crypto / A股 调度任务：Crypto 为 K 线 + 分析或舆论扫描；A股 为 qlib 日线分析（支持自选列表）。
+      管理 Crypto / A股 调度任务：Crypto 为 K 线 + 分析或舆论扫描；A股 为 qlib 分析、自选刷新或公告扫描。
     </p>
 
     <el-tabs v-model="marketTab" class="market-tabs">
@@ -318,26 +350,50 @@ onMounted(async () => {
             </router-link>
           </el-form>
           <el-form v-else label-width="100px" size="small">
+            <el-form-item label="任务类型">
+              <el-select v-model="stockCreateForm.job_type" style="width: 100%">
+                <el-option label="qlib 分析" value="stock_qlib" />
+                <el-option label="自选刷新" value="stock_watchlist" />
+                <el-option label="公告扫描" value="stock_announcements" />
+              </el-select>
+            </el-form-item>
             <el-form-item label="名称"><el-input v-model="stockCreateForm.name" /></el-form-item>
             <el-form-item label="ID"><el-input v-model="stockCreateForm.id" placeholder="留空自动生成" /></el-form-item>
             <el-form-item label="自选模式">
-              <el-switch v-model="stockCreateForm.use_watchlist" />
+              <el-switch
+                v-model="stockCreateForm.use_watchlist"
+                :disabled="stockCreateForm.job_type === 'stock_announcements'"
+              />
               <span class="hint">开启后分析 watchlist 全部标的</span>
             </el-form-item>
-            <el-form-item v-if="!stockCreateForm.use_watchlist" label="代码">
+            <el-form-item
+              v-if="!stockCreateForm.use_watchlist && stockCreateForm.job_type !== 'stock_announcements'"
+              label="代码"
+            >
               <el-select v-model="stockCreateForm.symbols" multiple filterable allow-create default-first-option>
                 <el-option label="600519 茅台" value="600519" />
                 <el-option label="000001 平安" value="000001" />
               </el-select>
             </el-form-item>
-            <el-form-item label="回溯(年)"><el-input-number v-model="stockCreateForm.years" :min="1" :max="10" /></el-form-item>
-            <el-form-item label="OpenBB"><el-switch v-model="stockCreateForm.with_openbb" /></el-form-item>
+            <el-form-item v-if="stockCreateForm.job_type !== 'stock_announcements'" label="回溯(年)">
+              <el-input-number v-model="stockCreateForm.years" :min="1" :max="10" />
+            </el-form-item>
+            <el-form-item v-if="stockCreateForm.job_type !== 'stock_announcements'" label="OpenBB">
+              <el-switch v-model="stockCreateForm.with_openbb" />
+            </el-form-item>
             <el-form-item label="间隔(分)">
               <el-input-number v-model="stockCreateForm.interval_minutes" :min="60" :step="60" />
               <span class="hint">建议 1440（收盘后每日）</span>
             </el-form-item>
             <el-form-item label="自动启动"><el-switch v-model="stockCreateForm.auto_start" /></el-form-item>
             <el-button type="primary" @click="createJob">创建</el-button>
+            <router-link
+              v-if="stockCreateForm.job_type === 'stock_announcements'"
+              to="/stock-announcements"
+              class="news-link"
+            >
+              公告雷达配置 →
+            </router-link>
           </el-form>
         </el-card>
       </el-col>
@@ -352,7 +408,7 @@ onMounted(async () => {
             <el-table-column prop="name" label="名称" />
             <el-table-column label="类型" width="100">
               <template #default="{ row }">
-                <el-tag size="small" :type="row.job_type === 'news' ? 'warning' : ''">
+                <el-tag size="small" :type="row.job_type === 'news' || row.job_type === 'stock_announcements' ? 'warning' : ''">
                   {{ jobTypeLabel(String(row.job_type || "analysis")) }}
                 </el-tag>
               </template>
@@ -448,6 +504,17 @@ onMounted(async () => {
             <el-form-item label="Webhook 推送">
               <el-switch v-model="alertRules.webhook_on_alert" />
               <span class="hint">使用「Crypto 运营」里配置的 Webhook URL</span>
+            </el-form-item>
+          </el-form>
+
+          <el-divider content-position="left">A股 公告告警</el-divider>
+          <el-form label-width="140px" size="small">
+            <el-form-item label="高影响公告">
+              <el-switch v-model="stockAnnouncementsAlerts.on_high_impact" />
+              <span class="hint">公告扫描周期完成后，分数超阈值时 Bark/Webhook 告警</span>
+            </el-form-item>
+            <el-form-item label="最低分数">
+              <el-input-number v-model="stockAnnouncementsAlerts.min_score" :min="40" :max="100" />
             </el-form-item>
           </el-form>
 

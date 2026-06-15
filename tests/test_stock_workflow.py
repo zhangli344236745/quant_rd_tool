@@ -112,6 +112,35 @@ def test_run_workflow_mocked(monkeypatch, tmp_path):
     assert result.get("advice")
     assert result["advice"]["stance"] in ("偏多", "谨慎", "中性")
     assert len(result["steps"]) >= 5
+    assert result.get("audit_record", {}).get("run_id")
+
+
+def test_workflow_qlib_oos_compact():
+    from quant_rd_tool.stock_workflow import _compact_output, summarize_step
+
+    output = {
+        "skipped": False,
+        "combined_signal": {"stance": "偏多", "agreement": "一致"},
+        "ml_analysis": {"enabled": True},
+        "oos_summary": {
+            "protocol_type": "fixed_split",
+            "gate_passed": True,
+            "test_ic": 0.03,
+            "headline": "OOS 通过",
+            "markdown": "## OOS",
+        },
+    }
+    compact = _compact_output("qlib_ml", output)
+    assert compact["oos_summary"]["gate_passed"] is True
+    assert compact["oos_markdown"] == "## OOS"
+    summary = summarize_step("qlib_ml", output, status="ok")
+    assert "OOS✓" in summary
+
+
+def test_oos_protocol_route_missing_data(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    r = client.get("/api/v1/stocks/600519/oos-protocol?data_dir=data/stocks")
+    assert r.status_code == 404
 
 
 def test_workflow_steps_route():

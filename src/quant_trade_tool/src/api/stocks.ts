@@ -463,6 +463,24 @@ export const stocksApi = {
   complianceAuditGet: (runId: string) =>
     http.get<Record<string, unknown>>(`/stocks/compliance/audit/${runId}`),
 
+  oosProtocol: (
+    code: string,
+    params?: { algorithm?: "xgb" | "lgb" | "both"; start_date?: string; end_date?: string; data_dir?: string },
+  ) =>
+    http.get<{
+      code: string;
+      qlib_code: string;
+      oos_protocol?: Record<string, unknown>;
+      oos_summary?: {
+        gate_passed?: boolean;
+        test_ic?: number;
+        direction_accuracy?: number;
+        markdown?: string;
+      };
+      skipped?: boolean;
+      reason?: string;
+    }>(`/stocks/${code}/oos-protocol`, { params }),
+
   screener: (body: {
     q?: string;
     has_report?: boolean | null;
@@ -632,6 +650,7 @@ export const stocksApi = {
     ml_algorithm?: string;
     with_openbb?: boolean;
     use_watchlist?: boolean;
+    job_type?: "stock_qlib" | "stock_watchlist" | "stock_announcements" | "";
     auto_start?: boolean;
   }) => http.post("/stocks/schedules", body),
 
@@ -707,6 +726,12 @@ export const stocksApi = {
       min_score: 40,
       ...body,
     }),
+
+  opsSummary: (params?: { data_dir?: string; stale_calendar_days?: number }) =>
+    http.get<StockOpsSummary>("/stocks/ops/summary", { params }),
+
+  opsConnectivity: (params?: { data_dir?: string; probe_code?: string }) =>
+    http.get<StockConnectivityProbe>("/stocks/ops/connectivity", { params }),
 };
 
 export interface StockWorkflowStepDef {
@@ -767,6 +792,11 @@ export interface StockWorkflowRunResult {
   bars?: number;
   steps: StockWorkflowStepResult[];
   advice?: StockWorkflowAdvice | null;
+  audit_record?: {
+    run_id?: string;
+    entry_hash?: string;
+    content_hash?: string;
+  };
   generated_at?: string;
   generated_at_beijing?: string;
 }
@@ -806,4 +836,51 @@ export interface StockAnnouncementScanResult {
   digest?: StockAnnouncementDigest;
   fetch_errors?: Array<{ code?: string; error?: string }>;
   error?: string;
+}
+
+export interface StockConnectivityProbe {
+  ok: boolean;
+  probe_code?: string;
+  source?: string;
+  bars?: number;
+  latency_ms?: number;
+  error?: string;
+}
+
+export interface StockDataFreshnessItem {
+  code?: string;
+  symbol?: string;
+  ready?: boolean;
+  bars_count?: number;
+  last_bar?: string;
+  days_old?: number | null;
+  stale?: boolean;
+}
+
+export interface StockOpsSummary {
+  market?: string;
+  data_dir?: string;
+  connectivity: StockConnectivityProbe;
+  data_freshness: {
+    symbols_checked?: number;
+    stale_count?: number;
+    stale_calendar_days?: number;
+    checked_at?: string;
+    items?: StockDataFreshnessItem[];
+  };
+  announcements: {
+    digest_generated_at?: string;
+    items_new?: number;
+    symbols_scanned?: number;
+    top_items?: StockAnnouncementItem[];
+    errors?: Array<{ code?: string; error?: string }>;
+  };
+  schedules: {
+    total?: number;
+    running?: number;
+    jobs?: Record<string, unknown>[];
+  };
+  schedule_alerts?: Record<string, unknown>;
+  schedule_alert_recent?: Record<string, unknown>[];
+  schedule_stale_checks?: Record<string, unknown>[];
 }

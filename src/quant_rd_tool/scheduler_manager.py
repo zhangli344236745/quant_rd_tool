@@ -19,9 +19,9 @@ from quant_rd_tool.stock_scheduler import run_stock_scheduled_cycle
 logger = logging.getLogger(__name__)
 
 JobStatus = Literal["stopped", "running", "error"]
-StockJobType = Literal["stock_qlib", "stock_watchlist"]
+StockJobType = Literal["stock_qlib", "stock_watchlist", "stock_announcements"]
 CryptoJobType = Literal["analysis", "news"]
-JobType = Literal["analysis", "news", "stock_qlib", "stock_watchlist"]
+JobType = Literal["analysis", "news", "stock_qlib", "stock_watchlist", "stock_announcements"]
 
 
 @dataclass
@@ -45,17 +45,19 @@ class ScheduleJobConfig:
     def __post_init__(self) -> None:
         from quant_rd_tool.akshare_data import to_ak_code
 
-        if self.job_type in ("stock_qlib", "stock_watchlist"):
+        if self.job_type in ("stock_qlib", "stock_watchlist", "stock_announcements"):
             self.symbols = [to_ak_code(s) for s in self.symbols if str(s).strip()]
         else:
             self.symbols = [s.strip().upper() for s in self.symbols if s.strip()]
-        if self.job_type == "stock_watchlist":
+        if self.job_type in ("stock_watchlist", "stock_announcements"):
             self.use_watchlist = True
         if not self.name:
             if self.job_type == "news":
                 self.name = "crypto news scan"
             elif self.job_type == "stock_watchlist":
                 self.name = "自选 qlib 刷新"
+            elif self.job_type == "stock_announcements":
+                self.name = "公告雷达扫描"
             elif self.job_type == "stock_qlib":
                 self.name = f"{'-'.join(self.symbols).lower() or 'stocks'} 1d"
             else:
@@ -65,6 +67,8 @@ class ScheduleJobConfig:
                 self.id = "news-scan"
             elif self.job_type == "stock_watchlist":
                 self.id = "watchlist-1d"
+            elif self.job_type == "stock_announcements":
+                self.id = "announcements-watchlist"
             elif self.job_type == "stock_qlib":
                 self.id = _slug_id(self.symbols or ["stocks"], "1d")
             else:
@@ -106,9 +110,9 @@ class _RunningJob:
 
 
 def _is_stock_job(cfg: ScheduleJobConfig) -> bool:
-    return cfg.job_type in ("stock_qlib", "stock_watchlist") or str(cfg.data_dir).rstrip("/").endswith(
-        "stocks"
-    )
+    return cfg.job_type in ("stock_qlib", "stock_watchlist", "stock_announcements") or str(
+        cfg.data_dir
+    ).rstrip("/").endswith("stocks")
 
 
 def _run_analysis_cycle(cfg: ScheduleJobConfig) -> list[dict[str, Any]]:
@@ -184,9 +188,11 @@ class SchedulerManager:
             if not running:
                 raise KeyError(f"未找到任务: {job_id}")
             cfg = running.record.config
-        if run_immediately and cfg.symbols and cfg.job_type not in ("news", "stock_watchlist") and not (
-            _is_stock_job(cfg) and not cfg.symbols
-        ):
+        if run_immediately and cfg.symbols and cfg.job_type not in (
+            "news",
+            "stock_watchlist",
+            "stock_announcements",
+        ) and not (_is_stock_job(cfg) and not cfg.symbols):
             if not _is_stock_job(cfg):
                 from quant_rd_tool.ccxt_connectivity import require_connectivity
 
@@ -249,7 +255,11 @@ class SchedulerManager:
             if not running:
                 raise KeyError(f"未找到任务: {job_id}")
             cfg = running.record.config
-        if precheck_connectivity and cfg.job_type not in ("news", "stock_watchlist") and cfg.symbols:
+        if precheck_connectivity and cfg.job_type not in (
+            "news",
+            "stock_watchlist",
+            "stock_announcements",
+        ) and cfg.symbols:
             if not _is_stock_job(cfg):
                 from quant_rd_tool.ccxt_connectivity import require_connectivity
 
@@ -261,6 +271,8 @@ class SchedulerManager:
                 )
         if cfg.job_type == "news":
             results = _run_news_cycle(cfg, job_id=job_id)
+        elif cfg.job_type == "stock_announcements":
+            results = _run_announcement_cycle(cfg, job_id=job_id)
         else:
             results = _run_analysis_cycle(cfg)
         with self._lock:
@@ -270,6 +282,9 @@ class SchedulerManager:
             if cfg.job_type == "news":
                 running.record.last_error = _first_news_error(results)
                 running.record.last_cycle_summary = _summarize_news_result(results)
+            elif cfg.job_type == "stock_announcements":
+                running.record.last_error = _first_announcement_error(results)
+                running.record.last_cycle_summary = _summarize_announcement_result(results)
             elif _is_stock_job(cfg):
                 running.record.last_error = _first_error(results)
                 running.record.last_cycle_summary = _summarize_stock_results(results)
@@ -278,7 +293,7 @@ class SchedulerManager:
                 running.record.last_cycle_summary = _summarize_results(results)
             record = running.record
             self._save()
-        if cfg.job_type != "news":
+        if cfg.job_type not in ("news", "stock_announcements"):
             self._evaluate_alerts(job_id, record)
         return {
             "job": record.to_public_dict(),
@@ -315,6 +330,10 @@ class SchedulerManager:
                     results = _run_news_cycle(cfg, job_id=job_id)
                     last_error = _first_news_error(results)
                     summary = _summarize_news_result(results)
+                elif cfg.job_type == "stock_announcements":
+                    results = _run_announcement_cycle(cfg, job_id=job_id)
+                    last_error = _first_announcement_error(results)
+                    summary = _summarize_announcement_result(results)
                 else:
                     results = _run_analysis_cycle(cfg)
                     last_error = _first_error(results)
@@ -333,7 +352,7 @@ class SchedulerManager:
                     running.record.status = "running"
                     record = running.record
                     self._save()
-                if cfg.job_type != "news":
+                if cfg.job_type not in ("news", "stock_announcements"):
                     self._evaluate_alerts(job_id, record)
             except Exception as e:
                 logger.exception("Schedule job %s failed", job_id)
@@ -435,6 +454,41 @@ def _first_error(results: list[dict[str, Any]]) -> str | None:
         if r.get("error"):
             return str(r["error"])
     return None
+
+
+def _run_announcement_cycle(cfg: ScheduleJobConfig, *, job_id: str) -> dict[str, Any]:
+    from quant_rd_tool.stock_announcement_scheduler import run_announcement_cycle
+
+    return run_announcement_cycle(
+        data_dir=cfg.data_dir,
+        symbols=cfg.symbols,
+        use_watchlist=cfg.use_watchlist or cfg.job_type == "stock_announcements",
+        job_id=job_id,
+    )
+
+
+def _first_announcement_error(result: dict[str, Any]) -> str | None:
+    if result.get("error"):
+        return str(result["error"])
+    errors = result.get("fetch_errors") or []
+    if errors:
+        return str(errors[0].get("error") or errors[0])
+    return None
+
+
+def _summarize_announcement_result(result: dict[str, Any]) -> list[dict[str, Any]]:
+    digest = result.get("digest") or {}
+    top = digest.get("top_items") or []
+    max_score = max((int(i.get("score") or 0) for i in top), default=0)
+    return [
+        {
+            "job_type": "stock_announcements",
+            "items_new": result.get("items_new", 0),
+            "items_processed": result.get("items_processed", 0),
+            "symbols_scanned": digest.get("symbols_scanned", 0),
+            "top_score": max_score,
+        }
+    ]
 
 
 def _run_news_cycle(cfg: ScheduleJobConfig, *, job_id: str) -> dict[str, Any]:

@@ -63,7 +63,29 @@ def get_alert_rules() -> dict[str, Any]:
     out["bark"] = _public_bark_config(bark if isinstance(bark, dict) else {})
     crypto_news = raw.get("crypto_news")
     out["crypto_news"] = crypto_news if isinstance(crypto_news, dict) else _default_crypto_news_alert_config()
+    stock_ann = raw.get("stock_announcements")
+    out["stock_announcements"] = (
+        stock_ann if isinstance(stock_ann, dict) else _default_stock_announcements_alert_config()
+    )
     return out
+
+
+def _default_stock_announcements_alert_config() -> dict[str, Any]:
+    return {
+        "on_high_impact": True,
+        "min_score": 70,
+    }
+
+
+def get_stock_announcements_alert_config(raw: dict[str, Any] | None = None) -> dict[str, Any]:
+    raw = raw or get_alert_rules()
+    section = raw.get("stock_announcements")
+    cfg = _default_stock_announcements_alert_config()
+    if isinstance(section, dict):
+        cfg.update({k: section[k] for k in cfg if k in section and section[k] is not None})
+    cfg["on_high_impact"] = cfg.get("on_high_impact", True) is not False
+    cfg["min_score"] = int(cfg.get("min_score", 70))
+    return cfg
 
 
 def _default_crypto_news_alert_config() -> dict[str, Any]:
@@ -171,6 +193,7 @@ def save_alert_rules(
     on_cycle_complete: bool | None = None,
     on_stance_changed: bool | None = None,
     crypto_news: dict[str, Any] | None = None,
+    stock_announcements: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     data = load_settings(settings_json_path())
     raw = dict(data.get("schedule_alerts") or {}) if isinstance(data.get("schedule_alerts"), dict) else {}
@@ -226,6 +249,14 @@ def save_alert_rules(
             if k in crypto_news and crypto_news[k] is not None:
                 ent[k] = crypto_news[k]
         raw["crypto_news"] = ent
+    if stock_announcements is not None:
+        if not isinstance(stock_announcements, dict):
+            raise ValueError("stock_announcements must be an object")
+        ent = dict(raw.get("stock_announcements") or {}) if isinstance(raw.get("stock_announcements"), dict) else {}
+        for k in ("on_high_impact", "min_score"):
+            if k in stock_announcements and stock_announcements[k] is not None:
+                ent[k] = stock_announcements[k]
+        raw["stock_announcements"] = ent
     raw["updated_at"] = datetime.now(UTC).isoformat()
     data["schedule_alerts"] = raw
     path = settings_json_path()
@@ -649,6 +680,58 @@ def evaluate_news_alerts(
             rules=rules,
         ):
             fired.append({"rule": "news_high_impact", "message": msg, "title": title})
+
+    return fired
+
+
+def evaluate_announcement_alerts(
+    job_id: str,
+    digest: dict[str, Any],
+    *,
+    state_path: Path = _DEFAULT_STATE,
+) -> list[dict[str, Any]]:
+    """Alert when announcement digest top items exceed score threshold."""
+    raw = get_alert_rules()
+    rules = ScheduleAlertRules(
+        **{k: v for k, v in raw.items() if k in ScheduleAlertRules.__dataclass_fields__}
+    )
+    if not rules.enabled:
+        return []
+
+    cfg = get_stock_announcements_alert_config(raw)
+    if not cfg.get("on_high_impact", True):
+        return []
+
+    min_score = int(cfg.get("min_score", 70))
+    fired: list[dict[str, Any]] = []
+
+    for item in digest.get("top_items") or []:
+        if not isinstance(item, dict):
+            continue
+        score = item.get("score")
+        try:
+            if score is None or int(score) < min_score:
+                continue
+        except (TypeError, ValueError):
+            continue
+
+        code = str(item.get("code") or "")
+        title = str(item.get("title") or "公告")
+        keywords = item.get("keywords") or []
+        kw_text = "、".join(str(k) for k in keywords[:3]) if keywords else "—"
+        msg = (
+            f"[{job_id}] 高影响公告: {code} {title}\n"
+            f"分数 {score} | 关键词 {kw_text}"
+        )
+        if _fire_alert(
+            job_id=job_id,
+            rule="announcement_high_impact",
+            message=msg,
+            detail={"item": item, "digest_generated_at": digest.get("generated_at")},
+            state_path=state_path,
+            rules=rules,
+        ):
+            fired.append({"rule": "announcement_high_impact", "message": msg, "title": title})
 
     return fired
 

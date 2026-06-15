@@ -14,6 +14,7 @@ from quant_rd_tool.crypto_time import utc_now_beijing_str
 from quant_rd_tool.crypto_var import parse_confidence_levels
 from quant_rd_tool.crypto_workflow_price_levels import compute_iv_price_guidance
 from quant_rd_tool.openbb_equity import compute_technical_overlay
+from quant_rd_tool.oos_protocol import compact_oos_for_ui
 from quant_rd_tool.qlib_dump import QlibDataDumper
 from quant_rd_tool.qlib_ml import MlAlgorithm, run_ml_analysis
 from quant_rd_tool.stock_analyzer import analyze_ohlcv, build_narrative
@@ -280,7 +281,7 @@ def _compact_output(sid: str, output: dict[str, Any]) -> dict[str, Any]:
     if sid == "qlib_ml":
         ml = output.get("ml_analysis") or {}
         comb = output.get("combined_signal") or {}
-        return {
+        compact: dict[str, Any] = {
             "skipped": output.get("skipped"),
             "reason": output.get("reason"),
             "stance": comb.get("stance"),
@@ -288,12 +289,44 @@ def _compact_output(sid: str, output: dict[str, Any]) -> dict[str, Any]:
             "ml_signal": (comb.get("ml") or {}).get("signal"),
             "ml_enabled": ml.get("enabled"),
         }
+        oos = output.get("oos_summary") or compact_oos_for_ui(output.get("oos_protocol"))
+        if oos:
+            compact["oos_summary"] = {
+                k: oos[k]
+                for k in (
+                    "protocol_type",
+                    "gate_passed",
+                    "test_ic",
+                    "direction_accuracy",
+                    "headline",
+                )
+                if k in oos
+            }
+            if oos.get("markdown"):
+                compact["oos_markdown"] = oos["markdown"]
+        return compact
     if sid == "zipline_strategy":
-        return {
+        compact = {
             k: output[k]
             for k in ("strategy_id", "target_pct", "position", "bullish", "metrics")
             if k in output
         }
+        oos = output.get("oos_summary")
+        if oos:
+            compact["oos_summary"] = {
+                k: oos[k]
+                for k in (
+                    "protocol_type",
+                    "gate_passed",
+                    "test_ic",
+                    "direction_accuracy",
+                    "headline",
+                )
+                if k in oos
+            }
+            if oos.get("markdown"):
+                compact["oos_markdown"] = oos["markdown"]
+        return compact
     if sid == "var_symbol":
         narr = output.get("narrative") or {}
         return {
@@ -335,9 +368,24 @@ def summarize_step(sid: str, output: dict[str, Any], *, status: str) -> str:
     if sid == "qlib_ml":
         if output.get("skipped"):
             return f"跳过：{output.get('reason', '样本不足')}"
-        return f"{output.get('stance')} · {output.get('agreement')}"
+        oos = output.get("oos_summary") or {}
+        oos_tag = ""
+        if oos.get("gate_passed") is True:
+            oos_tag = " · OOS✓"
+        elif oos.get("gate_passed") is False:
+            oos_tag = " · OOS✗"
+        return f"{output.get('stance')} · {output.get('agreement')}{oos_tag}"
     if sid == "zipline_strategy":
-        return f"{output.get('strategy_id')} → 仓位 {float(output.get('target_pct') or 0) * 100:.0f}%"
+        oos = output.get("oos_summary") or {}
+        oos_tag = ""
+        if oos.get("gate_passed") is True:
+            oos_tag = " · OOS✓"
+        elif oos.get("gate_passed") is False:
+            oos_tag = " · OOS✗"
+        return (
+            f"{output.get('strategy_id')} → 仓位 {float(output.get('target_pct') or 0) * 100:.0f}%"
+            f"{oos_tag}"
+        )
     if sid == "var_symbol":
         return (
             f"99% VaR {float(output.get('var_99_pct') or 0) * 100:.2f}%"
@@ -419,12 +467,16 @@ def _step_qlib_ml(ctx: dict[str, Any], params: dict[str, Any]) -> dict[str, Any]
             "reason": reason,
         }
     combined = _merge_stock_signals(tech_signal, ml)
+    oos_protocol = ml.get("oos_protocol")
+    oos_summary = compact_oos_for_ui(oos_protocol)
     return {
         "ml_analysis": ml,
         "combined_signal": combined,
         "stance": combined.get("stance"),
         "agreement": combined.get("agreement"),
         "skipped": False,
+        "oos_protocol": oos_protocol,
+        "oos_summary": oos_summary,
     }
 
 
@@ -444,6 +496,8 @@ def _step_zipline_strategy(ctx: dict[str, Any], params: dict[str, Any]) -> dict[
     )
     final = out.get("final_signal") or {}
     target = float(final.get("target_pct") or 0.0)
+    oos_protocol = out.get("oos_protocol")
+    oos_summary = compact_oos_for_ui(oos_protocol)
     return {
         "strategy_id": strategy_id,
         "engine": out.get("engine"),
@@ -452,6 +506,8 @@ def _step_zipline_strategy(ctx: dict[str, Any], params: dict[str, Any]) -> dict[
         "position": final.get("position", "flat"),
         "metrics": out.get("metrics"),
         "bullish": target >= 0.5,
+        "oos_protocol": oos_protocol,
+        "oos_summary": oos_summary,
     }
 
 
@@ -896,6 +952,26 @@ def run_workflow(
         "generated_at": ctx["generated_at"],
         "generated_at_beijing": ctx["generated_at_beijing"],
     }
+    from quant_rd_tool.research_audit import record_research_run
+
+    qlib_step = ctx["steps"].get("qlib_ml", {}).get("output") or {}
+    result["audit_record"] = record_research_run(
+        "stock_workflow",
+        code=code,
+        inputs={
+            "template_id": template.get("id"),
+            "template_name": template.get("name"),
+            "timeframe": tf,
+            "steps": [s["id"] for s in enabled],
+        },
+        outputs_summary={
+            "stance": (advice or {}).get("stance"),
+            "risk_level": (advice or {}).get("risk_level"),
+            "oos_gate_passed": (qlib_step.get("oos_summary") or {}).get("gate_passed"),
+        },
+        data_dir=dd,
+        run_id=result["run_id"],
+    )
     if save:
         return save_run(dd, result)
     return result

@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 from quant_rd_tool.schedule_alerts import (
     evaluate_after_cycle,
+    evaluate_announcement_alerts,
     evaluate_news_alerts,
     evaluate_stale_jobs,
     get_alert_rules,
@@ -312,6 +313,42 @@ def test_news_high_impact_respects_thresholds(tmp_path, monkeypatch):
     }
     with patch("quant_rd_tool.bark_push.post_bark") as post_bark:
         fired = evaluate_news_alerts("news-job", digest)
+    assert fired == []
+    assert not post_bark.called
+
+
+def test_announcement_high_impact_alert(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    save_alert_rules(
+        cooldown_minutes=0,
+        bark={"enabled": True, "device_key": "k1"},
+        stock_announcements={"on_high_impact": True, "min_score": 70},
+    )
+    digest = {
+        "generated_at": "2026-06-12T12:00:00+00:00",
+        "top_items": [
+            {"code": "600519", "title": "业绩预增公告", "score": 80, "keywords": ["业绩预增"]},
+            {"code": "000001", "title": "日常说明", "score": 30},
+        ],
+    }
+    with patch("quant_rd_tool.bark_push.post_bark") as post_bark:
+        fired = evaluate_announcement_alerts("ann-job", digest)
+    assert any(f["rule"] == "announcement_high_impact" for f in fired)
+    assert post_bark.called
+    assert len(fired) == 1
+
+
+def test_announcement_high_impact_respects_thresholds(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    save_alert_rules(
+        cooldown_minutes=0,
+        stock_announcements={"on_high_impact": True, "min_score": 90},
+    )
+    digest = {
+        "top_items": [{"code": "600519", "title": "一般公告", "score": 75}],
+    }
+    with patch("quant_rd_tool.bark_push.post_bark") as post_bark:
+        fired = evaluate_announcement_alerts("ann-job", digest)
     assert fired == []
     assert not post_bark.called
 

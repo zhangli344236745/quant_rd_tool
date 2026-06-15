@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field
 
 from quant_rd_tool import akshare_stocks as astk
-from quant_rd_tool.akshare_data import to_ak_code
+from quant_rd_tool.akshare_data import to_ak_code, to_qlib_code
 from quant_rd_tool import report_index as rpt
 from quant_rd_tool import stock_screener
 from quant_rd_tool.watchlist import Watchlist
@@ -186,6 +186,62 @@ def stocks_reports_latest(code: str) -> dict[str, Any]:
         raise HTTPException(status_code=404, detail=str(e)) from e
 
 
+@router.get("/{code}/oos-protocol")
+def stocks_oos_protocol_get(
+    code: str,
+    algorithm: str = Query("both", pattern="^(xgb|lgb|both)$"),
+    start_date: str | None = Query(None),
+    end_date: str | None = Query(None),
+    data_dir: str = "data/stocks",
+) -> dict[str, Any]:
+    """Run qlib ML OOS fixed-split protocol for a symbol with local qlib data."""
+    from quant_rd_tool.oos_protocol import compact_oos_for_ui
+    from quant_rd_tool.qlib_ml import run_ml_analysis
+    from quant_rd_tool.stock_storage import csv_path, load_csv, qlib_path, stock_root
+
+    root = stock_root(data_dir, code)
+    csv_file = csv_path(root)
+    if not csv_file.is_file():
+        raise HTTPException(status_code=404, detail=f"本地无 {code} 行情，请先运行 analyze")
+    qlib_dir = qlib_path(root)
+    if not qlib_dir.is_dir():
+        raise HTTPException(status_code=404, detail="缺少 qlib 目录，请先运行 analyze")
+    df = load_csv(csv_file)
+    end = end_date or str(df["date"].max().date())
+    start = start_date or str(df["date"].min().date())
+    try:
+        ml = run_ml_analysis(
+            str(qlib_dir.resolve()),
+            to_qlib_code(code),
+            start_date=start,
+            end_date=end,
+            num_bars=len(df),
+            algorithm=algorithm,  # type: ignore[arg-type]
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except ImportError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+    proto = ml.get("oos_protocol")
+    if not proto and isinstance(ml.get("models"), dict):
+        for model in ml["models"].values():
+            if isinstance(model, dict) and model.get("oos_protocol"):
+                proto = model["oos_protocol"]
+                break
+    return {
+        "code": to_ak_code(code),
+        "qlib_code": to_qlib_code(code),
+        "algorithm": algorithm,
+        "start_date": start,
+        "end_date": end,
+        "ml_enabled": ml.get("enabled"),
+        "skipped": ml.get("skipped"),
+        "reason": ml.get("reason"),
+        "oos_protocol": proto,
+        "oos_summary": compact_oos_for_ui(proto),
+    }
+
+
 @router.get("/{code}/reports/history")
 def stocks_reports_history(code: str) -> dict[str, Any]:
     items = rpt.report_history(code)
@@ -283,6 +339,10 @@ class StockScheduleCreateRequest(BaseModel):
     ml_algorithm: str = "both"
     with_openbb: bool = False
     use_watchlist: bool = Field(False, description="True 时分析自选列表全部标的")
+    job_type: str = Field(
+        "",
+        description="stock_qlib | stock_watchlist | stock_announcements；留空时按 use_watchlist 推断",
+    )
     auto_start: bool = False
 
 
@@ -310,7 +370,11 @@ def stocks_schedules_get(job_id: str, data_dir: str = "data/stocks") -> dict[str
 def stocks_schedules_create(req: StockScheduleCreateRequest) -> dict[str, Any]:
     from quant_rd_tool.scheduler_manager import ScheduleJobConfig, get_scheduler_manager
 
-    job_type = "stock_watchlist" if req.use_watchlist else "stock_qlib"
+    if req.job_type in ("stock_qlib", "stock_watchlist", "stock_announcements"):
+        job_type = req.job_type
+    else:
+        job_type = "stock_watchlist" if req.use_watchlist else "stock_qlib"
+    use_watchlist = req.use_watchlist or job_type in ("stock_watchlist", "stock_announcements")
     mgr = get_scheduler_manager(req.data_dir)
     cfg = ScheduleJobConfig(
         symbols=req.symbols,
@@ -324,12 +388,30 @@ def stocks_schedules_create(req: StockScheduleCreateRequest) -> dict[str, Any]:
         job_type=job_type,
         years=req.years,
         with_openbb=req.with_openbb,
-        use_watchlist=req.use_watchlist,
+        use_watchlist=use_watchlist,
     )
     try:
         return mgr.add_job(cfg, auto_start=req.auto_start)
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e)) from e
+
+
+@router.get("/ops/summary")
+def stock_ops_summary(
+    data_dir: str = "data/stocks",
+    stale_calendar_days: int = Query(5, ge=1, le=30),
+) -> dict[str, Any]:
+    """Schedules, data freshness, connectivity, and announcement digest for A-share ops."""
+    from quant_rd_tool.stock_ops import build_stock_ops_summary
+
+    return build_stock_ops_summary(data_dir=data_dir, stale_calendar_days=stale_calendar_days)
+
+
+@router.get("/ops/connectivity")
+def stock_ops_connectivity(data_dir: str = "data/stocks", probe_code: str = "600519") -> dict[str, Any]:
+    from quant_rd_tool.stock_ops import check_akshare_connectivity
+
+    return check_akshare_connectivity(probe_code=probe_code, data_dir=data_dir)
 
 
 @router.post("/schedules/{job_id}/start")
