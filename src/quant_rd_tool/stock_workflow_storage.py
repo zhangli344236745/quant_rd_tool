@@ -36,17 +36,23 @@ def _default_template() -> dict[str, Any]:
         "data_dir": DEFAULT_DATA_DIR,
         "steps": [
             {"id": "technical", "enabled": True, "order": 0, "params": {}},
-            {"id": "qlib_ml", "enabled": True, "order": 1, "params": {"algorithm": "both"}},
+            {
+                "id": "announcement_scan",
+                "enabled": True,
+                "order": 1,
+                "params": {"min_score": 40, "notice_limit": 15, "refresh": True},
+            },
+            {"id": "qlib_ml", "enabled": True, "order": 2, "params": {"algorithm": "both"}},
             {
                 "id": "zipline_strategy",
                 "enabled": True,
-                "order": 2,
+                "order": 3,
                 "params": {"strategy_id": "ma_crossover", "capital_base": 100_000},
             },
             {
                 "id": "var_symbol",
                 "enabled": True,
-                "order": 3,
+                "order": 4,
                 "params": {
                     "notional_cny": 100_000,
                     "lookback_bars": 252,
@@ -54,7 +60,7 @@ def _default_template() -> dict[str, Any]:
                     "confidence": "0.95,0.99",
                 },
             },
-            {"id": "advice_synth", "enabled": True, "order": 4, "params": {"var_gate_pct": 0.08}},
+            {"id": "advice_synth", "enabled": True, "order": 5, "params": {"var_gate_pct": 0.08}},
         ],
         "created_at": datetime.now(UTC).isoformat(),
         "updated_at": datetime.now(UTC).isoformat(),

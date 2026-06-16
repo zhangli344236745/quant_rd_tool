@@ -9,7 +9,9 @@ from fastapi.testclient import TestClient
 from quant_rd_tool.main import app
 from quant_rd_tool.stock_announcement_radar import (
     append_items,
+    derive_announcement_impact,
     save_digest,
+    scan_symbol_announcements,
     score_text,
     tail_items,
 )
@@ -65,6 +67,57 @@ def test_synthesize_advice_var_gate():
     assert advice["suggested_position_pct"] <= 0.1
 
 
+def test_synthesize_advice_announcement_gate():
+    ctx = {
+        "symbol": "600519",
+        "timeframe": "1d",
+        "steps": {
+            "technical": {
+                "status": "ok",
+                "output": {"stance": "偏多", "score": 5, "technical_signal": {"stance": "偏多"}},
+            },
+            "announcement_scan": {
+                "status": "ok",
+                "output": {
+                    "impact_stance": "谨慎",
+                    "max_score": 90,
+                    "high_impact": True,
+                    "top_title": "收到立案告知书",
+                    "top_keywords": ["立案"],
+                },
+            },
+        },
+    }
+    advice = synthesize_advice(ctx, {"var_gate_pct": 0.08})
+    assert advice["stance"] == "中性"
+    assert any("公告门控" in b for b in advice["bullets"])
+
+
+def test_announcement_scan_step_mocked(monkeypatch):
+    from quant_rd_tool import stock_announcement_radar as radar
+    from quant_rd_tool import stock_workflow as sw
+
+    monkeypatch.setattr(
+        radar,
+        "scan_symbol_announcements",
+        lambda code, **kw: {
+            "code": code,
+            "items_count": 1,
+            "items_new": 1,
+            "max_score": 90,
+            "high_impact": True,
+            "impact_stance": "谨慎",
+            "top_title": "立案告知书",
+            "top_keywords": ["立案"],
+            "fetch_error": None,
+        },
+    )
+    ctx = {"code": "600519", "data_dir": "data/stocks"}
+    out = sw._step_announcement_scan(ctx, {"refresh": True, "min_score": 40})
+    assert out["impact_stance"] == "谨慎"
+    assert ctx["_announcement_scan"]["max_score"] == 90
+
+
 def test_run_workflow_mocked(monkeypatch, tmp_path):
     from quant_rd_tool import stock_workflow as sw
 
@@ -74,6 +127,17 @@ def test_run_workflow_mocked(monkeypatch, tmp_path):
         sw,
         "_step_technical",
         lambda ctx, p: {"stance": "中性", "score": 0, "technical_signal": {"stance": "中性", "action": "hold"}},
+    )
+    monkeypatch.setattr(
+        sw,
+        "_step_announcement_scan",
+        lambda ctx, p: {
+            "impact_stance": "中性",
+            "max_score": 0,
+            "high_impact": False,
+            "top_title": "",
+            "items_count": 0,
+        },
     )
     monkeypatch.setattr(
         sw,
@@ -99,10 +163,11 @@ def test_run_workflow_mocked(monkeypatch, tmp_path):
         "steps": normalize_template_steps(
             [
                 {"id": "technical", "enabled": True, "order": 0},
-                {"id": "qlib_ml", "enabled": True, "order": 1},
-                {"id": "zipline_strategy", "enabled": True, "order": 2},
-                {"id": "var_symbol", "enabled": True, "order": 3},
-                {"id": "advice_synth", "enabled": True, "order": 4},
+                {"id": "announcement_scan", "enabled": True, "order": 1},
+                {"id": "qlib_ml", "enabled": True, "order": 2},
+                {"id": "zipline_strategy", "enabled": True, "order": 3},
+                {"id": "var_symbol", "enabled": True, "order": 4},
+                {"id": "advice_synth", "enabled": True, "order": 5},
             ]
         ),
     }
@@ -111,7 +176,7 @@ def test_run_workflow_mocked(monkeypatch, tmp_path):
     assert result["symbol"] in ("600519", "SH600519")
     assert result.get("advice")
     assert result["advice"]["stance"] in ("偏多", "谨慎", "中性")
-    assert len(result["steps"]) >= 5
+    assert len(result["steps"]) >= 6
     assert result.get("audit_record", {}).get("run_id")
 
 
@@ -148,6 +213,7 @@ def test_workflow_steps_route():
     assert r.status_code == 200, r.text
     ids = {s["id"] for s in r.json()["steps"]}
     assert "technical" in ids
+    assert "announcement_scan" in ids
     assert "advice_synth" in ids
     assert "options_vol" not in ids
 
@@ -172,6 +238,29 @@ def test_score_text():
     score, hits = score_text("关于公司收到立案告知书的公告")
     assert score >= 80
     assert "立案" in hits
+
+
+def test_derive_announcement_impact_bearish():
+    impact = derive_announcement_impact(
+        [{"title": "立案", "score": 90, "keywords": ["立案"]}],
+        high_impact_min=70,
+    )
+    assert impact["impact_stance"] == "谨慎"
+    assert impact["high_impact"] is True
+
+
+def test_scan_symbol_announcements_mocked(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+    from quant_rd_tool import stock_announcement_radar as radar
+
+    monkeypatch.setattr(
+        radar.astk,
+        "fetch_stock_notices",
+        lambda code, limit=15: [{"公告标题": "业绩预增公告", "公告日期": "2026-06-12"}],
+    )
+    out = scan_symbol_announcements("600519", data_dir="data/stocks", min_score=40, persist=True)
+    assert out["items_count"] >= 1
+    assert out["impact_stance"] == "偏多"
 
 
 def test_screener_high_impact_filter(tmp_path, monkeypatch):

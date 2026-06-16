@@ -127,6 +127,126 @@ def tail_items(*, data_dir: str = DEFAULT_DATA_DIR, limit: int = 50) -> list[dic
     return rows
 
 
+BEARISH_KEYWORDS = frozenset(
+    {"立案", "调查", "退市", "预亏", "预减", "减持", "处罚", "风险提示", "监管", "停牌"}
+)
+BULLISH_KEYWORDS = frozenset({"业绩预增", "预盈", "增持", "回购", "并购", "重组"})
+
+
+def items_for_symbol(
+    code: str,
+    *,
+    data_dir: str = DEFAULT_DATA_DIR,
+    limit: int = 20,
+) -> list[dict[str, Any]]:
+    """Recent scored announcement items for one symbol (newest first)."""
+    from quant_rd_tool.akshare_data import to_ak_code
+
+    ak = to_ak_code(code)
+    rows = [r for r in tail_items(data_dir=data_dir, limit=max(limit * 4, 80)) if str(r.get("code")) == ak]
+    rows.sort(key=lambda x: int(x.get("score") or 0), reverse=True)
+    return rows[:limit]
+
+
+def derive_announcement_impact(
+    items: list[dict[str, Any]],
+    *,
+    high_impact_min: int = 70,
+) -> dict[str, Any]:
+    """Map top announcement items to a coarse stance for workflow advice."""
+    if not items:
+        return {
+            "impact_stance": "中性",
+            "max_score": 0,
+            "high_impact": False,
+            "top_title": "",
+            "top_keywords": [],
+            "top_item": None,
+        }
+    top = max(items, key=lambda x: int(x.get("score") or 0))
+    score = int(top.get("score") or 0)
+    keywords = [str(k) for k in (top.get("keywords") or [])]
+    kw_set = set(keywords)
+    impact = "中性"
+    if kw_set & BEARISH_KEYWORDS:
+        impact = "谨慎"
+    elif kw_set & BULLISH_KEYWORDS:
+        impact = "偏多"
+    elif score >= high_impact_min:
+        impact = "谨慎"
+    return {
+        "impact_stance": impact,
+        "max_score": score,
+        "high_impact": score >= high_impact_min,
+        "top_title": str(top.get("title") or ""),
+        "top_keywords": keywords,
+        "top_item": top,
+    }
+
+
+def scan_symbol_announcements(
+    code: str,
+    *,
+    data_dir: str = DEFAULT_DATA_DIR,
+    notice_limit: int = 15,
+    min_score: int = MIN_SCORE,
+    persist: bool = True,
+) -> dict[str, Any]:
+    """Fetch and score recent notices for a single A-share symbol."""
+    from quant_rd_tool.akshare_data import to_ak_code
+
+    ak = to_ak_code(code)
+    seen = _load_seen(data_dir) if persist else set()
+    scored: list[dict[str, Any]] = []
+    new_rows: list[dict[str, Any]] = []
+    fetch_error: str | None = None
+    try:
+        notices = astk.fetch_stock_notices(ak, limit=notice_limit)
+    except Exception as e:
+        fetch_error = str(e)
+        notices = []
+
+    for row in notices:
+        title = str(row.get("公告标题") or row.get("title") or "")
+        published = str(row.get("公告日期") or row.get("date") or "")
+        body = str(row.get("公告内容") or row.get("content") or title)
+        text = f"{title} {body}"
+        score, hits = score_text(text)
+        if score < min_score:
+            continue
+        entry = {
+            "ts": datetime.now(UTC).isoformat(),
+            "code": ak,
+            "title": title,
+            "published": published,
+            "score": score,
+            "keywords": hits,
+            "source": "notice",
+            "category": row.get("公告类型") or row.get("category"),
+        }
+        scored.append(entry)
+        if persist:
+            h = _item_hash(ak, title, published)
+            if h not in seen:
+                seen.add(h)
+                new_rows.append(entry)
+
+    if persist and new_rows:
+        append_items(data_dir, new_rows)
+        _save_seen(data_dir, seen)
+
+    scored.sort(key=lambda x: int(x.get("score") or 0), reverse=True)
+    impact = derive_announcement_impact(scored, high_impact_min=max(min_score, 70))
+    return {
+        "code": ak,
+        "items": scored[:10],
+        "items_count": len(scored),
+        "items_new": len(new_rows),
+        "fetch_error": fetch_error,
+        **impact,
+    }
+
+
 def _resolve_symbols(symbols: list[str] | None, *, use_watchlist: bool) -> list[str]:
     from quant_rd_tool.akshare_data import to_ak_code
 

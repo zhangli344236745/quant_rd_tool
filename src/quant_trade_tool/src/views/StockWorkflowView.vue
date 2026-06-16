@@ -36,6 +36,9 @@ let pollTimer: ReturnType<typeof setTimeout> | null = null;
 
 const sortedSteps = computed(() => [...editSteps.value].sort((a, b) => a.order - b.order));
 const priceGuidance = computed(() => result.value?.advice?.price_guidance);
+const announcementHighImpact = computed(() =>
+  (result.value?.advice?.bullets || []).some((b) => String(b).includes("公告门控")),
+);
 
 function stepName(id: string) {
   return stepCatalog.value.find((s) => s.id === id)?.name || id;
@@ -143,6 +146,13 @@ function buildRunPayload() {
     if (step.id === "qlib_ml") {
       ensureParam(step, "algorithm", "both");
       ensureParam(step, "use_cache", true);
+    }
+    if (step.id === "announcement_scan") {
+      ensureParam(step, "min_score", 40);
+      ensureParam(step, "notice_limit", 15);
+      ensureParam(step, "refresh", true);
+      ensureParam(step, "persist", true);
+      ensureParam(step, "high_impact_min", 70);
     }
     if (step.id === "advice_synth") {
       ensureParam(step, "var_gate_pct", 0.08);
@@ -289,7 +299,7 @@ onMounted(async () => {
   <div v-loading="loading">
     <h1 class="page-title">A股 Workflow 分析</h1>
     <p class="page-desc">
-      可配置分析流水线：技术面 → qlib ML → 策略信号 → VaR → 综合投资建议（支持 VaR 风险门控）。
+      可配置分析流水线：技术面 → 公告扫描 → qlib ML → 策略信号 → VaR → 综合投资建议（支持 VaR / 公告风险门控）。
     </p>
 
     <el-row :gutter="16">
@@ -360,6 +370,17 @@ onMounted(async () => {
               </el-select>
               <el-checkbox v-model="stepParams(step).use_cache" size="small">复用缓存</el-checkbox>
             </template>
+            <template v-if="step.enabled && step.id === 'announcement_scan'">
+              <p class="param-label">公告扫描</p>
+              最低分数
+              <el-input-number v-model="stepParams(step).min_score" :min="0" :max="100" size="small" />
+              条数
+              <el-input-number v-model="stepParams(step).notice_limit" :min="5" :max="30" size="small" />
+              高影响阈值
+              <el-input-number v-model="stepParams(step).high_impact_min" :min="40" :max="100" size="small" />
+              <el-checkbox v-model="stepParams(step).refresh" size="small">实时拉取</el-checkbox>
+              <el-checkbox v-model="stepParams(step).persist" size="small">写入雷达库</el-checkbox>
+            </template>
             <template v-if="step.enabled && step.id === 'advice_synth'">
               <p class="param-label">建议合成</p>
               VaR 门控
@@ -418,6 +439,7 @@ onMounted(async () => {
               信号 {{ result.advice.signal_agreement }}
             </el-tag>
             <el-tag v-if="result.advice.var_gate_triggered" type="danger">VaR 门控</el-tag>
+            <el-tag v-if="announcementHighImpact" type="warning">公告门控</el-tag>
             <el-tag type="info">置信 {{ pct(result.advice.confidence) }}</el-tag>
             <el-tag v-if="result.audit_record?.run_id" type="info">
               审计 {{ String(result.audit_record.run_id).slice(0, 8) }}

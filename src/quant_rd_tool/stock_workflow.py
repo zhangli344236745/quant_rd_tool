@@ -34,6 +34,18 @@ STEP_CATALOG: list[dict[str, Any]] = [
         "params_schema": {},
     },
     {
+        "id": "announcement_scan",
+        "name": "公告扫描",
+        "description": "拉取近期公告并按关键词规则打分，识别高影响事件",
+        "params_schema": {
+            "min_score": {"type": "integer", "default": 40},
+            "notice_limit": {"type": "integer", "default": 15},
+            "refresh": {"type": "boolean", "default": True},
+            "persist": {"type": "boolean", "default": True},
+            "high_impact_min": {"type": "integer", "default": 70},
+        },
+    },
+    {
         "id": "qlib_ml",
         "name": "qlib ML",
         "description": "Alpha158 + XGBoost / LightGBM 方向预测",
@@ -278,6 +290,22 @@ def _compact_output(sid: str, output: dict[str, Any]) -> dict[str, Any]:
             for k in ("stance", "action", "score", "confidence", "reasons")
             if k in output
         }
+    if sid == "announcement_scan":
+        return {
+            k: output[k]
+            for k in (
+                "code",
+                "items_count",
+                "items_new",
+                "max_score",
+                "high_impact",
+                "impact_stance",
+                "top_title",
+                "top_keywords",
+                "fetch_error",
+            )
+            if k in output
+        }
     if sid == "qlib_ml":
         ml = output.get("ml_analysis") or {}
         comb = output.get("combined_signal") or {}
@@ -365,6 +393,12 @@ def summarize_step(sid: str, output: dict[str, Any], *, status: str) -> str:
         return "执行失败"
     if sid == "technical":
         return f"{output.get('stance')} · score {output.get('score')}"
+    if sid == "announcement_scan":
+        if output.get("fetch_error") and not output.get("items_count"):
+            return f"拉取失败：{output.get('fetch_error')}"
+        hi = " · 高影响" if output.get("high_impact") else ""
+        title = str(output.get("top_title") or "无命中公告")[:40]
+        return f"{output.get('impact_stance')} · 分数 {output.get('max_score', 0)}{hi} · {title}"
     if sid == "qlib_ml":
         if output.get("skipped"):
             return f"跳过：{output.get('reason', '样本不足')}"
@@ -421,6 +455,46 @@ def _step_technical(ctx: dict[str, Any], params: dict[str, Any]) -> dict[str, An
         "confidence": signal.get("confidence", 0),
         "reasons": signal.get("reasons", []),
     }
+
+
+def _step_announcement_scan(ctx: dict[str, Any], params: dict[str, Any]) -> dict[str, Any]:
+    from quant_rd_tool.stock_announcement_radar import (
+        derive_announcement_impact,
+        items_for_symbol,
+        scan_symbol_announcements,
+    )
+
+    code = ctx["code"]
+    data_dir = ctx["data_dir"]
+    min_score = int(params.get("min_score") or 40)
+    notice_limit = int(params.get("notice_limit") or 15)
+    high_impact_min = int(params.get("high_impact_min") or 70)
+    refresh = params.get("refresh", True) is not False
+    persist = params.get("persist", True) is not False
+
+    if refresh:
+        out = scan_symbol_announcements(
+            code,
+            data_dir=data_dir,
+            notice_limit=notice_limit,
+            min_score=min_score,
+            persist=persist,
+        )
+    else:
+        items = items_for_symbol(code, data_dir=data_dir, limit=notice_limit)
+        items = [i for i in items if int(i.get("score") or 0) >= min_score]
+        impact = derive_announcement_impact(items, high_impact_min=high_impact_min)
+        out = {
+            "code": code,
+            "items": items[:10],
+            "items_count": len(items),
+            "items_new": 0,
+            "fetch_error": None,
+            **impact,
+        }
+
+    ctx["_announcement_scan"] = out
+    return out
 
 
 def _step_qlib_ml(ctx: dict[str, Any], params: dict[str, Any]) -> dict[str, Any]:
@@ -569,6 +643,30 @@ def synthesize_advice(ctx: dict[str, Any], params: dict[str, Any]) -> dict[str, 
         sources["technical"] = {"stance": out.get("stance"), "score": out.get("score")}
         bullets.append(f"技术面：{out.get('stance')}（score {out.get('score')}）")
 
+    ann = ctx["steps"].get("announcement_scan", {})
+    if ann.get("status") == "ok":
+        out = ann.get("output") or {}
+        impact = str(out.get("impact_stance") or "中性")
+        max_score = int(out.get("max_score") or 0)
+        high_impact = bool(out.get("high_impact"))
+        sources["announcement_scan"] = {
+            "impact_stance": impact,
+            "max_score": max_score,
+            "high_impact": high_impact,
+            "top_title": out.get("top_title"),
+        }
+        title = str(out.get("top_title") or "—")[:48]
+        kw = "、".join((out.get("top_keywords") or [])[:3]) or "—"
+        bullets.append(f"公告：{impact} · 分数 {max_score} · {title}（{kw}）")
+        if impact != "中性":
+            stances.append(impact)
+        if impact == "谨慎":
+            score -= 2 if high_impact else 1
+        elif impact == "偏多":
+            score += 1
+    elif ann.get("status") == "skipped":
+        bullets.append(f"公告扫描：跳过（{ann.get('error', '未运行')}）")
+
     ml = ctx["steps"].get("qlib_ml", {})
     if ml.get("status") == "ok":
         out = ml.get("output") or {}
@@ -632,6 +730,11 @@ def synthesize_advice(ctx: dict[str, Any], params: dict[str, Any]) -> dict[str, 
     if var_triggered and stance == "偏多":
         stance, action = "中性", "hold"
         bullets.append("风险门控：VaR 偏高，看多信号已降级为观望")
+
+    ann_out = (ctx["steps"].get("announcement_scan", {}).get("output") or {})
+    if ann_out.get("high_impact") and ann_out.get("impact_stance") == "谨慎" and stance == "偏多":
+        stance, action = "中性", "hold"
+        bullets.append("公告门控：高影响负面公告，看多信号已降级为观望")
 
     base_position = max(0.0, min(max_position_pct, strategy_target if strategy_target > 0 else 0.25))
     if stance == "谨慎":
@@ -795,6 +898,7 @@ def synthesize_advice(ctx: dict[str, Any], params: dict[str, Any]) -> dict[str, 
 
 _STEP_HANDLERS: dict[str, Callable[[dict[str, Any], dict[str, Any]], dict[str, Any]]] = {
     "technical": _step_technical,
+    "announcement_scan": _step_announcement_scan,
     "qlib_ml": _step_qlib_ml,
     "zipline_strategy": _step_zipline_strategy,
     "var_symbol": _step_var_symbol,
