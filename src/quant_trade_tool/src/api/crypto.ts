@@ -914,6 +914,40 @@ export const cryptoApi = {
 
   ziplineRun: (run_id: string, data_dir = "data/crypto") =>
     http.get<CryptoZiplineBacktestResult>("/crypto/zipline/runs/" + run_id, { params: { data_dir } }),
+
+  carryScan: () =>
+    http.get<CarryScanResult>("/crypto/carry/scan"),
+
+  carryPreview: (params: { symbol: string; notional_usdt?: number }) =>
+    http.get<CarryPreview>("/crypto/carry/preview", { params }),
+
+  carryClosePreview: (id: string) =>
+    http.get<CarryClosePreview>(`/crypto/carry/positions/${id}/close-preview`),
+
+  carryGetConfig: () => http.get<CarryConfig>("/crypto/carry/config"),
+
+  carryPutConfig: (body: Partial<CarryConfig>) => http.put<CarryConfig>("/crypto/carry/config", body),
+
+  carryOpen: (body: {
+    symbol: string;
+    notional_usdt?: number;
+    spot_mark?: number;
+    perp_mark?: number;
+    funding_rate?: number;
+  }) => http.post<CarryPosition>("/crypto/carry/positions/open", body),
+
+  carryClose: (
+    id: string,
+    body?: { spot_mark?: number; perp_mark?: number; funding_rate?: number },
+  ) => http.post<CarryPosition>(`/crypto/carry/positions/${id}/close`, body ?? {}),
+
+  carrySummary: () => http.get<CarrySummary>("/crypto/carry/summary"),
+
+  carryPositions: (params?: { status?: string; limit?: number }) =>
+    http.get<{ items: CarryPosition[] }>("/crypto/carry/positions", { params }),
+
+  carryEvents: (limit = 100) =>
+    http.get<{ items: CarryEvent[] }>("/crypto/carry/events", { params: { limit } }),
 };
 
 export interface OptionsVolConfig {
@@ -1638,6 +1672,240 @@ export interface CryptoWorkflowRunSummary {
   stance?: string;
   risk_level?: string;
   generated_at?: string;
+}
+
+export interface CarryConfig {
+  watchlist: string[];
+  quote: string;
+  entry_threshold_apr: number;
+  exit_threshold_apr: number;
+  default_notional_usdt: number;
+  spot_fee_pct: number;
+  perp_fee_pct: number;
+  slippage_pct: number;
+  testnet: boolean;
+}
+
+export interface CarryLegStep {
+  order: number;
+  market: "spot" | "perp" | string;
+  side: string;
+  side_label: string;
+  base_amount: number;
+  price?: number;
+  quote_amount_usdt?: number;
+  fee_usdt?: number;
+  description: string;
+}
+
+export interface CarryExecutionPlan {
+  symbol: string;
+  quote: string;
+  notional_usdt?: number;
+  base_amount: number;
+  steps: CarryLegStep[];
+  summary: string;
+  open_fees_usdt?: number;
+  close_fees_usdt?: number;
+  expected_income?: {
+    funding_per_8h_usdt: number;
+    funding_daily_usdt: number;
+    funding_7d_usdt?: number;
+    funding_30d_usdt?: number;
+    funding_annual_usdt: number;
+    net_daily_after_open_fee_usdt?: number;
+  };
+}
+
+export interface CarryPnlBreakdown {
+  accrued_funding_usdt: number;
+  spot_leg_mtm_usdt: number;
+  perp_leg_mtm_usdt: number;
+  basis_pnl_if_close_usdt: number;
+  open_fees_paid_usdt: number;
+  close_fees_est_usdt: number;
+  unrealized_pnl_if_close_now_usdt: number;
+}
+
+export interface CarryPositionLiveStatus {
+  open_plan: CarryExecutionPlan;
+  current_spot_mark: number;
+  current_perp_mark: number;
+  pending_funding_usdt: number;
+  pnl_breakdown: CarryPnlBreakdown;
+  expected_income_if_hold?: {
+    funding_per_8h_usdt: number;
+    funding_daily_usdt: number;
+  };
+}
+
+export interface CarryProfitEstimate {
+  notional_usdt: number;
+  funding_per_8h_usdt: number;
+  funding_daily_usdt: number;
+  funding_7d_usdt: number;
+  funding_30d_usdt: number;
+  funding_annual_usdt: number;
+  basis_annual_hint_usdt?: number;
+  composite_annual_hint_usdt?: number;
+  open_fees_usdt?: number;
+  open_cost_usdt: number;
+  round_trip_cost_usdt: number;
+  net_daily_after_open_fee_usdt?: number;
+  net_7d_after_open_cost_usdt: number;
+  net_30d_after_open_cost_usdt: number;
+  breakeven_days: number | null;
+}
+
+export interface CarryOpportunity {
+  symbol: string;
+  notional_usdt?: number;
+  spot_mark?: number;
+  perp_mark?: number;
+  basis_bps?: number;
+  funding_rate?: number;
+  funding_apr?: number;
+  basis_apr_hint?: number;
+  composite_apr?: number;
+  profit_estimate?: CarryProfitEstimate;
+  entry_alert?: boolean;
+  exit_alert?: boolean;
+  has_open_position?: boolean;
+  carry_plan?: CarryExecutionPlan;
+  error?: string;
+  ts?: string;
+}
+
+export interface CarryPosition {
+  id: string;
+  symbol: string;
+  quote: string;
+  notional_usdt: number;
+  base_amount: number;
+  spot_entry: number;
+  perp_entry: number;
+  entry_basis_bps: number;
+  entry_ts: string;
+  status: "open" | "closed";
+  accrued_funding: number;
+  total_fees: number;
+  last_funding_ts?: string | null;
+  closed_ts?: string | null;
+  realized_pnl?: number | null;
+  exit_basis_bps?: number;
+  basis_pnl?: number;
+  execution_plan?: CarryExecutionPlan;
+  live_status?: CarryPositionLiveStatus;
+}
+
+export interface CarryEvent {
+  type: string;
+  position_id?: string;
+  symbol?: string;
+  ts?: string;
+  [key: string]: unknown;
+}
+
+export interface CarryScanResult {
+  items: CarryOpportunity[];
+  positions: CarryPosition[];
+  config: CarryConfig;
+  summary: CarrySummary;
+}
+
+export interface CarrySummary {
+  open_count: number;
+  closed_count: number;
+  entry_alert_count: number;
+  exit_alert_count: number;
+  total_realized_pnl: number;
+  total_accrued_funding: number;
+  recent_events: CarryEvent[];
+  last_scan_ts?: string | null;
+}
+
+export interface CarryRiskWarning {
+  level: "high" | "medium" | "info" | string;
+  title: string;
+  detail: string;
+}
+
+export interface CarryPreview {
+  symbol: string;
+  notional_usdt: number;
+  has_open_position: boolean;
+  can_open: boolean;
+  market: {
+    spot_mark: number;
+    perp_mark: number;
+    basis_bps: number;
+    funding_rate: number;
+    funding_apr: number;
+    basis_apr_hint: number;
+    composite_apr: number;
+  };
+  profit_estimate: {
+    funding_per_8h_usdt: number;
+    funding_daily_usdt: number;
+    funding_7d_usdt: number;
+    funding_30d_usdt: number;
+    funding_annual_usdt: number;
+    basis_annual_hint_usdt: number;
+    composite_annual_hint_usdt: number;
+    open_fees_usdt?: number;
+    open_cost_usdt: number;
+    round_trip_cost_usdt: number;
+    net_daily_after_open_fee_usdt?: number;
+    net_7d_after_open_cost_usdt: number;
+    net_30d_after_open_cost_usdt: number;
+    breakeven_days: number | null;
+  };
+  cost_breakdown: Record<string, number>;
+  execution_plan?: CarryExecutionPlan;
+  risk_warnings: CarryRiskWarning[];
+  disclaimer: string;
+}
+
+export interface CarryClosePreview {
+  position_id: string;
+  symbol: string;
+  notional_usdt: number;
+  entry_ts?: string;
+  hold_days: number;
+  can_close: boolean;
+  exit_alert: boolean;
+  market: {
+    spot_mark: number;
+    perp_mark: number;
+    basis_bps: number;
+    funding_rate: number;
+    funding_apr: number;
+    composite_apr: number;
+  };
+  position_snapshot: {
+    accrued_funding_booked: number;
+    pending_funding_usdt: number;
+    pending_periods: number;
+    entry_basis_bps: number;
+  };
+  pnl_estimate: {
+    entry_basis_bps: number;
+    exit_basis_bps: number;
+    basis_change_bps: number;
+    basis_pnl: number;
+    accrued_funding: number;
+    close_fees_usdt: number;
+    total_fees_usdt: number;
+    realized_pnl: number;
+    open_fees_paid_usdt: number;
+    funding_component_usdt: number;
+    fee_component_usdt: number;
+  };
+  execution_plan?: CarryExecutionPlan;
+  open_legs?: CarryExecutionPlan;
+  pnl_breakdown?: CarryPnlBreakdown;
+  risk_warnings: CarryRiskWarning[];
+  disclaimer: string;
 }
 
 export interface StrikeProbabilityReport {

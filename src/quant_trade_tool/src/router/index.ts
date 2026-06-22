@@ -86,6 +86,7 @@ const router = createRouter({
           component: () => import("@/views/CryptoZiplineLabView.vue"),
         },
         { path: "spot-bot", name: "spot-bot", component: () => import("@/views/SpotBotView.vue") },
+        { path: "crypto-carry", name: "crypto-carry", component: () => import("@/views/CryptoCarryView.vue") },
         { path: "crypto-ops", name: "crypto-ops", component: () => import("@/views/CryptoOpsView.vue") },
         { path: "perp-bot", name: "perp-bot", component: () => import("@/views/PerpBotView.vue") },
         {

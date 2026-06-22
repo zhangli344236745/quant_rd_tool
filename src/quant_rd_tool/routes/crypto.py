@@ -1964,3 +1964,179 @@ def crypto_options_strike_probability(
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+class CarryConfigUpdate(BaseModel):
+    watchlist: list[str] | None = None
+    quote: str | None = None
+    entry_threshold_apr: float | None = None
+    exit_threshold_apr: float | None = None
+    default_notional_usdt: float | None = None
+    spot_fee_pct: float | None = None
+    perp_fee_pct: float | None = None
+    slippage_pct: float | None = None
+    testnet: bool | None = None
+
+
+class CarryOpenRequest(BaseModel):
+    symbol: str
+    notional_usdt: float | None = None
+    spot_mark: float | None = None
+    perp_mark: float | None = None
+    funding_rate: float | None = None
+
+
+class CarryCloseRequest(BaseModel):
+    spot_mark: float | None = None
+    perp_mark: float | None = None
+    funding_rate: float | None = None
+
+
+@router.get("/carry/preview")
+def crypto_carry_preview(
+    symbol: str,
+    notional_usdt: float | None = Query(None, gt=0),
+) -> dict[str, Any]:
+    from quant_rd_tool.crypto_carry_arbitrage import load_config, preview_paper_carry
+
+    try:
+        return preview_paper_carry(symbol, notional_usdt, config=load_config())
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+@router.get("/carry/scan")
+def crypto_carry_scan() -> dict[str, Any]:
+    from quant_rd_tool.crypto_carry_arbitrage import (
+        build_carry_summary,
+        build_position_live_status,
+        fetch_watchlist_snapshots,
+        list_positions,
+        load_config,
+        scan_watchlist,
+    )
+
+    try:
+        cfg = load_config()
+        items = scan_watchlist(cfg)
+        snapshots = fetch_watchlist_snapshots(
+            [s.strip().upper() for s in cfg.watchlist if s and str(s).strip()],
+            quote=cfg.quote,
+            testnet=cfg.testnet,
+        )
+        positions: list[dict[str, Any]] = []
+        for p in list_positions(status="open", limit=100):
+            sym = str(p.get("symbol", "")).upper()
+            snap = snapshots.get(sym)
+            if snap is not None:
+                p = {
+                    **p,
+                    "live_status": build_position_live_status(p, snap, cfg),
+                }
+            positions.append(p)
+        summary = build_carry_summary(cfg, scan_items=items)
+        return {"items": items, "positions": positions, "config": cfg.__dict__, "summary": summary}
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+@router.get("/carry/config")
+def crypto_carry_get_config() -> dict[str, Any]:
+    from quant_rd_tool.crypto_carry_arbitrage import load_config
+
+    return load_config().__dict__
+
+
+@router.put("/carry/config")
+def crypto_carry_put_config(body: CarryConfigUpdate) -> dict[str, Any]:
+    from quant_rd_tool.crypto_carry_arbitrage import CarryConfig, load_config, save_config
+
+    cfg = load_config()
+    data = cfg.__dict__.copy()
+    for key, value in body.model_dump(exclude_none=True).items():
+        if key == "watchlist" and value is not None:
+            data[key] = [str(s).upper() for s in value]
+        else:
+            data[key] = value
+    updated = save_config(CarryConfig(**data))
+    return updated.__dict__
+
+
+@router.get("/carry/positions")
+def crypto_carry_positions(
+    status: str | None = Query(None),
+    limit: int = Query(50, ge=1, le=500),
+) -> dict[str, Any]:
+    from quant_rd_tool.crypto_carry_arbitrage import list_positions
+
+    pos_status = status if status in ("open", "closed") else None
+    return {"items": list_positions(status=pos_status, limit=limit)}
+
+
+@router.post("/carry/positions/open")
+def crypto_carry_open(body: CarryOpenRequest) -> dict[str, Any]:
+    from quant_rd_tool.crypto_carry_arbitrage import load_config, open_paper_carry
+
+    try:
+        return open_paper_carry(
+            body.symbol,
+            body.notional_usdt,
+            config=load_config(),
+            spot_mark=body.spot_mark,
+            perp_mark=body.perp_mark,
+            funding_rate=body.funding_rate,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+@router.get("/carry/positions/{position_id}/close-preview")
+def crypto_carry_close_preview(position_id: str) -> dict[str, Any]:
+    from quant_rd_tool.crypto_carry_arbitrage import load_config, preview_close_paper_carry
+
+    try:
+        return preview_close_paper_carry(position_id, config=load_config())
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+@router.post("/carry/positions/{position_id}/close")
+def crypto_carry_close(position_id: str, body: CarryCloseRequest | None = None) -> dict[str, Any]:
+    from quant_rd_tool.crypto_carry_arbitrage import close_paper_carry, load_config
+
+    payload = body or CarryCloseRequest()
+    try:
+        return close_paper_carry(
+            position_id,
+            config=load_config(),
+            spot_mark=payload.spot_mark,
+            perp_mark=payload.perp_mark,
+            funding_rate=payload.funding_rate,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+@router.get("/carry/summary")
+def crypto_carry_summary() -> dict[str, Any]:
+    from quant_rd_tool.crypto_carry_arbitrage import carry_summary, load_config
+
+    try:
+        return carry_summary(load_config())
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+@router.get("/carry/events")
+def crypto_carry_events(limit: int = Query(100, ge=1, le=1000)) -> dict[str, Any]:
+    from quant_rd_tool.crypto_carry_arbitrage import read_events
+
+    return {"items": read_events(limit=limit)}

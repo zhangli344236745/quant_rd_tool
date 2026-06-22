@@ -53,9 +53,10 @@ const groups: MenuGroup[] = [
       { path: "/crypto-news", icon: "Bell", label: "舆论雷达" },
       { path: "/crypto-zipline", icon: "DataLine", label: "策略实验室" },
       { path: "/crypto-ops", icon: "Monitor", label: "Crypto 运营" },
-      { path: "/spot-bot", icon: "Coin", label: "现货 Bot" },
-      { path: "/perp-bot", icon: "Histogram", label: "永续 Bot" },
-      { path: "/perp-portfolio", icon: "Grid", label: "组合永续" },
+        { path: "/spot-bot", icon: "Coin", label: "现货 Bot" },
+        { path: "/perp-bot", icon: "Histogram", label: "永续 Bot" },
+        { path: "/crypto-carry", icon: "Sort", label: "Carry 套利" },
+        { path: "/perp-portfolio", icon: "Grid", label: "组合永续" },
     ],
   },
 ];
