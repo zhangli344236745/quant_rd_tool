@@ -948,6 +948,51 @@ export const cryptoApi = {
 
   carryEvents: (limit = 100) =>
     http.get<{ items: CarryEvent[] }>("/crypto/carry/events", { params: { limit } }),
+
+  hftStrategies: () => http.get<HftStrategy[]>("/crypto/hft/strategies"),
+
+  hftBots: () => http.get<{ items: HftBotStatus[] }>("/crypto/hft/bots"),
+
+  hftUpsertBot: (body: HftBotConfig) => http.post<HftBotConfig>("/crypto/hft/bots", body),
+
+  hftBotStatus: (bot_id: string) => http.get<HftBotStatusDetail>(`/crypto/hft/bots/${bot_id}/status`),
+
+  hftStartBot: (bot_id: string, body?: { confirm_mainnet?: boolean }) =>
+    http.post<HftBotStatusDetail>(`/crypto/hft/bots/${bot_id}/start`, body ?? {}),
+
+  hftStopBot: (bot_id: string, cancel_orders = false) =>
+    http.post<HftBotStatusDetail>(`/crypto/hft/bots/${bot_id}/stop`, null, {
+      params: { cancel_orders },
+    }),
+
+  hftCycleBot: (bot_id: string) => http.post<Record<string, unknown>>(`/crypto/hft/bots/${bot_id}/cycle`),
+
+  hftBotEvents: (bot_id: string, limit = 50) =>
+    http.get<{ items: HftEvent[] }>(`/crypto/hft/bots/${bot_id}/events`, { params: { limit } }),
+
+  hftBook: (params: { symbol: string; market_type?: string; testnet?: boolean }) =>
+    http.get<{ symbol: string; book: Record<string, unknown> }>("/crypto/hft/book", { params }),
+
+  wsHftStrategies: () => http.get<HftStrategy[]>("/crypto/ws-hft/strategies"),
+
+  wsHftBots: () => http.get<{ items: WsHftBotStatus[] }>("/crypto/ws-hft/bots"),
+
+  wsHftUpsertBot: (body: WsHftBotConfig) => http.post<WsHftBotConfig>("/crypto/ws-hft/bots", body),
+
+  wsHftBotStatus: (bot_id: string) => http.get<WsHftBotStatusDetail>(`/crypto/ws-hft/bots/${bot_id}/status`),
+
+  wsHftStartBot: (
+    bot_id: string,
+    body?: { confirm_live?: boolean; confirm_mainnet?: boolean },
+  ) => http.post<WsHftBotStatusDetail>(`/crypto/ws-hft/bots/${bot_id}/start`, body ?? {}),
+
+  wsHftStopBot: (bot_id: string, cancel_orders = false) =>
+    http.post<WsHftBotStatusDetail>(`/crypto/ws-hft/bots/${bot_id}/stop`, null, {
+      params: { cancel_orders },
+    }),
+
+  wsHftBotEvents: (bot_id: string, limit = 50) =>
+    http.get<{ items: HftEvent[] }>(`/crypto/ws-hft/bots/${bot_id}/events`, { params: { limit } }),
 };
 
 export interface OptionsVolConfig {
@@ -1822,6 +1867,106 @@ export interface CarrySummary {
   total_accrued_funding: number;
   recent_events: CarryEvent[];
   last_scan_ts?: string | null;
+}
+
+export interface HftStrategy {
+  id: string;
+  name: string;
+  description: string;
+  default_params: Record<string, number>;
+  param_schema: Array<Record<string, unknown>>;
+}
+
+export interface HftBotConfig {
+  bot_id: string;
+  symbol?: string;
+  quote?: string;
+  market_type?: string;
+  strategy_id?: string;
+  strategy_params?: Record<string, number>;
+  testnet?: boolean;
+  interval_ms?: number;
+  book_depth?: number;
+  price_tolerance_bps?: number;
+  post_only?: boolean;
+  max_order_size_usdt?: number;
+  max_open_orders?: number;
+  max_session_loss_usdt?: number;
+  max_inventory_usdt?: number;
+}
+
+export interface HftBotStatus {
+  bot_id: string;
+  running: boolean;
+  run_count: number;
+  error_count: number;
+  last_cycle_at?: string | null;
+  last_error?: string | null;
+  status?: string;
+  registered?: boolean;
+}
+
+export interface HftBotStatusDetail extends HftBotStatus {
+  config?: HftBotConfig | null;
+  state?: Record<string, unknown>;
+}
+
+export interface HftEvent {
+  ts?: string;
+  type: string;
+  [key: string]: unknown;
+}
+
+export interface WsHftBotConfig {
+  bot_id: string;
+  symbol?: string;
+  quote?: string;
+  market_type?: string;
+  strategy_id?: string;
+  strategy_params?: Record<string, number>;
+  testnet?: boolean;
+  book_depth?: number;
+  price_tolerance_bps?: number;
+  post_only?: boolean;
+  max_order_size_usdt?: number;
+  max_open_orders?: number;
+  trigger_mode?: "every_update" | "throttle";
+  throttle_ms?: number;
+  dry_run?: boolean;
+  max_session_loss_usdt?: number;
+  max_inventory_usdt?: number;
+}
+
+export interface WsHftLatency {
+  last?: number | null;
+  p50?: number | null;
+  p95?: number | null;
+  samples?: number[];
+}
+
+export interface WsHftBotStatus {
+  bot_id: string;
+  running: boolean;
+  live_trading: boolean;
+  reconcile_count: number;
+  error_count: number;
+  last_reconcile_at?: string | null;
+  last_error?: string | null;
+  status?: string;
+  registered?: boolean;
+}
+
+export interface WsHftBotStatusDetail extends WsHftBotStatus {
+  config?: WsHftBotConfig | null;
+  state?: {
+    last_mid?: number | null;
+    inventory_usdt?: number;
+    book_updates_total?: number;
+    reconciles_total?: number;
+    throttled_skips?: number;
+    latency_us?: WsHftLatency;
+    [key: string]: unknown;
+  };
 }
 
 export interface CarryRiskWarning {

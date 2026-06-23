@@ -133,6 +133,31 @@ class JobRunner:
             }
             return save_job_result(job_id, snap), out
 
+        if jtype == "vbt_backtest":
+            from quant_rd_tool.stock_vbt_lab import run_backtest
+
+            self.store.mark_progress(job_id, 0.2, message="vbt backtest")
+            out = run_backtest(
+                symbol=str(payload.get("symbol", code)),
+                start=str(payload.get("start", "2023-01-01")),
+                end=str(payload.get("end", "2024-01-01")),
+                strategy_id=str(payload.get("strategy_id", "sma_cross")),
+                strategy_params=payload.get("strategy_params"),
+                capital_base=float(payload.get("capital_base", 100_000)),
+                data_dir=str(payload.get("data_dir", self.data_dir)),
+                refresh_data=bool(payload.get("refresh_data", False)),
+            )
+            snap = {
+                "kind": "vbt_backtest",
+                "run_id": out.get("run_id"),
+                "symbol": out.get("symbol"),
+                "strategy_id": out.get("strategy_id"),
+                "metrics": out.get("metrics"),
+                "trades_count": out.get("trades_count"),
+                "report_path": out.get("report_path"),
+            }
+            return save_job_result(job_id, snap), out
+
         if jtype == "macro_panel":
             from quant_rd_tool.macro_panel import build_macro_panel, save_macro_panel
 

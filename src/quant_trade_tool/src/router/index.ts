@@ -51,6 +51,11 @@ const router = createRouter({
           component: () => import("@/views/StockZiplineLabView.vue"),
         },
         {
+          path: "stock-vbt",
+          name: "stock-vbt",
+          component: () => import("@/views/StockVbtLabView.vue"),
+        },
+        {
           path: "stock-var",
           name: "stock-var",
           component: () => import("@/views/StockVarView.vue"),
@@ -87,6 +92,8 @@ const router = createRouter({
         },
         { path: "spot-bot", name: "spot-bot", component: () => import("@/views/SpotBotView.vue") },
         { path: "crypto-carry", name: "crypto-carry", component: () => import("@/views/CryptoCarryView.vue") },
+        { path: "crypto-hft", name: "crypto-hft", component: () => import("@/views/CryptoHftView.vue") },
+        { path: "crypto-ws-hft", name: "crypto-ws-hft", component: () => import("@/views/CryptoWsHftView.vue") },
         { path: "crypto-ops", name: "crypto-ops", component: () => import("@/views/CryptoOpsView.vue") },
         { path: "perp-bot", name: "perp-bot", component: () => import("@/views/PerpBotView.vue") },
         {

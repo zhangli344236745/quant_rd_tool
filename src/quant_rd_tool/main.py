@@ -28,7 +28,21 @@ async def lifespan(app: FastAPI):
     runner.start_background()
     app.state.job_store = store
     app.state.job_runner = runner
+    try:
+        from quant_rd_tool.stock_vbt_scheduler import boot_vbt_scheduler_if_enabled
+
+        boot_vbt_scheduler_if_enabled()
+    except Exception:
+        import logging
+
+        logging.getLogger(__name__).exception("VBT scheduler boot failed")
     yield
+    try:
+        from quant_rd_tool.stock_vbt_scheduler import get_vbt_scheduler
+
+        get_vbt_scheduler().stop()
+    except Exception:
+        pass
     runner.stop()
 
 

@@ -126,6 +126,17 @@ class CryptoWorkflowJobRequest(BaseModel):
     refresh_ohlcv: bool = True
 
 
+class VbtBacktestJobRequest(BaseModel):
+    symbol: str
+    start: str
+    end: str
+    strategy_id: str
+    strategy_params: dict[str, Any] | None = None
+    capital_base: float = Field(default=100_000.0, gt=0)
+    refresh_data: bool = False
+    data_dir: str = "data/stocks"
+
+
 def _store(request: Request):
     store = getattr(request.app.state, "job_store", None)
     if store is None:
@@ -162,6 +173,17 @@ def enqueue_backtest(req: BacktestJobRequest, request: Request) -> dict[str, str
     job = store.create(
         type="backtest_run",
         code=",".join(syms),
+        payload=req.model_dump(),
+    )
+    return {"job_id": job["id"]}
+
+
+@router.post("/vbt-backtest", status_code=202)
+def enqueue_vbt_backtest(req: VbtBacktestJobRequest, request: Request) -> dict[str, str]:
+    store = _store(request)
+    job = store.create(
+        type="vbt_backtest",
+        code=req.symbol.strip(),
         payload=req.model_dump(),
     )
     return {"job_id": job["id"]}

@@ -27,6 +27,125 @@ export interface StockZiplineStrategy {
   tv_ref?: string;
 }
 
+export interface StockVbtParamSchema {
+  name: string;
+  type: string;
+  min?: number;
+  max?: number;
+  default: number;
+  label: string;
+}
+
+export interface StockVbtStrategy {
+  id: string;
+  name: string;
+  description: string;
+  min_bars: number;
+  default_params: Record<string, number>;
+  param_schema: StockVbtParamSchema[];
+}
+
+export interface StockVbtBacktestRequest {
+  symbol: string;
+  start: string;
+  end: string;
+  strategy_id: string;
+  strategy_params?: Record<string, number>;
+  capital_base?: number;
+  refresh_data?: boolean;
+}
+
+export interface StockVbtBacktestResult {
+  run_id: string;
+  symbol: string;
+  strategy_id: string;
+  strategy_name: string;
+  metrics: Record<string, number | Record<string, unknown>>;
+  execution_stats: Record<string, unknown>;
+  trades_count: number;
+  equity_curve: Array<{ time: string; value: number }>;
+  trades: Array<Record<string, unknown>>;
+}
+
+export interface StockVbtRunSummary {
+  run_id: string;
+  symbol: string;
+  strategy_id?: string;
+  strategy_name?: string;
+  start?: string;
+  end?: string;
+  created_at?: string;
+  total_return?: number;
+  sharpe?: number;
+  max_drawdown?: number;
+}
+
+export interface StockVbtTuneRequest {
+  symbol: string;
+  start: string;
+  end: string;
+  strategy_id: string;
+  n_trials?: number;
+  train_ratio?: number;
+  capital_base?: number;
+  refresh_data?: boolean;
+}
+
+export interface StockVbtTuneResult {
+  run_id: string;
+  symbol: string;
+  strategy_id: string;
+  strategy_name: string;
+  best_params: Record<string, number>;
+  best_sharpe: number;
+  train_metrics: Record<string, number>;
+  test_metrics: Record<string, number>;
+  n_trials: number;
+  train_ratio: number;
+}
+
+export interface StockVbtMlScoreItem {
+  symbol: string;
+  score: number;
+  expected_fwd_return_5d?: number;
+  algorithm?: string;
+}
+
+export interface StockVbtMlScoreResult {
+  run_id: string;
+  items: StockVbtMlScoreItem[];
+  errors?: Array<{ symbol: string; error: string }>;
+  universe_size: number;
+  scored: number;
+  algorithm: string;
+}
+
+export interface StockVbtPortfolioResult {
+  run_id: string;
+  weights: Record<string, number>;
+  method: string;
+  expected_annual_return: number;
+  annual_volatility: number;
+  sharpe_ratio: number;
+  symbols: string[];
+  backtest?: {
+    total_return: number;
+    sharpe: number;
+    max_drawdown: number;
+    equity_curve: Array<{ time: string; value: number }>;
+  };
+}
+
+export interface StockVbtSchedulerStatus {
+  running: boolean;
+  config: Record<string, unknown>;
+  last_run_at?: string | null;
+  last_error?: string | null;
+  last_result?: Record<string, unknown> | null;
+  run_count: number;
+  latest_signals?: Record<string, unknown> | null;
+}
+
 export interface StockZiplineTimeframeOption {
   id: string;
   label: string;
@@ -732,6 +851,62 @@ export const stocksApi = {
 
   opsConnectivity: (params?: { data_dir?: string; probe_code?: string }) =>
     http.get<StockConnectivityProbe>("/stocks/ops/connectivity", { params }),
+
+  vbtStrategies: () => http.get<StockVbtStrategy[]>("/stocks/vbt/strategies"),
+
+  vbtBacktest: (body: StockVbtBacktestRequest) =>
+    http.post<StockVbtBacktestResult>("/stocks/vbt/backtest", body, { timeout: 120_000 }),
+
+  vbtRuns: (params?: { limit?: number; symbol?: string }) =>
+    http.get<{ items: StockVbtRunSummary[] }>("/stocks/vbt/runs", { params }),
+
+  vbtRun: (run_id: string) => http.get<StockVbtBacktestResult & { params: Record<string, unknown> }>(`/stocks/vbt/runs/${run_id}`),
+
+  vbtTune: (body: StockVbtTuneRequest) =>
+    http.post<StockVbtTuneResult>("/stocks/vbt/tune", body, { timeout: 300_000 }),
+
+  vbtTuneRuns: (params?: { limit?: number }) =>
+    http.get<{ items: StockVbtTuneResult[] }>("/stocks/vbt/tune/runs", { params }),
+
+  vbtBacktestJob: (body: StockVbtBacktestRequest) =>
+    http.post<{ job_id: string }>("/jobs/vbt-backtest", body),
+
+  vbtMlScore: (body: {
+    symbols?: string[];
+    start: string;
+    end: string;
+    top_k?: number;
+    algorithm?: string;
+    use_watchlist?: boolean;
+    refresh_data?: boolean;
+  }) => http.post<StockVbtMlScoreResult>("/stocks/vbt/ml/score", body, { timeout: 300_000 }),
+
+  vbtPortfolioOptimize: (body: {
+    symbols: string[];
+    start: string;
+    end: string;
+    method?: string;
+    lookback_days?: number;
+    with_backtest?: boolean;
+    capital_base?: number;
+    refresh_data?: boolean;
+  }) =>
+    http.post<StockVbtPortfolioResult>("/stocks/vbt/portfolio/optimize", body, { timeout: 180_000 }),
+
+  vbtSchedulerStatus: () => http.get<StockVbtSchedulerStatus>("/stocks/vbt/scheduler/status"),
+
+  vbtSchedulerConfig: (body: Record<string, unknown>) =>
+    http.post<{ config: Record<string, unknown> }>("/stocks/vbt/scheduler/config", body),
+
+  vbtSchedulerStart: () => http.post<StockVbtSchedulerStatus>("/stocks/vbt/scheduler/start"),
+
+  vbtSchedulerStop: () => http.post<StockVbtSchedulerStatus>("/stocks/vbt/scheduler/stop"),
+
+  vbtSchedulerTrigger: () =>
+    http.post<{ ok: boolean; result: Record<string, unknown> }>("/stocks/vbt/scheduler/trigger", {}, { timeout: 300_000 }),
+
+  vbtSignalsLatest: () =>
+    http.get<{ available: boolean; signals?: Record<string, unknown> }>("/stocks/vbt/signals/latest"),
 };
 
 export interface StockWorkflowStepDef {
