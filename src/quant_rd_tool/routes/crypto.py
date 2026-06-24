@@ -2140,3 +2140,194 @@ def crypto_carry_events(limit: int = Query(100, ge=1, le=1000)) -> dict[str, Any
     from quant_rd_tool.crypto_carry_arbitrage import read_events
 
     return {"items": read_events(limit=limit)}
+
+
+class PolymarketConfigUpdate(BaseModel):
+    top_n_volume: int | None = Field(default=None, ge=1, le=200)
+    watchlist_condition_ids: list[str] | None = None
+    min_edge_bps: float | None = Field(default=None, ge=0)
+    taker_fee_bps: float | None = Field(default=None, ge=0, le=1000)
+    min_size_shares: float | None = Field(default=None, ge=0)
+    min_liquidity_usd: float | None = Field(default=None, ge=0)
+    builtin_scan_enabled: bool | None = None
+    builtin_interval_sec: int | None = Field(default=None, ge=30, le=3600)
+    scan_dedupe_sec: int | None = Field(default=None, ge=0, le=600)
+    default_paper_size_shares: float | None = Field(default=None, gt=0)
+    alert_cooldown_sec: int | None = Field(default=None, ge=0)
+
+
+class PolymarketOpenRequest(BaseModel):
+    condition_id: str
+    question: str | None = None
+    ask_yes: float
+    ask_no: float
+    size_shares: float | None = None
+
+
+class PolymarketCloseRequest(BaseModel):
+    settlement_payout_usd: float | None = None
+
+
+@router.get("/polymarket/scan")
+def crypto_polymarket_scan(force: bool = Query(default=False)) -> dict[str, Any]:
+    from quant_rd_tool.crypto_polymarket_arb import load_config, scan_markets
+
+    try:
+        return scan_markets(load_config(), force=force)
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+@router.get("/polymarket/scan/latest")
+def crypto_polymarket_scan_latest() -> dict[str, Any]:
+    from quant_rd_tool.crypto_polymarket_arb import empty_scan_result, load_latest_scan
+
+    latest = load_latest_scan()
+    if not latest:
+        return empty_scan_result()
+    return latest
+
+
+@router.get("/polymarket/config")
+def crypto_polymarket_get_config() -> dict[str, Any]:
+    from quant_rd_tool.crypto_polymarket_arb import load_config
+
+    return load_config().__dict__
+
+
+@router.put("/polymarket/config")
+def crypto_polymarket_put_config(body: PolymarketConfigUpdate) -> dict[str, Any]:
+    from quant_rd_tool.crypto_polymarket_arb import PolymarketArbConfig, load_config, save_config
+
+    cfg = load_config()
+    data = cfg.__dict__.copy()
+    for key, value in body.model_dump(exclude_none=True).items():
+        data[key] = value
+    updated = save_config(PolymarketArbConfig(**data))
+    return updated.__dict__
+
+
+@router.get("/polymarket/summary")
+def crypto_polymarket_summary() -> dict[str, Any]:
+    from quant_rd_tool.crypto_polymarket_arb import build_stats, load_config
+
+    return build_stats(load_config())
+
+
+@router.get("/polymarket/stats")
+def crypto_polymarket_stats() -> dict[str, Any]:
+    from quant_rd_tool.crypto_polymarket_arb import build_stats, load_config
+
+    return build_stats(load_config())
+
+
+@router.get("/polymarket/scans/history")
+def crypto_polymarket_scan_history(limit: int = Query(20, ge=1, le=100)) -> dict[str, Any]:
+    from quant_rd_tool.crypto_polymarket_arb import list_scan_history
+
+    return {"items": list_scan_history(limit=limit)}
+
+
+@router.get("/polymarket/preview")
+def crypto_polymarket_preview(
+    condition_id: str,
+    size_shares: float | None = Query(None, gt=0),
+) -> dict[str, Any]:
+    from quant_rd_tool.crypto_polymarket_arb import load_config, preview_paper_open_by_condition
+
+    try:
+        return preview_paper_open_by_condition(condition_id, size_shares, config=load_config())
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@router.get("/polymarket/positions")
+def crypto_polymarket_positions(
+    status: str | None = Query(None),
+    limit: int = Query(50, ge=1, le=500),
+) -> dict[str, Any]:
+    from quant_rd_tool.crypto_polymarket_arb import list_positions_with_live, load_config
+
+    pos_status = status if status in ("open", "closed") else None
+    return {
+        "items": list_positions_with_live(
+            status=pos_status,
+            limit=limit,
+            config=load_config(),
+        )
+    }
+
+
+@router.get("/polymarket/positions/{position_id}/close-preview")
+def crypto_polymarket_close_preview(position_id: str) -> dict[str, Any]:
+    from quant_rd_tool.crypto_polymarket_arb import load_config, preview_close_paper_position
+
+    try:
+        return preview_close_paper_position(position_id, config=load_config())
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@router.post("/polymarket/positions/open")
+def crypto_polymarket_open(body: PolymarketOpenRequest) -> dict[str, Any]:
+    from quant_rd_tool.crypto_polymarket_arb import load_config, open_paper_position
+
+    opp = body.model_dump()
+    try:
+        return open_paper_position(opp, body.size_shares, config=load_config())
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@router.post("/polymarket/positions/{position_id}/close")
+def crypto_polymarket_close(
+    position_id: str,
+    body: PolymarketCloseRequest | None = None,
+) -> dict[str, Any]:
+    from quant_rd_tool.crypto_polymarket_arb import close_paper_position, load_config
+
+    payload = body or PolymarketCloseRequest()
+    try:
+        return close_paper_position(
+            position_id,
+            config=load_config(),
+            settlement_payout_usd=payload.settlement_payout_usd,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@router.get("/polymarket/events")
+def crypto_polymarket_events(limit: int = Query(100, ge=1, le=1000)) -> dict[str, Any]:
+    from quant_rd_tool.crypto_polymarket_arb import read_events
+
+    return {"items": read_events(limit=limit)}
+
+
+@router.get("/polymarket/builtin/status")
+def crypto_polymarket_builtin_status() -> dict[str, Any]:
+    from quant_rd_tool.crypto_polymarket_runner import get_polymarket_runner
+
+    return get_polymarket_runner().public()
+
+
+@router.post("/polymarket/builtin/start")
+def crypto_polymarket_builtin_start() -> dict[str, Any]:
+    from quant_rd_tool.crypto_polymarket_arb import load_config, save_config
+    from quant_rd_tool.crypto_polymarket_runner import get_polymarket_runner
+
+    cfg = load_config()
+    cfg.builtin_scan_enabled = True
+    save_config(cfg)
+    return get_polymarket_runner().start()
+
+
+@router.post("/polymarket/builtin/stop")
+def crypto_polymarket_builtin_stop() -> dict[str, Any]:
+    from quant_rd_tool.crypto_polymarket_arb import load_config, save_config
+    from quant_rd_tool.crypto_polymarket_runner import get_polymarket_runner
+
+    cfg = load_config()
+    cfg.builtin_scan_enabled = False
+    save_config(cfg)
+    return get_polymarket_runner().stop()

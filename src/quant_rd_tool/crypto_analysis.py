@@ -1,6 +1,7 @@
 """Crypto analyze pipeline: ccxt OHLCV → qlib → ML → report."""
 
 from __future__ import annotations
+from quant_rd_tool.time_util import now_iso
 
 import json
 from datetime import UTC, datetime
@@ -117,7 +118,7 @@ def analyze_crypto_from_df(
         "combined_signal": combined,
         "signal": combined,
         "narrative": narrative,
-        "generated_at": datetime.now(UTC).isoformat(),
+        "generated_at": now_iso(),
         "generated_at_beijing": utc_now_beijing_str(),
     }
     report["markdown"] = _render_markdown(report)

@@ -1,6 +1,7 @@
 """Kill switch & webhook settings for crypto ops (persisted in data/settings.json)."""
 
 from __future__ import annotations
+from quant_rd_tool.time_util import now_iso
 
 import json
 from datetime import UTC, datetime
@@ -51,7 +52,7 @@ def save_crypto_ops(
         co["webhook_on_error"] = webhook_on_error
     if webhook_on_circuit_breaker is not None:
         co["webhook_on_circuit_breaker"] = webhook_on_circuit_breaker
-    co["updated_at"] = datetime.now(UTC).isoformat()
+    co["updated_at"] = now_iso()
     data["crypto_ops"] = co
     _write_all(data)
     return get_crypto_ops()

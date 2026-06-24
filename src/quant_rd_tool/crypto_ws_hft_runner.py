@@ -1,6 +1,7 @@
 """Asyncio runner for WebSocket crypto market-making bots."""
 
 from __future__ import annotations
+from quant_rd_tool.time_util import now_iso
 
 import asyncio
 import logging
@@ -98,7 +99,7 @@ class WsHftRunnerManager:
             state = load_bot_state(bid)
             begin_risk_session(state)
             state["status"] = "running"
-            state["session_started_at"] = datetime.now(UTC).isoformat()
+            state["session_started_at"] = now_iso()
             state["last_error"] = None
             save_bot_state(bid, state)
             bot._task = asyncio.create_task(self._run_loop(bid), name=f"ws-hft-{bid}")
@@ -206,7 +207,7 @@ class WsHftRunnerManager:
                         exchange=ex,
                     )
                     bot.reconcile_count += 1
-                    bot.last_reconcile_at = datetime.now(UTC).isoformat()
+                    bot.last_reconcile_at = now_iso()
                     if result.get("skipped") != "throttled":
                         bot.last_result = {
                             "mid": (result.get("book") or {}).get("mid"),

@@ -1,6 +1,7 @@
 """Background runner for crypto HFT market-making bots."""
 
 from __future__ import annotations
+from quant_rd_tool.time_util import now_iso
 
 import logging
 import threading
@@ -81,7 +82,7 @@ class HftRunnerManager:
             state = load_bot_state(bid)
             begin_risk_session(state)
             state["status"] = "running"
-            state["session_started_at"] = datetime.now(UTC).isoformat()
+            state["session_started_at"] = now_iso()
             state["last_error"] = None
             save_bot_state(bid, state)
             bot._stop.clear()
@@ -134,7 +135,7 @@ class HftRunnerManager:
         try:
             result = run_cycle(bid)
             bot.run_count += 1
-            bot.last_cycle_at = datetime.now(UTC).isoformat()
+            bot.last_cycle_at = now_iso()
             bot.last_result = {
                 "mid": (result.get("book") or {}).get("mid"),
                 "placed": result.get("placed"),

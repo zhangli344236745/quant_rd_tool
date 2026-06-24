@@ -1,6 +1,7 @@
 """Orchestrate news ingest → score → advise → persist."""
 
 from __future__ import annotations
+from quant_rd_tool.time_util import now_iso
 
 import logging
 from collections import Counter

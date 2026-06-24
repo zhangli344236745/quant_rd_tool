@@ -1,6 +1,7 @@
 """Single-stock pipeline: fetch → local CSV/qlib → analysis report."""
 
 from __future__ import annotations
+from quant_rd_tool.time_util import now_iso
 
 import json
 from datetime import UTC, date, datetime
@@ -395,7 +396,7 @@ def analyze_stock(
         "narrative": narrative,
         "ml_analysis": ml_analysis,
         "openbb": openbb_context,
-        "generated_at": datetime.now(UTC).isoformat(),
+        "generated_at": now_iso(),
     }
     report["markdown"] = _render_markdown(report)
 

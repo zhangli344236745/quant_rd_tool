@@ -1,6 +1,7 @@
 """Binance European options (EAPI) — ATM IV snapshots and local history."""
 
 from __future__ import annotations
+from quant_rd_tool.time_util import now_iso
 
 import json
 import logging
@@ -325,7 +326,7 @@ def fetch_atm_iv_snapshot(
         if own:
             c.close()
 
-    ts = datetime.now(UTC).isoformat()
+    ts = now_iso()
     rows: list[dict[str, Any]] = []
     for base in symbols:
         idx = indices.get(base)

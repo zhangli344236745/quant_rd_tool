@@ -12,6 +12,11 @@ import {
   type StockVbtTuneResult,
 } from "@/api/stocks";
 import { extractError } from "@/api/http";
+import { formatBeijing } from "@/utils/datetime";
+
+function formatTimeCol(_r: unknown, _c: unknown, v: string) {
+  return formatBeijing(v);
+}
 import EquityCurveChart from "@/components/EquityCurveChart.vue";
 
 const activeTab = ref("backtest");
@@ -667,7 +672,7 @@ onMounted(async () => {
                 <el-tag v-if="schedStatus?.running" type="success" size="small" class="ml">运行中</el-tag>
                 <el-tag v-else type="info" size="small" class="ml">已停止</el-tag>
               </template>
-              <p v-if="schedStatus?.last_run_at">上次运行：{{ schedStatus.last_run_at }}</p>
+              <p v-if="schedStatus?.last_run_at">上次运行：{{ formatBeijing(schedStatus.last_run_at) }}</p>
               <p v-if="schedStatus?.last_error" class="err">错误：{{ schedStatus.last_error }}</p>
               <el-table
                 v-if="schedStatus?.latest_signals?.ml_rankings"
@@ -697,7 +702,7 @@ onMounted(async () => {
         <el-table-column label="夏普" width="80">
           <template #default="{ row }">{{ num(row.sharpe) }}</template>
         </el-table-column>
-        <el-table-column prop="created_at" label="时间" min-width="160" />
+        <el-table-column prop="created_at" label="时间" min-width="160" :formatter="formatTimeCol" />
       </el-table>
     </el-card>
   </div>

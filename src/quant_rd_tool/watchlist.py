@@ -1,6 +1,7 @@
 """Local watchlist persistence for A-share workbench."""
 
 from __future__ import annotations
+from quant_rd_tool.time_util import now_iso
 
 import json
 from datetime import UTC, datetime
@@ -21,7 +22,7 @@ class Watchlist:
 
     def _save(self, data: dict[str, Any]) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        data["updated_at"] = datetime.now(UTC).isoformat()
+        data["updated_at"] = now_iso()
         self.path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
     def list_items(self) -> list[dict[str, str]]:
@@ -43,7 +44,7 @@ class Watchlist:
         row = {
             "code": code,
             "name": name or "",
-            "added_at": datetime.now(UTC).isoformat(),
+            "added_at": now_iso(),
         }
         items.append(row)
         data["items"] = items

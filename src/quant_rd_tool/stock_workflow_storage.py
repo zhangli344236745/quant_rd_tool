@@ -1,6 +1,7 @@
 """Persist A-share workflow templates and run history."""
 
 from __future__ import annotations
+from quant_rd_tool.time_util import now_iso
 
 import json
 import uuid
@@ -62,8 +63,8 @@ def _default_template() -> dict[str, Any]:
             },
             {"id": "advice_synth", "enabled": True, "order": 5, "params": {"var_gate_pct": 0.08}},
         ],
-        "created_at": datetime.now(UTC).isoformat(),
-        "updated_at": datetime.now(UTC).isoformat(),
+        "created_at": now_iso(),
+        "updated_at": now_iso(),
     }
 
 
@@ -101,7 +102,7 @@ def upsert_template(data_dir: str, template: dict[str, Any]) -> dict[str, Any]:
     templates = list_templates(data_dir)
     tid = template.get("id") or str(uuid.uuid4())
     template["id"] = tid
-    now = datetime.now(UTC).isoformat()
+    now = now_iso()
     template.setdefault("created_at", now)
     template["updated_at"] = now
     found = False
@@ -140,7 +141,7 @@ def delete_template(data_dir: str, template_id: str) -> bool:
 def save_run(data_dir: str, result: dict[str, Any]) -> dict[str, Any]:
     run_id = result.get("run_id") or str(uuid.uuid4())
     result["run_id"] = run_id
-    result.setdefault("generated_at", datetime.now(UTC).isoformat())
+    result.setdefault("generated_at", now_iso())
     rd = run_dir(data_dir, run_id)
     rd.mkdir(parents=True, exist_ok=True)
     (rd / "result.json").write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")

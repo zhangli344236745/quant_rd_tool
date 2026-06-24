@@ -8,6 +8,7 @@ trackable P&L regardless of dry-run vs live.
 """
 
 from __future__ import annotations
+from quant_rd_tool.time_util import now_iso
 
 import json
 import math
@@ -53,7 +54,7 @@ class PaperAccount:
     def load(path: str | Path, *, symbol: str, quote: str, initial_cash: float) -> PaperAccount:
         p = Path(path)
         if not p.exists():
-            now = datetime.now(UTC).isoformat()
+            now = now_iso()
             return PaperAccount(
                 symbol=symbol,
                 quote=quote,
@@ -81,8 +82,8 @@ class PaperAccount:
             total_fees=float(data.get("total_fees", 0.0)),
             trades=list(data.get("trades") or []),
             equity_curve=list(data.get("equity_curve") or []),
-            created_at=data.get("created_at") or datetime.now(UTC).isoformat(),
-            updated_at=data.get("updated_at") or datetime.now(UTC).isoformat(),
+            created_at=data.get("created_at") or now_iso(),
+            updated_at=data.get("updated_at") or now_iso(),
         )
 
     def save(self, path: str | Path) -> None:
@@ -137,7 +138,7 @@ def apply_action(
     """
     if price <= 0:
         raise ValueError("price must be positive")
-    ts = ts or datetime.now(UTC).isoformat()
+    ts = ts or now_iso()
     fill_buy = price * (1.0 + account.slippage_pct)
     fill_sell = price * (1.0 - account.slippage_pct)
     order: dict[str, Any] | None = None

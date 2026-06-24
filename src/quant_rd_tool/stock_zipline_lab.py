@@ -1,6 +1,7 @@
 """Orchestration for A-share zipline strategy lab."""
 
 from __future__ import annotations
+from quant_rd_tool.time_util import now_iso
 
 import uuid
 from datetime import UTC, date, datetime, timedelta
@@ -162,7 +163,7 @@ def run_lab_backtest(
         "end": end,
         "capital_base": capital_base,
         "market": "stock",
-        "generated_at": datetime.now(UTC).isoformat(),
+        "generated_at": now_iso(),
         **raw,
     }
     if combo_spec:

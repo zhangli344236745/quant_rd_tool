@@ -1,6 +1,7 @@
 """Scan local stock report artifacts under data/stocks/."""
 
 from __future__ import annotations
+from quant_rd_tool.time_util import now_iso
 
 import io
 import json
@@ -243,7 +244,7 @@ def build_reports_zip(
                         md_text,
                         meta={
                             "content_hash": verify.get("content_hash"),
-                            "exported_at": datetime.now(UTC).isoformat(),
+                            "exported_at": now_iso(),
                         },
                     )
                 zf.writestr(f"{prefix}/report.md", md_text.encode("utf-8"))

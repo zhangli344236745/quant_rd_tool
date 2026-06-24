@@ -1,6 +1,7 @@
 """In-process scheduler registry: list / start / stop crypto schedule jobs."""
 
 from __future__ import annotations
+from quant_rd_tool.time_util import now_iso
 
 import json
 import logging
@@ -20,8 +21,8 @@ logger = logging.getLogger(__name__)
 
 JobStatus = Literal["stopped", "running", "error"]
 StockJobType = Literal["stock_qlib", "stock_watchlist", "stock_announcements"]
-CryptoJobType = Literal["analysis", "news"]
-JobType = Literal["analysis", "news", "stock_qlib", "stock_watchlist", "stock_announcements"]
+CryptoJobType = Literal["analysis", "news", "polymarket_arb"]
+JobType = Literal["analysis", "news", "stock_qlib", "stock_watchlist", "stock_announcements", "polymarket_arb"]
 
 
 @dataclass
@@ -40,7 +41,7 @@ class ScheduleJobConfig:
     years: int = 2
     with_openbb: bool = False
     use_watchlist: bool = False
-    created_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
+    created_at: str = field(default_factory=lambda: now_iso())
 
     def __post_init__(self) -> None:
         from quant_rd_tool.akshare_data import to_ak_code
@@ -54,6 +55,8 @@ class ScheduleJobConfig:
         if not self.name:
             if self.job_type == "news":
                 self.name = "crypto news scan"
+            elif self.job_type == "polymarket_arb":
+                self.name = "Polymarket 套利扫描"
             elif self.job_type == "stock_watchlist":
                 self.name = "自选 qlib 刷新"
             elif self.job_type == "stock_announcements":
@@ -65,6 +68,8 @@ class ScheduleJobConfig:
         if not self.id:
             if self.job_type == "news":
                 self.id = "news-scan"
+            elif self.job_type == "polymarket_arb":
+                self.id = "polymarket-arb"
             elif self.job_type == "stock_watchlist":
                 self.id = "watchlist-1d"
             elif self.job_type == "stock_announcements":
@@ -115,9 +120,18 @@ def _is_stock_job(cfg: ScheduleJobConfig) -> bool:
     ).rstrip("/").endswith("stocks")
 
 
+def _run_polymarket_cycle() -> list[dict[str, Any]]:
+    from quant_rd_tool.crypto_polymarket_scheduler import run_polymarket_scan_cycle
+
+    result = run_polymarket_scan_cycle()
+    return [result]
+
+
 def _run_analysis_cycle(cfg: ScheduleJobConfig) -> list[dict[str, Any]]:
     if cfg.job_type == "news":
         raise ValueError("use _run_news_cycle for news jobs")
+    if cfg.job_type == "polymarket_arb":
+        return _run_polymarket_cycle()
     if _is_stock_job(cfg):
         return run_stock_scheduled_cycle(
             cfg.symbols,
@@ -192,6 +206,7 @@ class SchedulerManager:
             "news",
             "stock_watchlist",
             "stock_announcements",
+            "polymarket_arb",
         ) and not (_is_stock_job(cfg) and not cfg.symbols):
             if not _is_stock_job(cfg):
                 from quant_rd_tool.ccxt_connectivity import require_connectivity
@@ -210,7 +225,7 @@ class SchedulerManager:
                 return running.record.to_public_dict()
             running.stop_event.clear()
             running.record.status = "running"
-            running.record.started_at = datetime.now(UTC).isoformat()
+            running.record.started_at = now_iso()
             running.record.last_error = None
             running.thread = threading.Thread(
                 target=self._worker,
@@ -259,6 +274,7 @@ class SchedulerManager:
             "news",
             "stock_watchlist",
             "stock_announcements",
+            "polymarket_arb",
         ) and cfg.symbols:
             if not _is_stock_job(cfg):
                 from quant_rd_tool.ccxt_connectivity import require_connectivity
@@ -273,18 +289,23 @@ class SchedulerManager:
             results = _run_news_cycle(cfg, job_id=job_id)
         elif cfg.job_type == "stock_announcements":
             results = _run_announcement_cycle(cfg, job_id=job_id)
+        elif cfg.job_type == "polymarket_arb":
+            results = _run_polymarket_cycle()
         else:
             results = _run_analysis_cycle(cfg)
         with self._lock:
             running = self._jobs[job_id]
             running.record.run_count += 1
-            running.record.last_run_at = datetime.now(UTC).isoformat()
+            running.record.last_run_at = now_iso()
             if cfg.job_type == "news":
                 running.record.last_error = _first_news_error(results)
                 running.record.last_cycle_summary = _summarize_news_result(results)
             elif cfg.job_type == "stock_announcements":
                 running.record.last_error = _first_announcement_error(results)
                 running.record.last_cycle_summary = _summarize_announcement_result(results)
+            elif cfg.job_type == "polymarket_arb":
+                running.record.last_error = None
+                running.record.last_cycle_summary = _summarize_polymarket_results(results)
             elif _is_stock_job(cfg):
                 running.record.last_error = _first_error(results)
                 running.record.last_cycle_summary = _summarize_stock_results(results)
@@ -334,6 +355,10 @@ class SchedulerManager:
                     results = _run_announcement_cycle(cfg, job_id=job_id)
                     last_error = _first_announcement_error(results)
                     summary = _summarize_announcement_result(results)
+                elif cfg.job_type == "polymarket_arb":
+                    results = _run_polymarket_cycle()
+                    last_error = None
+                    summary = _summarize_polymarket_results(results)
                 else:
                     results = _run_analysis_cycle(cfg)
                     last_error = _first_error(results)
@@ -346,7 +371,7 @@ class SchedulerManager:
                     if not running:
                         break
                     running.record.run_count += 1
-                    running.record.last_run_at = datetime.now(UTC).isoformat()
+                    running.record.last_run_at = now_iso()
                     running.record.last_error = last_error
                     running.record.last_cycle_summary = summary
                     running.record.status = "running"
@@ -519,6 +544,15 @@ def _summarize_news_result(result: dict[str, Any]) -> list[dict[str, Any]]:
             "market_stance": digest.get("market_stance"),
         }
     ]
+
+
+def _summarize_polymarket_results(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    from quant_rd_tool.crypto_polymarket_scheduler import summarize_polymarket_cycle
+
+    if not results:
+        return [{"job_type": "polymarket_arb", "markets_scanned": 0, "opportunities_count": 0}]
+    row = summarize_polymarket_cycle(results[0])
+    return [{"job_type": "polymarket_arb", **row}]
 
 
 def _summarize_results(results: list[dict[str, Any]]) -> list[dict[str, Any]]:

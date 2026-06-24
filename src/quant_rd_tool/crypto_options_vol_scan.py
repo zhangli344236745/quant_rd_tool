@@ -1,6 +1,7 @@
 """Score options IV: percentile, 24h change, cross-symbol rank."""
 
 from __future__ import annotations
+from quant_rd_tool.time_util import now_iso
 
 import json
 import time
@@ -282,7 +283,7 @@ def run_volatility_scan(
         row["rank"] = rank
 
     payload = {
-        "scanned_at": datetime.now(UTC).isoformat(),
+        "scanned_at": now_iso(),
         "config": {**cfg, "symbols": syms, "lookback_days": lb, "data_dir": dd},
         "items": items,
     }

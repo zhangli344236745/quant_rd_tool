@@ -36,7 +36,21 @@ async def lifespan(app: FastAPI):
         import logging
 
         logging.getLogger(__name__).exception("VBT scheduler boot failed")
+    try:
+        from quant_rd_tool.crypto_polymarket_runner import boot_polymarket_scheduler_if_enabled
+
+        boot_polymarket_scheduler_if_enabled()
+    except Exception:
+        import logging
+
+        logging.getLogger(__name__).exception("Polymarket scheduler boot failed")
     yield
+    try:
+        from quant_rd_tool.crypto_polymarket_runner import get_polymarket_runner
+
+        get_polymarket_runner().stop()
+    except Exception:
+        pass
     try:
         from quant_rd_tool.stock_vbt_scheduler import get_vbt_scheduler
 

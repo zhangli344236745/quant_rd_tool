@@ -1,6 +1,7 @@
 """Scheduled crypto data sync + analysis (ccxt incremental → qlib → signals)."""
 
 from __future__ import annotations
+from quant_rd_tool.time_util import now_iso
 
 import json
 import logging
@@ -133,7 +134,7 @@ def run_scheduled_cycle(
                     "symbol": sym,
                     "timeframe": timeframe,
                     "error": str(e),
-                    "generated_at": datetime.now(UTC).isoformat(),
+                    "generated_at": now_iso(),
                 }
             )
 

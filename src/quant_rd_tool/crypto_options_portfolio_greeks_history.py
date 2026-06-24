@@ -1,6 +1,7 @@
 """JSONL history for portfolio-level Greeks snapshots."""
 
 from __future__ import annotations
+from quant_rd_tool.time_util import now_iso
 
 import json
 from datetime import UTC, datetime
@@ -35,7 +36,7 @@ def snapshot_from_report(report: dict[str, Any]) -> dict[str, Any] | None:
         bases = [b] if b else []
     pid = report.get("portfolio_id") or portfolio_id_from_bases(list(bases))
     row: dict[str, Any] = {
-        "ts": datetime.now(UTC).isoformat(),
+        "ts": now_iso(),
         "portfolio_id": pid,
         "bases": bases,
         "scale_mode": report.get("scale_mode", "notional"),

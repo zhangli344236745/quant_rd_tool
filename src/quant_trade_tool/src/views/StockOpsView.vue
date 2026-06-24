@@ -3,6 +3,11 @@ import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { stocksApi, type StockOpsSummary } from "@/api/stocks";
 import { extractError } from "@/api/http";
+import { formatBeijing } from "@/utils/datetime";
+
+function formatTimeCol(_r: unknown, _c: unknown, v: string) {
+  return formatBeijing(v);
+}
 import AlertFeedPanel from "@/components/AlertFeedPanel.vue";
 import { useNotify } from "@/composables/useNotify";
 
@@ -165,7 +170,7 @@ onUnmounted(() => {
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="last_run_at" label="上次运行" min-width="150" show-overflow-tooltip />
+            <el-table-column prop="last_run_at" label="上次运行" min-width="150" show-overflow-tooltip :formatter="formatTimeCol" />
           </el-table>
         </el-card>
 

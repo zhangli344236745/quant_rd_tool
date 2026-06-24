@@ -1,6 +1,7 @@
 """Export OHLCV / backtest artifacts for download."""
 
 from __future__ import annotations
+from quant_rd_tool.time_util import now_iso
 
 import io
 import json
@@ -96,7 +97,7 @@ def build_export_zip(
             "bars": len(df),
             "start": start,
             "end": end,
-            "exported_at": datetime.now(UTC).isoformat(),
+            "exported_at": now_iso(),
         }
         if not df.empty:
             ts = _bar_timestamps(df)

@@ -1,6 +1,7 @@
 """Push alerts when cross-venue aligned IV spread exceeds thresholds."""
 
 from __future__ import annotations
+from quant_rd_tool.time_util import now_iso
 
 import json
 import logging
@@ -61,7 +62,7 @@ def save_spread_alert_config(*, data_dir: str = "data/crypto", **updates: Any) -
         if k in updates and updates[k] is not None:
             ent[k] = updates[k]
             cfg[k] = updates[k]
-    ent["updated_at"] = datetime.now(UTC).isoformat()
+    ent["updated_at"] = now_iso()
     raw["crypto_options_spread_alerts"] = ent
     path.write_text(json.dumps(raw, ensure_ascii=False, indent=2), encoding="utf-8")
     return cfg
@@ -87,7 +88,7 @@ def _save_state(state: dict[str, Any], path: Path | None = None) -> None:
 def append_spread_alert_log(entry: dict[str, Any], *, log_path: Path | None = None) -> None:
     log_path = log_path or _LOG_PATH
     log_path.parent.mkdir(parents=True, exist_ok=True)
-    row = {"ts": datetime.now(UTC).isoformat(), **entry}
+    row = {"ts": now_iso(), **entry}
     with log_path.open("a", encoding="utf-8") as f:
         f.write(json.dumps(row, ensure_ascii=False, default=str) + "\n")
 
@@ -225,7 +226,7 @@ def fire_spread_alert(
     )
     _deliver_notification(title=title, message=message, detail=detail, cfg=cfg)
 
-    state.setdefault("last_alerts", {})[key] = datetime.now(UTC).isoformat()
+    state.setdefault("last_alerts", {})[key] = now_iso()
     _save_state(state)
     return True
 

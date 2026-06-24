@@ -8,6 +8,7 @@ and a single managed cycle are decoupled from the threading loop.
 """
 
 from __future__ import annotations
+from quant_rd_tool.time_util import now_iso
 
 import logging
 import threading
@@ -35,7 +36,7 @@ class ManagedBot:
     last_run_at: str | None = None
     last_result: dict[str, Any] | None = None
     last_error: str | None = None
-    created_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
+    created_at: str = field(default_factory=lambda: now_iso())
     _thread: threading.Thread | None = field(default=None, repr=False, compare=False)
     _stop: threading.Event = field(default_factory=threading.Event, repr=False, compare=False)
 
@@ -108,7 +109,7 @@ class BotScheduler:
         factory = self._factories.get(bot.kind)
         if factory is None:
             raise ValueError(f"未知机器人类型: {bot.kind}")
-        bot.last_run_at = datetime.now(UTC).isoformat()
+        bot.last_run_at = now_iso()
         try:
             instance = factory(bot_id, bot.config)
             result = instance.run_once()

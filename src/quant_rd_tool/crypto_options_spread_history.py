@@ -1,6 +1,7 @@
 """Local JSONL history for cross-venue aligned IV spreads."""
 
 from __future__ import annotations
+from quant_rd_tool.time_util import now_iso
 
 import json
 from datetime import UTC, datetime
@@ -55,7 +56,7 @@ def snapshot_from_aligned(aligned: dict[str, Any]) -> dict[str, Any] | None:
     atm = aligned.get("atm") or {}
     return {
         "base": aligned.get("base"),
-        "ts": datetime.now(UTC).isoformat(),
+        "ts": now_iso(),
         "expiry_date": aligned.get("expiry_date"),
         "dte": aligned.get("dte"),
         "atm_strike": aligned.get("atm_strike"),

@@ -1,6 +1,7 @@
 """Configurable A-share analysis workflow: technical + qlib + strategy + VaR → advice."""
 
 from __future__ import annotations
+from quant_rd_tool.time_util import now_iso
 
 import time
 import uuid
@@ -973,7 +974,7 @@ def run_workflow(
         "data_dir": dd,
         "df": df,
         "steps": {},
-        "generated_at": datetime.now(UTC).isoformat(),
+        "generated_at": now_iso(),
         "generated_at_beijing": utc_now_beijing_str(),
     }
 

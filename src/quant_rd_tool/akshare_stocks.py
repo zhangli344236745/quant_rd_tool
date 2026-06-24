@@ -1,6 +1,7 @@
 """A-share company list, profile, management, news via akshare."""
 
 from __future__ import annotations
+from quant_rd_tool.time_util import now_iso
 
 import json
 import logging
@@ -83,7 +84,7 @@ def refresh_a_stock_list() -> dict[str, Any]:
     if _LIST_CACHE_FILE.exists():
         _LIST_CACHE_FILE.unlink(missing_ok=True)
     items = _fetch_a_stock_list_raw()
-    return {"count": len(items), "refreshed_at": datetime.now(UTC).isoformat()}
+    return {"count": len(items), "refreshed_at": now_iso()}
 
 
 def list_a_stocks(

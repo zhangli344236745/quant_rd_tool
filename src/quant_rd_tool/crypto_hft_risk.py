@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from quant_rd_tool.time_util import now_iso, today_beijing_date
+
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from typing import Any, Literal
@@ -29,11 +31,11 @@ class RiskDecision:
 
 
 def _iso_now() -> str:
-    return datetime.now(UTC).isoformat()
+    return now_iso()
 
 
 def _today_utc() -> str:
-    return date.today().isoformat()
+    return today_beijing_date()
 
 
 def default_pnl_block() -> dict[str, Any]:

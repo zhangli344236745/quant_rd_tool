@@ -10,6 +10,11 @@ import {
   type CryptoZiplineTimeframeOption,
 } from "@/api/crypto";
 import { extractError } from "@/api/http";
+import { formatBeijing } from "@/utils/datetime";
+
+function formatTimeCol(_r: unknown, _c: unknown, v: string) {
+  return formatBeijing(v);
+}
 import EquityCurveChart from "@/components/EquityCurveChart.vue";
 import OptionsPortfolioGreeksPanel from "@/components/options/OptionsPortfolioGreeksPanel.vue";
 
@@ -961,7 +966,7 @@ onMounted(async () => {
       <template #header>历史回测</template>
       <el-empty v-if="!runs.length" description="暂无记录" />
       <el-table v-else :data="runs" size="small" @row-click="(row: CryptoZiplineRunSummary) => openRun(row.run_id)">
-        <el-table-column prop="generated_at" label="时间" />
+        <el-table-column prop="generated_at" label="时间" :formatter="formatTimeCol" />
         <el-table-column prop="symbol" label="标的" width="70" />
         <el-table-column prop="timeframe" label="周期" width="56" />
         <el-table-column prop="strategy" label="策略" />

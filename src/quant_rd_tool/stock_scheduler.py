@@ -1,6 +1,7 @@
 """Scheduled A-share qlib analysis (watchlist or symbol list → report refresh)."""
 
 from __future__ import annotations
+from quant_rd_tool.time_util import now_iso
 
 import json
 import logging
@@ -51,7 +52,7 @@ def run_stock_scheduled_cycle(
                 "symbol": "",
                 "code": "",
                 "error": "无分析标的（请配置 symbols 或启用自选列表）",
-                "generated_at": datetime.now(UTC).isoformat(),
+                "generated_at": now_iso(),
             }
         ]
 
@@ -95,7 +96,7 @@ def run_stock_scheduled_cycle(
                     "code": code,
                     "symbol": code,
                     "error": str(e),
-                    "generated_at": datetime.now(UTC).isoformat(),
+                    "generated_at": now_iso(),
                 }
             )
     return results

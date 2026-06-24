@@ -1,6 +1,7 @@
 """Load crypto_news section from settings.json with env overrides."""
 
 from __future__ import annotations
+from quant_rd_tool.time_util import now_iso
 
 import json
 import os
@@ -118,7 +119,7 @@ def save_crypto_news_config(
     if web_search is not None:
         existing_ws = section.get("web_search") if isinstance(section.get("web_search"), dict) else {}
         section["web_search"] = {**_DEFAULT_WEB_SEARCH, **existing_ws, **web_search}
-    section["updated_at"] = datetime.now(UTC).isoformat()
+    section["updated_at"] = now_iso()
     data["crypto_news"] = section
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")

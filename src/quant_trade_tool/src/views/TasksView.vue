@@ -5,6 +5,7 @@ import { jobsApi, JOB_TYPE_LABELS, type JobRecord } from "@/api/jobs";
 import { jobTypeLabel } from "@/composables/useJobSubmit";
 import { useJobEvents } from "@/composables/useJobEvents";
 import { extractError } from "@/api/http";
+import { formatBeijing } from "@/utils/datetime";
 
 const router = useRouter();
 const items = ref<JobRecord[]>([]);
@@ -149,7 +150,9 @@ onUnmounted(() => {
             <template #default="{ row }">{{ Math.round((row.progress || 0) * 100) }}%</template>
           </el-table-column>
           <el-table-column prop="message" label="说明" min-width="100" show-overflow-tooltip />
-          <el-table-column prop="created_at" label="创建" width="170" show-overflow-tooltip />
+          <el-table-column label="创建" width="170" show-overflow-tooltip>
+            <template #default="{ row }">{{ formatBeijing(row.created_at) }}</template>
+          </el-table-column>
           <el-table-column label="" width="120">
             <template #default="{ row }">
               <el-button v-if="row.status === 'failed'" link type="warning" @click.stop="retryJob(row)">
@@ -172,7 +175,7 @@ onUnmounted(() => {
               <div class="log-head">实时日志 (SSE)</div>
               <el-scrollbar max-height="220">
                 <div v-for="(line, i) in logs" :key="i" class="log-line">
-                  <span v-if="line.created_at" class="log-ts">{{ line.created_at }}</span>
+                  <span v-if="line.created_at" class="log-ts">{{ formatBeijing(line.created_at) }}</span>
                   <span v-if="line.level" class="log-lv">{{ line.level }}</span>
                   {{ line.message || JSON.stringify(line) }}
                   <span v-if="line.progress != null" class="log-pct">

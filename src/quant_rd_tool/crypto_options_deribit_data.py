@@ -1,6 +1,7 @@
 """Deribit options market data — public REST API."""
 
 from __future__ import annotations
+from quant_rd_tool.time_util import now_iso
 
 import logging
 import re
@@ -197,7 +198,7 @@ def fetch_atm_iv_snapshot(
 ) -> list[dict[str, Any]]:
     """ATM IV per underlying from Deribit option book summaries."""
     symbols = [s.upper() for s in (bases or DERIBIT_SYMBOLS)]
-    ts = datetime.now(UTC).isoformat()
+    ts = now_iso()
     own = client is None
     c = client or _client()
     rows: list[dict[str, Any]] = []

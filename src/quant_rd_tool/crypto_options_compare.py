@@ -1,6 +1,7 @@
 """Cross-venue options IV comparison: Binance EAPI vs Deribit."""
 
 from __future__ import annotations
+from quant_rd_tool.time_util import now_iso
 
 import time
 from datetime import UTC, datetime
@@ -543,7 +544,7 @@ def build_venue_compare(
     else:
         out["comparison"]["mode"] = "near_month"
     out["disclaimer"] = _DISCLAIMER
-    out["scanned_at"] = datetime.now(UTC).isoformat()
+    out["scanned_at"] = now_iso()
     return out
 
 
@@ -608,7 +609,7 @@ def build_venue_compare_scan(
         data_dir=data_dir,
     )
     payload = {
-        "scanned_at": datetime.now(UTC).isoformat(),
+        "scanned_at": now_iso(),
         "symbols": syms,
         "items": items,
         "overview": overview,

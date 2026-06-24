@@ -18,11 +18,11 @@ PortfolioMethod = Literal["max_sharpe", "min_volatility"]
 PORTFOLIO_DIR = VBT_LAB_DIR / "portfolio"
 
 
+from quant_rd_tool.time_util import to_beijing_iso
+
+
 def _iso_now(now: datetime | None = None) -> str:
-    dt = now or datetime.now(UTC)
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=UTC)
-    return dt.isoformat()
+    return to_beijing_iso(now)
 
 
 def _load_price_panel(

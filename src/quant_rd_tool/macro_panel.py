@@ -1,6 +1,7 @@
 """Standalone OpenBB macro / industry panel (CLI & API)."""
 
 from __future__ import annotations
+from quant_rd_tool.time_util import now_iso
 
 import json
 from datetime import UTC, datetime
@@ -47,7 +48,7 @@ def build_macro_panel(
         }
 
     panel: dict[str, Any] = {
-        "generated_at": datetime.now(UTC).isoformat(),
+        "generated_at": now_iso(),
         "openbb": research,
         "macro": research.get("macro"),
         "industry": research.get("industry") if code else None,

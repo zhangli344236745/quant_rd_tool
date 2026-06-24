@@ -1,6 +1,7 @@
 """WebSocket event-driven market-making engine via ccxt.pro."""
 
 from __future__ import annotations
+from quant_rd_tool.time_util import now_iso
 
 import logging
 import time
@@ -46,7 +47,7 @@ _LATENCY_SAMPLE_CAP = 100
 
 
 def _iso_now() -> str:
-    return datetime.now(UTC).isoformat()
+    return now_iso()
 
 
 def should_process_update(

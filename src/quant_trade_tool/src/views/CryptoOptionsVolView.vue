@@ -20,6 +20,7 @@ import {
   type StrikeProbabilityReport,
 } from "@/api/crypto";
 import { extractError } from "@/api/http";
+import { formatBeijing } from "@/utils/datetime";
 import { jobsApi } from "@/api/jobs";
 import { useRouter } from "vue-router";
 import OptionsLineChart from "@/components/options/OptionsLineChart.vue";
@@ -739,7 +740,7 @@ onMounted(async () => {
         <el-button type="primary" :loading="loading" @click="runScan">立即扫描</el-button>
         <el-button :loading="jobEnqueueing" @click="enqueueVolScanJob">后台任务扫描</el-button>
         <el-button @click="configVisible = true">扫描配置</el-button>
-        <span v-if="scan" class="muted mono small">扫描于 {{ scan.scanned_at }}</span>
+        <span v-if="scan" class="muted mono small">扫描于 {{ formatBeijing(scan.scanned_at) }}</span>
       </div>
 
       <el-dialog v-model="spreadAlertVisible" title="跨所 IV 价差告警" width="440px">

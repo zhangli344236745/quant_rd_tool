@@ -1,6 +1,7 @@
 """Option Greeks from Binance EAPI mark and Deribit book summary."""
 
 from __future__ import annotations
+from quant_rd_tool.time_util import now_iso
 
 import math
 from datetime import UTC, datetime
@@ -267,7 +268,7 @@ def build_greeks_chain(
         "contract_index": _contract_index(),
         "common_expiries": common.get("expiries") or [],
         "disclaimer": _DISCLAIMER,
-        "scanned_at": datetime.now(UTC).isoformat(),
+        "scanned_at": now_iso(),
     }
 
 

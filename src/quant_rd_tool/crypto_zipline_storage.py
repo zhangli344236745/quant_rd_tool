@@ -1,6 +1,7 @@
 """Persist zipline lab backtest runs."""
 
 from __future__ import annotations
+from quant_rd_tool.time_util import now_iso
 
 import json
 import uuid
@@ -34,7 +35,7 @@ def save_run(data_dir: str | Path, result: dict[str, Any]) -> dict[str, Any]:
     run_id = result.get("run_id") or str(uuid.uuid4())
     result["run_id"] = run_id
     result.setdefault("disclaimer", DISCLAIMER)
-    result.setdefault("generated_at", datetime.now(UTC).isoformat())
+    result.setdefault("generated_at", now_iso())
 
     rd = run_dir(data_dir, run_id)
     rd.mkdir(parents=True, exist_ok=True)

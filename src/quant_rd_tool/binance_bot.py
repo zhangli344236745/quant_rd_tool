@@ -10,6 +10,7 @@ Brings the spot bot to parity with the perp bot's risk controls:
 """
 
 from __future__ import annotations
+from quant_rd_tool.time_util import now_iso
 
 import json
 import logging
@@ -276,7 +277,7 @@ class BinanceBot:
             return
         try:
             record = {
-                "ts": datetime.now(UTC).isoformat(),
+                "ts": now_iso(),
                 "symbol": self.config.symbol,
                 "pair": self._pair,
                 "mode": self._mode_label(),

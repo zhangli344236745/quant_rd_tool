@@ -1,6 +1,7 @@
 """A-share announcement / news radar for watchlist (rule-based scoring)."""
 
 from __future__ import annotations
+from quant_rd_tool.time_util import now_iso
 
 import hashlib
 import json
@@ -215,7 +216,7 @@ def scan_symbol_announcements(
         if score < min_score:
             continue
         entry = {
-            "ts": datetime.now(UTC).isoformat(),
+            "ts": now_iso(),
             "code": ak,
             "title": title,
             "published": published,
@@ -303,7 +304,7 @@ def run_announcement_scan(
                 continue
             seen.add(h)
             entry = {
-                "ts": datetime.now(UTC).isoformat(),
+                "ts": now_iso(),
                 "code": to_ak_code(code),
                 "title": title,
                 "published": published,
@@ -321,7 +322,7 @@ def run_announcement_scan(
 
     top.sort(key=lambda x: x.get("score", 0), reverse=True)
     digest = {
-        "generated_at": datetime.now(UTC).isoformat(),
+        "generated_at": now_iso(),
         "symbols_scanned": len(codes),
         "items_new": len(new_rows),
         "top_items": top[:20],

@@ -1,6 +1,7 @@
 """A-share OHLCV → zipline-reloaded csvdir daily bundle (XSHG calendar)."""
 
 from __future__ import annotations
+from quant_rd_tool.time_util import now_iso
 
 import hashlib
 import json
@@ -264,7 +265,7 @@ def ensure_bundle_ingested(
             "bar_minutes": bar_minutes_for(tf),
             "ingest_start": str(start),
             "ingest_end": str(end),
-            "ingested_at": datetime.now(UTC).isoformat(),
+            "ingested_at": now_iso(),
             "bundle": bundle_name_for(tf),
             "market": "stock",
         },

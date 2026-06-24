@@ -1,0 +1,8 @@
+{
+  "conditionId": "0xabc123",
+  "question": "Will BTC hit 100k in 2026?",
+  "slug": "btc-100k-2026",
+  "volume24hr": 50000,
+  "outcomes": "[\"Yes\", \"No\"]",
+  "clobTokenIds": "[\"yes-token-1\", \"no-token-2\"]"
+}

@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from quant_rd_tool import ccxt_data as cxt
+from quant_rd_tool.time_util import to_beijing_iso
 
 DEFAULT_WATCHLIST = ["BTC", "ETH", "SOL", "BNB"]
 CARRY_DIR = Path("data/crypto/carry")
@@ -759,10 +760,7 @@ def _parse_ts(ts: str | None) -> datetime:
 
 
 def _iso_now(now: datetime | None = None) -> str:
-    dt = now or datetime.now(UTC)
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=UTC)
-    return dt.astimezone(UTC).isoformat()
+    return to_beijing_iso(now)
 
 
 def _floor_funding_boundary(dt: datetime) -> datetime:

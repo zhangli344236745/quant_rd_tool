@@ -20,11 +20,11 @@ ML_DIR = VBT_LAB_DIR / "ml"
 FEATURE_COLS = ("ret_1", "ret_5", "ret_20", "vol_20", "mom_60")
 
 
+from quant_rd_tool.time_util import to_beijing_iso
+
+
 def _iso_now(now: datetime | None = None) -> str:
-    dt = now or datetime.now(UTC)
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=UTC)
-    return dt.isoformat()
+    return to_beijing_iso(now)
 
 
 def build_feature_matrix(df: pd.DataFrame) -> pd.DataFrame:

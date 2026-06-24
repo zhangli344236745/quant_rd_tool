@@ -949,6 +949,56 @@ export const cryptoApi = {
   carryEvents: (limit = 100) =>
     http.get<{ items: CarryEvent[] }>("/crypto/carry/events", { params: { limit } }),
 
+  polymarketScan: (force = false) =>
+    http.get<PolymarketScanResult>("/crypto/polymarket/scan", { params: { force } }),
+
+  polymarketScanLatest: () => http.get<PolymarketScanResult>("/crypto/polymarket/scan/latest"),
+
+  polymarketGetConfig: () => http.get<PolymarketArbConfig>("/crypto/polymarket/config"),
+
+  polymarketPutConfig: (body: Partial<PolymarketArbConfig>) =>
+    http.put<PolymarketArbConfig>("/crypto/polymarket/config", body),
+
+  polymarketSummary: () => http.get<PolymarketSummary>("/crypto/polymarket/summary"),
+
+  polymarketStats: () => http.get<PolymarketSummary>("/crypto/polymarket/stats"),
+
+  polymarketScanHistory: (limit = 20) =>
+    http.get<{ items: PolymarketScanHistoryItem[] }>("/crypto/polymarket/scans/history", {
+      params: { limit },
+    }),
+
+  polymarketPreview: (conditionId: string, sizeShares?: number) =>
+    http.get<PolymarketOpenPreview>("/crypto/polymarket/preview", {
+      params: { condition_id: conditionId, size_shares: sizeShares },
+    }),
+
+  polymarketClosePreview: (positionId: string) =>
+    http.get<PolymarketClosePreview>(`/crypto/polymarket/positions/${positionId}/close-preview`),
+
+  polymarketPositions: (params?: { status?: string; limit?: number }) =>
+    http.get<{ items: PolymarketPosition[] }>("/crypto/polymarket/positions", { params }),
+
+  polymarketOpen: (body: {
+    condition_id: string;
+    ask_yes: number;
+    ask_no: number;
+    question?: string;
+    size_shares?: number;
+  }) => http.post<PolymarketPosition>("/crypto/polymarket/positions/open", body),
+
+  polymarketClose: (id: string, body?: { settlement_payout_usd?: number }) =>
+    http.post<PolymarketPosition>(`/crypto/polymarket/positions/${id}/close`, body ?? {}),
+
+  polymarketEvents: (limit = 100) =>
+    http.get<{ items: PolymarketEvent[] }>("/crypto/polymarket/events", { params: { limit } }),
+
+  polymarketBuiltinStatus: () => http.get<PolymarketBuiltinStatus>("/crypto/polymarket/builtin/status"),
+
+  polymarketBuiltinStart: () => http.post<PolymarketBuiltinStatus>("/crypto/polymarket/builtin/start"),
+
+  polymarketBuiltinStop: () => http.post<PolymarketBuiltinStatus>("/crypto/polymarket/builtin/stop"),
+
   hftStrategies: () => http.get<HftStrategy[]>("/crypto/hft/strategies"),
 
   hftBots: () => http.get<{ items: HftBotStatus[] }>("/crypto/hft/bots"),
@@ -1729,6 +1779,140 @@ export interface CarryConfig {
   perp_fee_pct: number;
   slippage_pct: number;
   testnet: boolean;
+}
+
+export interface PolymarketArbConfig {
+  top_n_volume: number;
+  watchlist_condition_ids: string[];
+  min_edge_bps: number;
+  taker_fee_bps: number;
+  min_size_shares: number;
+  min_liquidity_usd: number;
+  builtin_scan_enabled: boolean;
+  builtin_interval_sec: number;
+  scan_dedupe_sec: number;
+  default_paper_size_shares: number;
+  alert_cooldown_sec: number;
+  last_scan_at?: string | null;
+}
+
+export interface PolymarketOpportunity {
+  condition_id: string;
+  question: string;
+  ask_yes?: number;
+  ask_no?: number;
+  edge_bps?: number;
+  profit_usd?: number;
+  profit_at_100_usd?: number;
+  cost_at_100_usd?: number;
+  roi_at_100_pct?: number;
+  ref_shares?: number;
+  size_cap?: number;
+  opportunity?: boolean;
+  market_url?: string | null;
+  volume24hr?: number;
+  error?: string;
+}
+
+export interface PolymarketScanResult {
+  scanned_at: string;
+  markets_scanned: number;
+  opportunities_count: number;
+  best_edge_bps?: number | null;
+  duration_sec?: number;
+  errors?: number;
+  books_fetched?: number;
+  items: PolymarketOpportunity[];
+}
+
+export interface PolymarketSummary {
+  last_scan_at?: string | null;
+  markets_scanned: number;
+  opportunities_count: number;
+  best_edge_bps?: number | null;
+  open_positions: number;
+  closed_positions: number;
+  total_realized_pnl_usd: number;
+  builtin_scan_enabled: boolean;
+  scans_today?: number;
+  opportunities_today?: number;
+  hit_rate_today?: number | null;
+  avg_best_edge_bps_today?: number | null;
+  best_edge_bps_today?: number | null;
+  last_duration_sec?: number | null;
+}
+
+export interface PolymarketLiveStatus {
+  current_ask_yes: number;
+  current_ask_no: number;
+  current_edge_bps?: number;
+  entry_edge_bps?: number;
+  edge_delta_bps?: number;
+  opportunity_active?: boolean;
+  unrealized_pnl_usd: number;
+}
+
+export interface PolymarketPosition {
+  id: string;
+  status: string;
+  condition_id: string;
+  question?: string;
+  size_shares: number;
+  entry_ask_yes: number;
+  entry_ask_no: number;
+  cost_usd: number;
+  fee_usd?: number;
+  realized_pnl_usd?: number | null;
+  opened_at?: string;
+  closed_at?: string | null;
+  live_status?: PolymarketLiveStatus | null;
+}
+
+export interface PolymarketOpenPreview {
+  condition_id?: string;
+  question?: string;
+  size_shares: number;
+  ask_yes: number;
+  ask_no: number;
+  cost_usd: number;
+  fee_usd: number;
+  payout_usd: number;
+  gross_edge_usd: number;
+  net_pnl_usd: number;
+}
+
+export interface PolymarketClosePreview {
+  position_id: string;
+  condition_id?: string;
+  question?: string;
+  size_shares: number;
+  cost_usd: number;
+  fee_usd: number;
+  payout_usd: number;
+  net_pnl_usd: number;
+  live_status?: PolymarketLiveStatus | null;
+}
+
+export interface PolymarketScanHistoryItem {
+  scanned_at?: string;
+  markets_scanned: number;
+  opportunities_count: number;
+  best_edge_bps?: number | null;
+  errors?: number;
+  duration_sec?: number | null;
+}
+
+export interface PolymarketEvent {
+  ts?: string;
+  type: string;
+  [key: string]: unknown;
+}
+
+export interface PolymarketBuiltinStatus {
+  running: boolean;
+  run_count: number;
+  last_run_at?: string | null;
+  last_error?: string | null;
 }
 
 export interface CarryLegStep {

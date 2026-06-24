@@ -1,6 +1,7 @@
 """Compliance audit chain for A-share research runs (hash-linked JSONL)."""
 
 from __future__ import annotations
+from quant_rd_tool.time_util import now_iso
 
 import hashlib
 import json
@@ -83,7 +84,7 @@ def record_research_run(
     path = audit_chain_path(data_dir)
     path.parent.mkdir(parents=True, exist_ok=True)
     run_id = run_id or str(uuid.uuid4())
-    ts = datetime.now(UTC).isoformat()
+    ts = now_iso()
     prev_hash = _last_entry_hash(path)
     body = {
         "run_id": run_id,
@@ -213,7 +214,7 @@ def lock_report_version(
     row = {
         "code": code.strip(),
         "version_id": version_id,
-        "locked_at": datetime.now(UTC).isoformat(),
+        "locked_at": now_iso(),
         "locked_by": locked_by,
         "reason": reason,
         "content_hash": verify.get("content_hash"),
@@ -241,7 +242,7 @@ def watermark_markdown(text: str, *, meta: dict[str, Any] | None = None) -> str:
     meta = meta or {}
     lines = [
         DEFAULT_WATERMARK,
-        f"导出时间: {meta.get('exported_at', datetime.now(UTC).isoformat())}",
+        f"导出时间: {meta.get('exported_at', now_iso())}",
     ]
     if meta.get("content_hash"):
         lines.append(f"内容哈希: {meta['content_hash']}")
@@ -260,7 +261,7 @@ def build_export_manifest(
     chain_verify: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     return {
-        "exported_at": datetime.now(UTC).isoformat(),
+        "exported_at": now_iso(),
         "disclaimer": DEFAULT_DISCLAIMER,
         "watermark": DEFAULT_WATERMARK,
         "reports": items,

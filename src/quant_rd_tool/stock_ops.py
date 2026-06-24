@@ -1,6 +1,7 @@
 """Read-only helpers for A-share ops dashboard (freshness, connectivity, schedules)."""
 
 from __future__ import annotations
+from quant_rd_tool.time_util import now_iso
 
 import time
 from datetime import UTC, date, datetime
@@ -89,7 +90,7 @@ def scan_data_freshness(
         "symbols_checked": len(items),
         "stale_count": stale_count,
         "stale_calendar_days": stale_calendar_days,
-        "checked_at": datetime.now(UTC).isoformat(),
+        "checked_at": now_iso(),
         "items": items,
     }
 

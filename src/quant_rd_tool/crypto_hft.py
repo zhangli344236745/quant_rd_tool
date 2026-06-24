@@ -1,6 +1,7 @@
 """REST-polling market-making engine for Binance spot + USDT-M perp."""
 
 from __future__ import annotations
+from quant_rd_tool.time_util import now_iso
 
 import logging
 from dataclasses import dataclass
@@ -45,7 +46,7 @@ class ReconcilePlan:
 
 
 def _iso_now() -> str:
-    return datetime.now(UTC).isoformat()
+    return now_iso()
 
 
 def resolve_ccxt_symbol(cfg: HftBotConfig) -> str:

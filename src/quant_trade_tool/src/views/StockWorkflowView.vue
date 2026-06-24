@@ -11,6 +11,11 @@ import {
   type StockWorkflowTemplate,
 } from "@/api/stocks";
 import { extractError } from "@/api/http";
+import { formatBeijing } from "@/utils/datetime";
+
+function formatTimeCol(_r: unknown, _c: unknown, v: string) {
+  return formatBeijing(v);
+}
 import { jobsApi } from "@/api/jobs";
 
 const route = useRoute();
@@ -533,7 +538,7 @@ onMounted(async () => {
             size="small"
             @row-click="(row: StockWorkflowRunSummary) => openRun(row.run_id)"
           >
-            <el-table-column prop="generated_at" label="时间" min-width="160" />
+            <el-table-column prop="generated_at" label="时间" min-width="160" :formatter="formatTimeCol" />
             <el-table-column prop="symbol" label="标的" width="90" />
             <el-table-column prop="stance" label="研判" width="72" />
             <el-table-column prop="risk_level" label="风险" width="64" />

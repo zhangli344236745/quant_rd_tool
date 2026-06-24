@@ -51,7 +51,7 @@ const createForm = reactive({
   interval_minutes: 30,
   backfill_days: 90,
   auto_start: false,
-  job_type: "analysis" as "analysis" | "news",
+  job_type: "analysis" as "analysis" | "news" | "polymarket_arb",
 });
 
 const stockCreateForm = reactive({
@@ -83,6 +83,12 @@ watch(
       if (!createForm.name || createForm.name === "BTC+ETH 5m") {
         createForm.name = "舆论扫描";
       }
+    } else if (t === "polymarket_arb") {
+      createForm.interval_minutes = 5;
+      createForm.symbols = [];
+      if (!createForm.name || createForm.name === "BTC+ETH 5m") {
+        createForm.name = "Polymarket 套利扫描";
+      }
     } else if (createForm.interval_minutes === 120 && createForm.name === "舆论扫描") {
       createForm.interval_minutes = 30;
       createForm.name = "BTC+ETH 5m";
@@ -110,6 +116,7 @@ watch(
 
 function jobTypeLabel(t: string) {
   if (t === "news") return "舆论扫描";
+  if (t === "polymarket_arb") return "Polymarket 套利";
   if (t === "stock_watchlist") return "自选刷新";
   if (t === "stock_announcements") return "公告扫描";
   if (t === "stock_qlib") return "A股 qlib";
@@ -332,6 +339,7 @@ onMounted(async () => {
               <el-select v-model="createForm.job_type" style="width: 100%">
                 <el-option label="行情分析" value="analysis" />
                 <el-option label="舆论扫描" value="news" />
+                <el-option label="Polymarket 套利" value="polymarket_arb" />
               </el-select>
             </el-form-item>
             <el-form-item label="名称"><el-input v-model="createForm.name" /></el-form-item>
@@ -347,6 +355,9 @@ onMounted(async () => {
             <el-button type="primary" @click="createJob">创建</el-button>
             <router-link v-if="createForm.job_type === 'news'" to="/crypto-news" class="news-link">
               舆论雷达配置 →
+            </router-link>
+            <router-link v-if="createForm.job_type === 'polymarket_arb'" to="/crypto-polymarket" class="news-link">
+              Polymarket 套利 →
             </router-link>
           </el-form>
           <el-form v-else label-width="100px" size="small">

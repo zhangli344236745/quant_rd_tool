@@ -1,6 +1,7 @@
 """Schedule job alert rules, cooldown, and webhook delivery."""
 
 from __future__ import annotations
+from quant_rd_tool.time_util import now_iso
 
 import json
 import logging
@@ -257,7 +258,7 @@ def save_alert_rules(
             if k in stock_announcements and stock_announcements[k] is not None:
                 ent[k] = stock_announcements[k]
         raw["stock_announcements"] = ent
-    raw["updated_at"] = datetime.now(UTC).isoformat()
+    raw["updated_at"] = now_iso()
     data["schedule_alerts"] = raw
     path = settings_json_path()
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -344,7 +345,7 @@ def append_alert_log(
     log_path: Path = _DEFAULT_LOG,
 ) -> None:
     log_path.parent.mkdir(parents=True, exist_ok=True)
-    row = {"ts": datetime.now(UTC).isoformat(), **entry}
+    row = {"ts": now_iso(), **entry}
     with log_path.open("a", encoding="utf-8") as f:
         f.write(json.dumps(row, ensure_ascii=False, default=str) + "\n")
 
@@ -411,7 +412,7 @@ def _fire_alert(
         "detail": detail or {},
     }
     append_alert_log(entry)
-    job_st["last_alerts"][rule] = datetime.now(UTC).isoformat()
+    job_st["last_alerts"][rule] = now_iso()
     _save_state(state, state_path)
 
     _deliver_schedule_notifications(

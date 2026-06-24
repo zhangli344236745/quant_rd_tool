@@ -1,6 +1,7 @@
 """Project scan and user upload ingest for knowledge base."""
 
 from __future__ import annotations
+from quant_rd_tool.time_util import now_iso
 
 import hashlib
 import json
@@ -324,7 +325,7 @@ def scan_project(
         )
     )
 
-    sync_state["last_sync_at"] = datetime.now(UTC).isoformat()
+    sync_state["last_sync_at"] = now_iso()
     _save_sync_state(sync_state, kb_data_dir)
     ingested = sum(1 for r in results if not r.get("skipped"))
     skipped = sum(1 for r in results if r.get("skipped"))

@@ -1,6 +1,7 @@
 """Persistence for crypto HFT market-making bots."""
 
 from __future__ import annotations
+from quant_rd_tool.time_util import now_iso
 
 import json
 import re
@@ -52,7 +53,7 @@ class HftBotConfig:
 
 
 def _iso_now() -> str:
-    return datetime.now(UTC).isoformat()
+    return now_iso()
 
 
 def validate_bot_id(bot_id: str) -> str:

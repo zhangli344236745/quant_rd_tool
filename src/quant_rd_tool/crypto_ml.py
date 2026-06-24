@@ -1,6 +1,7 @@
 """Qlib ML layer for crypto: Alpha158 + XGB/LGB and combined signals."""
 
 from __future__ import annotations
+from quant_rd_tool.time_util import now_iso
 
 import hashlib
 import json
@@ -56,7 +57,7 @@ def _load_ml_cache(path: Path) -> dict[str, Any] | None:
 
 def _save_ml_cache(path: Path, result: dict[str, Any]) -> None:
     try:
-        payload = {"cached_at": datetime.now(UTC).isoformat(), "result": result}
+        payload = {"cached_at": now_iso(), "result": result}
         text = json.dumps(payload, ensure_ascii=False, default=str)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text, encoding="utf-8")

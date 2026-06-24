@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 
-BEIJING_TZ = ZoneInfo("Asia/Shanghai")
+from quant_rd_tool.time_util import BEIJING_TZ, now_beijing
 
 
 def ms_to_beijing_naive(ms: int) -> pd.Timestamp:
@@ -23,7 +23,7 @@ def ms_to_beijing_str(ms: int, *, with_seconds: bool = True) -> str:
 
 
 def utc_now_beijing_str(*, with_seconds: bool = True) -> str:
-    now = datetime.now(BEIJING_TZ)
+    now = now_beijing()
     if with_seconds:
         return now.strftime("%Y-%m-%d %H:%M:%S")
     return now.strftime("%Y-%m-%d")

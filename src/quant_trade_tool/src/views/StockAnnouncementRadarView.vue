@@ -27,13 +27,10 @@ const digestHeadline = computed(() => {
   return `扫描 ${digest.value.symbols_scanned ?? 0} 只，新增 ${n} 条重点公告`;
 });
 
+import { formatBeijing } from "@/utils/datetime";
+
 function formatTime(ts: string | undefined) {
-  if (!ts) return "—";
-  try {
-    return new Date(ts).toLocaleString();
-  } catch {
-    return ts;
-  }
+  return formatBeijing(ts);
 }
 
 function scoreTagType(score: number | undefined) {

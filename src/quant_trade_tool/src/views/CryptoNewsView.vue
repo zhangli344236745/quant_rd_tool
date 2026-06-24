@@ -92,13 +92,10 @@ function itemKey(item: CryptoNewsItem, index: number) {
   return item.id || item.link || `${item.title}-${index}`;
 }
 
+import { formatBeijing } from "@/utils/datetime";
+
 function formatTime(ts: string | undefined) {
-  if (!ts) return "—";
-  try {
-    return new Date(ts).toLocaleString();
-  } catch {
-    return ts;
-  }
+  return formatBeijing(ts);
 }
 
 function pctConf(v: number | undefined) {

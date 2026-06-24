@@ -1,6 +1,7 @@
 """Archive and diff stock report.json versions under {root}/reports/."""
 
 from __future__ import annotations
+from quant_rd_tool.time_util import now_iso
 
 import json
 import shutil
@@ -49,7 +50,7 @@ def archive_report_if_exists(root: Path) -> str | None:
         json.dumps(
             {
                 "version_id": vid,
-                "archived_at": datetime.now(UTC).isoformat(),
+                "archived_at": now_iso(),
                 "source_mtime": mtime.isoformat(),
                 "stance": stance,
                 "content_hash": content_hash,

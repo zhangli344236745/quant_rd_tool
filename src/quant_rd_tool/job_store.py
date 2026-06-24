@@ -1,6 +1,7 @@
 """SQLite-backed async job queue for long-running stock analysis tasks."""
 
 from __future__ import annotations
+from quant_rd_tool.time_util import now_iso
 
 import json
 import sqlite3
@@ -39,7 +40,7 @@ CREATE INDEX IF NOT EXISTS idx_job_events_job ON job_events(job_id, id);
 
 
 def _now_iso() -> str:
-    return datetime.now(UTC).isoformat()
+    return now_iso()
 
 
 def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:

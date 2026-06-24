@@ -1,6 +1,7 @@
 """JSONL items, digest, and dedupe state for crypto news."""
 
 from __future__ import annotations
+from quant_rd_tool.time_util import now_iso
 
 import hashlib
 import json
@@ -136,4 +137,4 @@ def empty_digest() -> dict[str, Any]:
 
 
 def utc_now_iso() -> str:
-    return datetime.now(UTC).isoformat()
+    return now_iso()

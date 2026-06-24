@@ -1,6 +1,7 @@
 """Local persistence for single-stock OHLCV and qlib bins."""
 
 from __future__ import annotations
+from quant_rd_tool.time_util import now_iso
 
 import json
 from datetime import UTC, datetime
@@ -59,7 +60,7 @@ def save_qlib(df: pd.DataFrame, qlib_dir: Path) -> list[str]:
 
 
 def write_meta(root: Path, payload: dict[str, Any]) -> None:
-    payload = {**payload, "updated_at": datetime.now(UTC).isoformat()}
+    payload = {**payload, "updated_at": now_iso()}
     meta_path(root).write_text(
         json.dumps(payload, ensure_ascii=False, indent=2),
         encoding="utf-8",

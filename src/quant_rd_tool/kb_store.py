@@ -1,6 +1,7 @@
 """SQLite storage for finance knowledge base documents, chunks, and chat sessions."""
 
 from __future__ import annotations
+from quant_rd_tool.time_util import now_iso
 
 import json
 import sqlite3
@@ -16,7 +17,7 @@ from quant_rd_tool.config import settings
 
 
 def _now_iso() -> str:
-    return datetime.now(UTC).isoformat()
+    return now_iso()
 
 
 def kb_root(data_dir: str | Path | None = None) -> Path:
