@@ -58,6 +58,7 @@ const groups: MenuGroup[] = [
         { path: "/perp-bot", icon: "Histogram", label: "永续 Bot" },
         { path: "/crypto-carry", icon: "Sort", label: "Carry 套利" },
         { path: "/crypto-polymarket", icon: "Aim", label: "Polymarket" },
+        { path: "/crypto-market-radar", icon: "Compass", label: "市场雷达" },
         { path: "/crypto-hft", icon: "Odometer", label: "做市 HFT" },
         { path: "/crypto-ws-hft", icon: "Lightning", label: "WS 做市" },
         { path: "/perp-portfolio", icon: "Grid", label: "组合永续" },

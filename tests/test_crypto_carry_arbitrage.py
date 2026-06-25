@@ -226,6 +226,8 @@ def test_build_position_live_status(monkeypatch, tmp_path):
     assert live["open_plan"]["steps"][0]["side"] == "buy"
     assert "pnl_breakdown" in live
     assert "unrealized_pnl_if_close_now_usdt" in live["pnl_breakdown"]
+    assert live["expected_income_if_hold"]["funding_7d_usdt"] > 0
+    assert live["expected_income_if_hold"]["net_30d_after_open_cost_usdt"] is not None
 
 
 def test_preview_negative_funding_warns(monkeypatch, tmp_path):

@@ -951,8 +951,6 @@ def crypto_perp_account_trades(
         return fetch_recent_trades(base=base, quote=quote, limit=min(limit, 200), testnet=testnet)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
-    except Exception as e:
-        raise HTTPException(status_code=503, detail=str(e)) from e
 
 
 @router.get("/perp/account/daily-pnl")
@@ -2331,3 +2329,98 @@ def crypto_polymarket_builtin_stop() -> dict[str, Any]:
     cfg.builtin_scan_enabled = False
     save_config(cfg)
     return get_polymarket_runner().stop()
+
+
+class MarketRadarConfigUpdate(BaseModel):
+    top_n_liquidity: int | None = None
+    vol_lookback_hours: int | None = None
+    vol_top_n_compute: int | None = None
+    min_24h_change_pct: float | None = None
+    min_realized_vol_pct: float | None = None
+    builtin_scan_enabled: bool | None = None
+    builtin_interval_sec: int | None = None
+    scan_dedupe_sec: int | None = None
+    alert_cooldown_sec: int | None = None
+    coingecko_per_page: int | None = None
+
+
+@router.get("/market-radar/scan")
+def crypto_market_radar_scan(force: bool = Query(default=False)) -> dict[str, Any]:
+    from quant_rd_tool.crypto_market_radar import load_config, scan_markets
+
+    try:
+        return scan_markets(load_config(), force=force)
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+@router.get("/market-radar/scan/latest")
+def crypto_market_radar_scan_latest() -> dict[str, Any]:
+    from quant_rd_tool.crypto_market_radar import empty_scan_result, load_latest_scan
+
+    latest = load_latest_scan()
+    if not latest:
+        return empty_scan_result()
+    return latest
+
+
+@router.get("/market-radar/config")
+def crypto_market_radar_get_config() -> dict[str, Any]:
+    from quant_rd_tool.crypto_market_radar import load_config
+
+    return load_config().__dict__
+
+
+@router.put("/market-radar/config")
+def crypto_market_radar_put_config(body: MarketRadarConfigUpdate) -> dict[str, Any]:
+    from quant_rd_tool.crypto_market_radar import MarketRadarConfig, load_config, save_config
+
+    cfg = load_config()
+    data = cfg.__dict__.copy()
+    for key, value in body.model_dump(exclude_none=True).items():
+        data[key] = value
+    updated = save_config(MarketRadarConfig(**data))
+    return updated.__dict__
+
+
+@router.get("/market-radar/summary")
+def crypto_market_radar_summary() -> dict[str, Any]:
+    from quant_rd_tool.crypto_market_radar import build_stats, load_config
+
+    return build_stats(load_config())
+
+
+@router.get("/market-radar/events")
+def crypto_market_radar_events(limit: int = Query(100, ge=1, le=1000)) -> dict[str, Any]:
+    from quant_rd_tool.crypto_market_radar import read_events
+
+    return {"items": read_events(limit=limit)}
+
+
+@router.get("/market-radar/builtin/status")
+def crypto_market_radar_builtin_status() -> dict[str, Any]:
+    from quant_rd_tool.crypto_market_radar_runner import get_market_radar_runner
+
+    return get_market_radar_runner().public()
+
+
+@router.post("/market-radar/builtin/start")
+def crypto_market_radar_builtin_start() -> dict[str, Any]:
+    from quant_rd_tool.crypto_market_radar import load_config, save_config
+    from quant_rd_tool.crypto_market_radar_runner import get_market_radar_runner
+
+    cfg = load_config()
+    cfg.builtin_scan_enabled = True
+    save_config(cfg)
+    return get_market_radar_runner().start()
+
+
+@router.post("/market-radar/builtin/stop")
+def crypto_market_radar_builtin_stop() -> dict[str, Any]:
+    from quant_rd_tool.crypto_market_radar import load_config, save_config
+    from quant_rd_tool.crypto_market_radar_runner import get_market_radar_runner
+
+    cfg = load_config()
+    cfg.builtin_scan_enabled = False
+    save_config(cfg)
+    return get_market_radar_runner().stop()

@@ -2,14 +2,49 @@
 
 from __future__ import annotations
 
+import logging
+import time
 from collections import defaultdict
 from datetime import UTC, datetime, timedelta
-from typing import Any, Literal
+from typing import Any, Callable, Literal, TypeVar
 
 from quant_rd_tool import ccxt_data as cxt
 from quant_rd_tool.config import settings
 
+logger = logging.getLogger(__name__)
+
 IncomeType = Literal["REALIZED_PNL", "FUNDING_FEE", "COMMISSION"]
+
+T = TypeVar("T")
+
+
+def _with_retry(fn: Callable[[], T], *, attempts: int = 3, base_delay_sec: float = 0.4) -> T:
+    last_err: Exception | None = None
+    for i in range(attempts):
+        try:
+            return fn()
+        except Exception as e:  # noqa: BLE001
+            last_err = e
+            msg = str(e).lower()
+            retryable = any(
+                token in msg
+                for token in (
+                    "rate limit",
+                    "too many",
+                    "429",
+                    "timeout",
+                    "timed out",
+                    "network",
+                    "ddos",
+                    "invalidnonce",
+                    "recvwindow",
+                )
+            )
+            if not retryable or i >= attempts - 1:
+                raise
+            time.sleep(base_delay_sec * (2**i))
+    assert last_err is not None
+    raise last_err
 
 
 def _exchange(*, testnet: bool = False):
@@ -109,7 +144,9 @@ def fetch_recent_trades(
         return {"enabled": False, "error": "missing api key/secret", "items": []}
     symbol = f"{base.strip().upper()}/{quote.strip().upper()}:{quote.strip().upper()}"
     try:
-        trades = ex.fetch_my_trades(symbol, since_ms, min(int(limit), 200), {"type": "future"})
+        trades = _with_retry(
+            lambda: ex.fetch_my_trades(symbol, since_ms, min(int(limit), 200), {"type": "future"}),
+        )
         items: list[dict[str, Any]] = []
         for t in trades or []:
             items.append(
@@ -132,6 +169,9 @@ def fetch_recent_trades(
                 }
             )
         return {"enabled": True, "symbol": symbol, "count": len(items), "items": items}
+    except Exception as e:  # noqa: BLE001
+        logger.warning("fetch_recent_trades failed for %s: %s", symbol, e)
+        return {"enabled": True, "symbol": symbol, "count": 0, "items": [], "error": str(e)}
     finally:
         try:
             ex.close()

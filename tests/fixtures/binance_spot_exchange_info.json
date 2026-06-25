@@ -1,0 +1,18 @@
+{
+  "symbols": [
+    {
+      "symbol": "BTCUSDT",
+      "status": "TRADING",
+      "baseAsset": "BTC",
+      "quoteAsset": "USDT",
+      "isSpotTradingAllowed": true
+    },
+    {
+      "symbol": "NEWCOINUSDT",
+      "status": "TRADING",
+      "baseAsset": "NEWCOIN",
+      "quoteAsset": "USDT",
+      "isSpotTradingAllowed": true
+    }
+  ]
+}

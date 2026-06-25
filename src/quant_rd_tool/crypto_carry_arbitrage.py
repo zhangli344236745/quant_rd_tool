@@ -314,6 +314,15 @@ def build_position_live_status(
         ],
     }
 
+    basis_bps = compute_basis_bps(spot_mark=spot_mark, perp_mark=perp_mark)
+    notional = float(position["notional_usdt"])
+    profit_if_hold = build_carry_profit_estimate(
+        notional_usdt=notional,
+        funding_rate=funding_rate,
+        basis_bps=basis_bps,
+        config=config,
+    )
+
     return {
         "open_plan": open_plan,
         "current_spot_mark": round(spot_mark, 8),
@@ -328,10 +337,7 @@ def build_position_live_status(
             "close_fees_est_usdt": pnl["close_fees_usdt"],
             "unrealized_pnl_if_close_now_usdt": pnl["realized_pnl"],
         },
-        "expected_income_if_hold": {
-            "funding_per_8h_usdt": round(float(position["notional_usdt"]) * funding_rate, 4),
-            "funding_daily_usdt": round(float(position["notional_usdt"]) * funding_rate * 3, 4),
-        },
+        "expected_income_if_hold": profit_if_hold,
     }
 
 

@@ -999,6 +999,29 @@ export const cryptoApi = {
 
   polymarketBuiltinStop: () => http.post<PolymarketBuiltinStatus>("/crypto/polymarket/builtin/stop"),
 
+  marketRadarScan: (force = false) =>
+    http.get<MarketRadarScanResult>("/crypto/market-radar/scan", { params: { force } }),
+
+  marketRadarScanLatest: () => http.get<MarketRadarScanResult>("/crypto/market-radar/scan/latest"),
+
+  marketRadarGetConfig: () => http.get<MarketRadarConfig>("/crypto/market-radar/config"),
+
+  marketRadarPutConfig: (body: Partial<MarketRadarConfig>) =>
+    http.put<MarketRadarConfig>("/crypto/market-radar/config", body),
+
+  marketRadarSummary: () => http.get<MarketRadarSummary>("/crypto/market-radar/summary"),
+
+  marketRadarEvents: (limit = 100) =>
+    http.get<{ items: MarketRadarEvent[] }>("/crypto/market-radar/events", { params: { limit } }),
+
+  marketRadarBuiltinStatus: () => http.get<MarketRadarBuiltinStatus>("/crypto/market-radar/builtin/status"),
+
+  marketRadarBuiltinStart: () =>
+    http.post<MarketRadarBuiltinStatus>("/crypto/market-radar/builtin/start"),
+
+  marketRadarBuiltinStop: () =>
+    http.post<MarketRadarBuiltinStatus>("/crypto/market-radar/builtin/stop"),
+
   hftStrategies: () => http.get<HftStrategy[]>("/crypto/hft/strategies"),
 
   hftBots: () => http.get<{ items: HftBotStatus[] }>("/crypto/hft/bots"),
@@ -1915,6 +1938,86 @@ export interface PolymarketBuiltinStatus {
   last_error?: string | null;
 }
 
+export interface MarketRadarConfig {
+  top_n_liquidity: number;
+  vol_lookback_hours: number;
+  vol_top_n_compute: number;
+  min_24h_change_pct: number;
+  min_realized_vol_pct: number;
+  builtin_scan_enabled: boolean;
+  builtin_interval_sec: number;
+  scan_dedupe_sec: number;
+  alert_cooldown_sec: number;
+  coingecko_per_page: number;
+  last_scan_at?: string | null;
+}
+
+export interface BinanceNewListing {
+  source: string;
+  market_type: string;
+  symbol: string;
+  base: string;
+  quote: string;
+  trade_url?: string;
+}
+
+export interface CoingeckoNewCoin {
+  source: string;
+  coin_id: string;
+  symbol: string;
+  name: string;
+  market_cap_usd?: number;
+  price_change_pct_24h?: number;
+  detail_url?: string;
+}
+
+export interface HighVolatilityRow {
+  symbol: string;
+  base: string;
+  price: number;
+  quote_volume_usdt: number;
+  change_pct_24h: number;
+  abs_change_pct_24h: number;
+  realized_vol_pct?: number | null;
+  high_vol: boolean;
+  trade_url?: string;
+}
+
+export interface MarketRadarScanResult {
+  scan_id?: string | null;
+  scanned_at?: string | null;
+  binance_new: BinanceNewListing[];
+  coingecko_new: CoingeckoNewCoin[];
+  high_volatility: HighVolatilityRow[];
+  duration_sec?: number;
+  alerts?: unknown[];
+}
+
+export interface MarketRadarSummary {
+  last_scan_at?: string | null;
+  binance_new_count: number;
+  coingecko_new_count: number;
+  high_volatility_flagged_count: number;
+  builtin_scan_enabled: boolean;
+  builtin_interval_sec: number;
+}
+
+export interface MarketRadarEvent {
+  at?: string;
+  type: string;
+  title?: string;
+  body?: string;
+  [key: string]: unknown;
+}
+
+export interface MarketRadarBuiltinStatus {
+  running: boolean;
+  run_count: number;
+  last_run_at?: string | null;
+  last_error?: string | null;
+  last_result?: Record<string, unknown> | null;
+}
+
 export interface CarryLegStep {
   order: number;
   market: "spot" | "perp" | string;
@@ -1962,10 +2065,7 @@ export interface CarryPositionLiveStatus {
   current_perp_mark: number;
   pending_funding_usdt: number;
   pnl_breakdown: CarryPnlBreakdown;
-  expected_income_if_hold?: {
-    funding_per_8h_usdt: number;
-    funding_daily_usdt: number;
-  };
+  expected_income_if_hold?: CarryProfitEstimate;
 }
 
 export interface CarryProfitEstimate {

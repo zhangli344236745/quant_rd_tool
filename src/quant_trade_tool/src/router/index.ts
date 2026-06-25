@@ -93,6 +93,7 @@ const router = createRouter({
         { path: "spot-bot", name: "spot-bot", component: () => import("@/views/SpotBotView.vue") },
         { path: "crypto-carry", name: "crypto-carry", component: () => import("@/views/CryptoCarryView.vue") },
         { path: "crypto-polymarket", name: "crypto-polymarket", component: () => import("@/views/CryptoPolymarketView.vue") },
+        { path: "crypto-market-radar", name: "crypto-market-radar", component: () => import("@/views/CryptoMarketRadarView.vue") },
         { path: "crypto-hft", name: "crypto-hft", component: () => import("@/views/CryptoHftView.vue") },
         { path: "crypto-ws-hft", name: "crypto-ws-hft", component: () => import("@/views/CryptoWsHftView.vue") },
         { path: "crypto-ops", name: "crypto-ops", component: () => import("@/views/CryptoOpsView.vue") },

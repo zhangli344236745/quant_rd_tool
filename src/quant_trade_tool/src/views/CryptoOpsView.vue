@@ -241,19 +241,42 @@ async function loadAccountPanel() {
   acctError.value = "";
   portfolioVar.value = null;
   try {
-    const [b, t, p] = await Promise.all([
+    const [bRes, tRes, pRes] = await Promise.allSettled([
       cryptoApi.perpAccountBalances({ testnet: false }),
       cryptoApi.perpAccountTrades({ base: acctTradeBase.value, limit: 20, testnet: false }),
       cryptoApi.perpAccountDailyPnl({ days: 7, testnet: false }),
     ]);
-    acctBalances.value = b.data.items || [];
-    acctSummary.value = (b.data.summary as Record<string, unknown>) || null;
-    acctTrades.value = (t.data.items as Record<string, unknown>[]) || [];
-    acctDaily.value = p.data.items || [];
-    if ((b.data as any).error) acctError.value = String((b.data as any).error);
-    if ((t.data as any).error && !acctError.value) acctError.value = String((t.data as any).error);
-    if ((p.data as any).error && !acctError.value) acctError.value = String((p.data as any).error);
-    if (b.data.enabled) {
+
+    const errors: string[] = [];
+
+    if (bRes.status === "fulfilled") {
+      const b = bRes.value;
+      acctBalances.value = b.data.items || [];
+      acctSummary.value = (b.data.summary as Record<string, unknown>) || null;
+      if ((b.data as any).error) errors.push(String((b.data as any).error));
+    } else {
+      errors.push(extractError(bRes.reason));
+    }
+
+    if (tRes.status === "fulfilled") {
+      const t = tRes.value;
+      acctTrades.value = (t.data.items as Record<string, unknown>[]) || [];
+      if ((t.data as any).error) errors.push(String((t.data as any).error));
+    } else {
+      errors.push(extractError(tRes.reason));
+    }
+
+    if (pRes.status === "fulfilled") {
+      const p = pRes.value;
+      acctDaily.value = p.data.items || [];
+      if ((p.data as any).error) errors.push(String((p.data as any).error));
+    } else {
+      errors.push(extractError(pRes.reason));
+    }
+
+    acctError.value = errors.filter(Boolean).join("；");
+
+    if (bRes.status === "fulfilled" && bRes.value.data.enabled) {
       try {
         const { data } = await cryptoApi.varPortfolio({
           testnet: false,

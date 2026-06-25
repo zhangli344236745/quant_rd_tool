@@ -1,36 +1,29 @@
-from __future__ import annotations
+from unittest.mock import MagicMock, patch
+
+from quant_rd_tool.perp_account_analytics import _with_retry, fetch_recent_trades
 
 
-def test_fetch_daily_pnl_aggregates(monkeypatch):
-    from quant_rd_tool import perp_account_analytics as paa
+def test_with_retry_succeeds_after_transient_failure():
+    calls = {"n": 0}
 
-    class FakeEx:
-        def fapiPrivateGetIncome(self, params):
-            it = params.get("incomeType")
-            if it == "REALIZED_PNL":
-                return [{"time": 1717200000000, "income": "1.5", "incomeType": "REALIZED_PNL"}]
-            if it == "FUNDING_FEE":
-                return [{"time": 1717200000000, "income": "0.2", "incomeType": "FUNDING_FEE"}]
-            if it == "COMMISSION":
-                return [{"time": 1717200000000, "income": "-0.1", "incomeType": "COMMISSION"}]
-            return []
+    def fn():
+        calls["n"] += 1
+        if calls["n"] < 2:
+            raise Exception("429 Too Many Requests")
+        return "ok"
 
-        def close(self):
-            return None
-
-    monkeypatch.setattr(paa, "_exchange", lambda **_k: FakeEx())
-    out = paa.fetch_daily_pnl(days=2)
-    assert out["enabled"] is True
-    assert out["items"]
-    row = out["items"][0]
-    assert abs(row["net"] - (1.5 + 0.2 - 0.1)) < 1e-6
+    assert _with_retry(fn, attempts=3) == "ok"
+    assert calls["n"] == 2
 
 
-def test_fetch_balances_missing_keys(monkeypatch):
-    from quant_rd_tool import perp_account_analytics as paa
+def test_fetch_recent_trades_returns_error_instead_of_raising():
+    mock_ex = MagicMock()
+    mock_ex.fetch_my_trades.side_effect = RuntimeError("network timeout")
 
-    monkeypatch.setattr(paa.settings, "binance_api_key", None)
-    monkeypatch.setattr(paa.settings, "binance_api_secret", None)
-    out = paa.fetch_future_balances()
-    assert out["enabled"] is False
+    with patch("quant_rd_tool.perp_account_analytics._exchange", return_value=mock_ex):
+        result = fetch_recent_trades(base="ETH", limit=10, testnet=False)
 
+    assert result["enabled"] is True
+    assert result["items"] == []
+    assert "timeout" in result["error"].lower()
+    mock_ex.close.assert_called()

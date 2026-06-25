@@ -109,6 +109,33 @@ function rowProfit(row: CarryOpportunity): CarryProfitEstimate | null {
   };
 }
 
+function positionProfit(row: CarryPosition): CarryProfitEstimate | null {
+  const hold = row.live_status?.expected_income_if_hold;
+  if (hold?.funding_daily_usdt != null) return hold;
+  const ei = row.execution_plan?.expected_income;
+  if (!ei) return null;
+  const openFees = row.execution_plan?.open_fees_usdt ?? row.total_fees ?? 0;
+  return {
+    notional_usdt: row.notional_usdt,
+    funding_per_8h_usdt: ei.funding_per_8h_usdt,
+    funding_daily_usdt: ei.funding_daily_usdt,
+    funding_7d_usdt: ei.funding_7d_usdt ?? ei.funding_daily_usdt * 7,
+    funding_30d_usdt: ei.funding_30d_usdt ?? ei.funding_daily_usdt * 30,
+    funding_annual_usdt: ei.funding_annual_usdt,
+    open_cost_usdt: openFees,
+    round_trip_cost_usdt: openFees,
+    net_daily_after_open_fee_usdt: ei.net_daily_after_open_fee_usdt,
+    net_7d_after_open_cost_usdt: (ei.funding_7d_usdt ?? ei.funding_daily_usdt * 7) - openFees,
+    net_30d_after_open_cost_usdt: (ei.funding_30d_usdt ?? ei.funding_daily_usdt * 30) - openFees,
+    breakeven_days: null,
+  };
+}
+
+function incomeBrief(p: CarryProfitEstimate | null) {
+  if (!p) return "";
+  return `日 ${signedUsdt(p.funding_daily_usdt)} · 7日净 ${signedUsdt(p.net_7d_after_open_cost_usdt)} · 30日净 ${signedUsdt(p.net_30d_after_open_cost_usdt)}`;
+}
+
 const bestEntryOpportunity = computed(() => {
   const candidates = opportunities.value.filter((r) => r.entry_alert && !r.error && !r.has_open_position);
   if (!candidates.length) return null;
@@ -501,6 +528,36 @@ onMounted(loadScan);
         <el-table-column type="expand" width="40">
           <template #default="{ row }">
             <div v-if="row.carry_plan" class="expand-plan">
+              <div v-if="rowProfit(row)" class="income-banner mb">
+                <div class="income-banner-title">预期收益（按当前 funding，静态估算）</div>
+                <div class="income-banner-grid">
+                  <div>
+                    <span class="income-k">日收益</span>
+                    <strong :class="profitClass(rowProfit(row)!.funding_daily_usdt)">
+                      {{ signedUsdt(rowProfit(row)!.funding_daily_usdt) }} USDT
+                    </strong>
+                  </div>
+                  <div>
+                    <span class="income-k">7 日净收益</span>
+                    <strong :class="profitClass(rowProfit(row)!.net_7d_after_open_cost_usdt)">
+                      {{ signedUsdt(rowProfit(row)!.net_7d_after_open_cost_usdt) }} USDT
+                    </strong>
+                  </div>
+                  <div>
+                    <span class="income-k">30 日净收益</span>
+                    <strong :class="profitClass(rowProfit(row)!.net_30d_after_open_cost_usdt)">
+                      {{ signedUsdt(rowProfit(row)!.net_30d_after_open_cost_usdt) }} USDT
+                    </strong>
+                  </div>
+                  <div>
+                    <span class="income-k">年化</span>
+                    <strong :class="profitClass(rowProfit(row)!.funding_annual_usdt)">
+                      {{ signedUsdt(rowProfit(row)!.funding_annual_usdt) }} USDT
+                    </strong>
+                  </div>
+                </div>
+              </div>
+              <h4 class="mini-title">套利执行步骤</h4>
               <p class="plan-summary">{{ row.carry_plan.summary }}</p>
               <el-timeline>
                 <el-timeline-item
@@ -519,7 +576,8 @@ onMounted(loadScan);
                 </el-timeline-item>
               </el-timeline>
               <div v-if="row.carry_plan.expected_income" class="plan-income">
-                <span>预估日 funding：{{ signedUsdt(row.carry_plan.expected_income.funding_daily_usdt) }} USDT</span>
+                <span>每 8h：{{ signedUsdt(row.carry_plan.expected_income.funding_per_8h_usdt) }} USDT</span>
+                <span>扣费后日净：{{ signedUsdt(row.carry_plan.expected_income.net_daily_after_open_fee_usdt) }} USDT</span>
                 <span>开仓手续费：{{ num(row.carry_plan.open_fees_usdt) }} USDT</span>
               </div>
             </div>
@@ -604,6 +662,9 @@ onMounted(loadScan);
                 <el-tag size="small" type="warning">空永续</el-tag>
                 {{ num(row.carry_plan.base_amount, 4) }} {{ row.symbol }}
               </div>
+              <div v-if="rowProfit(row)" class="leg-income hint">
+                {{ incomeBrief(rowProfit(row)) }}
+              </div>
             </template>
             <span v-else-if="row.error" class="err">{{ row.error }}</span>
             <span v-else class="hint">—</span>
@@ -645,6 +706,35 @@ onMounted(loadScan);
         <el-table-column type="expand" width="40">
           <template #default="{ row }">
             <div v-if="row.live_status" class="expand-plan">
+              <div v-if="positionProfit(row)" class="income-banner mb">
+                <div class="income-banner-title">继续持有预期收入（按当前 funding）</div>
+                <div class="income-banner-grid">
+                  <div>
+                    <span class="income-k">日收益</span>
+                    <strong :class="profitClass(positionProfit(row)!.funding_daily_usdt)">
+                      {{ signedUsdt(positionProfit(row)!.funding_daily_usdt) }} USDT
+                    </strong>
+                  </div>
+                  <div>
+                    <span class="income-k">7 日净</span>
+                    <strong :class="profitClass(positionProfit(row)!.net_7d_after_open_cost_usdt)">
+                      {{ signedUsdt(positionProfit(row)!.net_7d_after_open_cost_usdt) }} USDT
+                    </strong>
+                  </div>
+                  <div>
+                    <span class="income-k">30 日净</span>
+                    <strong :class="profitClass(positionProfit(row)!.net_30d_after_open_cost_usdt)">
+                      {{ signedUsdt(positionProfit(row)!.net_30d_after_open_cost_usdt) }} USDT
+                    </strong>
+                  </div>
+                  <div>
+                    <span class="income-k">年化</span>
+                    <strong :class="profitClass(positionProfit(row)!.funding_annual_usdt)">
+                      {{ signedUsdt(positionProfit(row)!.funding_annual_usdt) }} USDT
+                    </strong>
+                  </div>
+                </div>
+              </div>
               <p class="plan-summary">{{ row.live_status.open_plan.summary || "当前持仓双腿" }}</p>
               <el-timeline>
                 <el-timeline-item
@@ -676,6 +766,19 @@ onMounted(loadScan);
               </el-descriptions>
             </div>
             <div v-else-if="row.execution_plan" class="expand-plan">
+              <div v-if="positionProfit(row)" class="income-banner mb">
+                <div class="income-banner-title">开仓时预期收入（快照）</div>
+                <div class="income-banner-grid">
+                  <div>
+                    <span class="income-k">日收益</span>
+                    <strong>{{ signedUsdt(positionProfit(row)!.funding_daily_usdt) }} USDT</strong>
+                  </div>
+                  <div>
+                    <span class="income-k">7 日净</span>
+                    <strong>{{ signedUsdt(positionProfit(row)!.net_7d_after_open_cost_usdt) }} USDT</strong>
+                  </div>
+                </div>
+              </div>
               <el-timeline>
                 <el-timeline-item
                   v-for="step in row.execution_plan.steps"
@@ -719,8 +822,30 @@ onMounted(loadScan);
             <TermLabel label="预估日收益" :hint="H.estDailyFunding" />
           </template>
           <template #default="{ row }">
-            <strong :class="profitClass(row.live_status?.expected_income_if_hold?.funding_daily_usdt)">
-              {{ signedUsdt(row.live_status?.expected_income_if_hold?.funding_daily_usdt) }}
+            <strong :class="profitClass(positionProfit(row)?.funding_daily_usdt)">
+              {{ signedUsdt(positionProfit(row)?.funding_daily_usdt) }}
+            </strong>
+            <span class="unit"> USDT</span>
+          </template>
+        </el-table-column>
+        <el-table-column width="120">
+          <template #header>
+            <TermLabel label="7日净收益" :hint="H.net7d" />
+          </template>
+          <template #default="{ row }">
+            <strong :class="profitClass(positionProfit(row)?.net_7d_after_open_cost_usdt)">
+              {{ signedUsdt(positionProfit(row)?.net_7d_after_open_cost_usdt) }}
+            </strong>
+            <span class="unit"> USDT</span>
+          </template>
+        </el-table-column>
+        <el-table-column width="120">
+          <template #header>
+            <TermLabel label="30日净收益" :hint="H.net7d" />
+          </template>
+          <template #default="{ row }">
+            <strong :class="profitClass(positionProfit(row)?.net_30d_after_open_cost_usdt)">
+              {{ signedUsdt(positionProfit(row)?.net_30d_after_open_cost_usdt) }}
             </strong>
             <span class="unit"> USDT</span>
           </template>
@@ -784,6 +909,23 @@ onMounted(loadScan);
           收回成本约 {{ preview.profit_estimate.breakeven_days ?? "—" }} 天
         </p>
 
+        <h3 v-if="openIncomeRows.length" class="section-title">预期收益（按当前 funding）</h3>
+        <el-table v-if="openIncomeRows.length" :data="openIncomeRows" size="small" stripe class="mb">
+          <el-table-column prop="label" label="项目" min-width="160" />
+          <el-table-column prop="value" label="估算" min-width="140" />
+        </el-table>
+
+        <h3 class="section-title">利润估算明细</h3>
+        <el-table :data="openProfitRows" size="small" stripe class="mb">
+          <el-table-column prop="label" label="项目" min-width="160" />
+          <el-table-column prop="value" label="估算" min-width="120" />
+          <el-table-column prop="hint" label="说明" min-width="200">
+            <template #default="{ row }">
+              <span class="hint">{{ row.hint }}</span>
+            </template>
+          </el-table-column>
+        </el-table>
+
         <h3 class="section-title">套利执行方案（纸面模拟）</h3>
         <p v-if="preview.execution_plan" class="plan-summary mb">{{ preview.execution_plan.summary }}</p>
         <el-timeline v-if="preview.execution_plan" class="mb">
@@ -804,12 +946,6 @@ onMounted(loadScan);
             </p>
           </el-timeline-item>
         </el-timeline>
-
-        <h3 v-if="openIncomeRows.length" class="section-title">预期收益（按当前 funding）</h3>
-        <el-table v-if="openIncomeRows.length" :data="openIncomeRows" size="small" stripe class="mb">
-          <el-table-column prop="label" label="项目" min-width="160" />
-          <el-table-column prop="value" label="估算" min-width="140" />
-        </el-table>
 
         <el-descriptions :column="2" border size="small" class="mb">
           <el-descriptions-item>
@@ -837,17 +973,6 @@ onMounted(loadScan);
             {{ pct(preview.market.funding_rate, 4) }}
           </el-descriptions-item>
         </el-descriptions>
-
-        <h3 class="section-title">利润估算（按当前费率静态推算，非承诺收益）</h3>
-        <el-table :data="openProfitRows" size="small" stripe>
-          <el-table-column prop="label" label="项目" min-width="160" />
-          <el-table-column prop="value" label="估算" min-width="120" />
-          <el-table-column prop="hint" label="说明" min-width="200">
-            <template #default="{ row }">
-              <span class="hint">{{ row.hint }}</span>
-            </template>
-          </el-table-column>
-        </el-table>
 
         <h3 class="section-title">风险提示</h3>
         <div class="risk-list">
@@ -1093,10 +1218,38 @@ onMounted(loadScan);
 }
 .plan-income {
   display: flex;
-  gap: 20px;
+  flex-wrap: wrap;
+  gap: 12px 20px;
   font-size: 12px;
   color: var(--el-text-color-secondary);
   margin-top: 8px;
+}
+.income-banner {
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: rgba(61, 214, 195, 0.08);
+  border: 1px solid rgba(61, 214, 195, 0.25);
+}
+.income-banner-title {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  margin-bottom: 8px;
+}
+.income-banner-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+.income-k {
+  display: block;
+  font-size: 11px;
+  color: var(--el-text-color-secondary);
+  margin-bottom: 2px;
+}
+.leg-income {
+  margin-top: 4px;
+  color: var(--el-text-color-secondary);
+  font-size: 11px;
 }
 .leg-brief {
   display: flex;
