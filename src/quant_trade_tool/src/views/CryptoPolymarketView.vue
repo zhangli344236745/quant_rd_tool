@@ -3,13 +3,19 @@ import { computed, onMounted, reactive, ref } from "vue";
 import { ElMessage } from "element-plus";
 import {
   cryptoApi,
+  type PolymarketAdvisorPick,
+  type PolymarketAdvisorReport,
   type PolymarketArbConfig,
   type PolymarketClosePreview,
+  type PolymarketEdgeHistoryPoint,
   type PolymarketEvent,
+  type PolymarketLeaderboardItem,
   type PolymarketOpenPreview,
   type PolymarketOpportunity,
   type PolymarketPosition,
   type PolymarketScanHistoryItem,
+  type PolymarketScanResult,
+  type PolymarketStrategyType,
   type PolymarketSummary,
 } from "@/api/crypto";
 import { extractError } from "@/api/http";
@@ -28,7 +34,13 @@ const builtinRunning = ref(false);
 const watchlistInput = ref("");
 const showAllMarkets = ref(false);
 const positionTab = ref("open");
+const strategyTab = ref<"all" | PolymarketStrategyType>("all");
 const lastScanDuration = ref<number | null>(null);
+const lastScanMeta = ref<Partial<PolymarketScanResult>>({});
+const leaderboard = ref<PolymarketLeaderboardItem[]>([]);
+const advisorReport = ref<PolymarketAdvisorReport | null>(null);
+const minWinRate = ref(0.6);
+const edgeTrendCache = ref<Record<string, PolymarketEdgeHistoryPoint[]>>({});
 
 const previewVisible = ref(false);
 const preview = ref<PolymarketOpenPreview | null>(null);
@@ -50,13 +62,65 @@ const config = reactive<PolymarketArbConfig>({
   scan_dedupe_sec: 30,
   default_paper_size_shares: 100,
   alert_cooldown_sec: 900,
+  min_volume24hr_usd: 5000,
+  use_depth_for_opportunity: true,
+  depth_target_shares: 100,
+  enabled_strategies: ["binary_ask", "binary_bid", "multi_ask"],
 });
 
-const opportunities = computed(() =>
-  showAllMarkets.value
+const opportunities = computed(() => {
+  let rows = showAllMarkets.value
     ? allMarkets.value
-    : allMarkets.value.filter((r) => r.opportunity && !r.error),
-);
+    : allMarkets.value.filter((r) => r.opportunity && !r.error && !r.skipped);
+  if (strategyTab.value !== "all") {
+    rows = rows.filter((r) => r.strategy_type === strategyTab.value);
+  }
+  return rows;
+});
+
+const strategyLabel: Record<string, string> = {
+  binary_ask: "二元买入",
+  binary_bid: "二元卖出",
+  multi_ask: "多结果",
+};
+
+const recTagType: Record<string, "success" | "warning" | "info" | "danger"> = {
+  strong_buy: "success",
+  buy: "success",
+  watch: "warning",
+  pass: "info",
+};
+
+function rowKey(row: PolymarketOpportunity) {
+  return `${row.condition_id}:${row.strategy_type || "binary_ask"}`;
+}
+
+async function onExpandChange(row: PolymarketOpportunity, expanded: PolymarketOpportunity[]) {
+  const isOpen = expanded.some((r) => rowKey(r) === rowKey(row));
+  if (!isOpen || !row.condition_id || edgeTrendCache.value[row.condition_id]) return;
+  try {
+    const { data } = await cryptoApi.polymarketEdgeTrend(row.condition_id, 24, row.strategy_type);
+    edgeTrendCache.value[row.condition_id] = data.items ?? [];
+  } catch {
+    edgeTrendCache.value[row.condition_id] = [];
+  }
+}
+
+function sparklinePoints(cid: string): string {
+  const pts = edgeTrendCache.value[cid] || [];
+  if (pts.length < 2) return "";
+  const vals = pts.map((p) => Number(p.edge_at_size_bps ?? p.edge_bps ?? 0));
+  const min = Math.min(...vals);
+  const max = Math.max(...vals);
+  const span = max - min || 1;
+  return vals
+    .map((v, i) => {
+      const x = (i / (vals.length - 1)) * 80;
+      const y = 20 - ((v - min) / span) * 18;
+      return `${x},${y}`;
+    })
+    .join(" ");
+}
 
 function num(v: number | undefined | null, d = 2) {
   if (v == null || Number.isNaN(v)) return "—";
@@ -89,7 +153,7 @@ async function loadConfig() {
 async function refresh() {
   loading.value = true;
   try {
-    const [scanRes, openRes, closedRes, sumRes, stRes, evRes, histRes] = await Promise.all([
+    const [scanRes, openRes, closedRes, sumRes, stRes, evRes, histRes, lbRes, advRes] = await Promise.all([
       cryptoApi.polymarketScanLatest(),
       cryptoApi.polymarketPositions({ status: "open" }),
       cryptoApi.polymarketPositions({ status: "closed", limit: 50 }),
@@ -97,6 +161,8 @@ async function refresh() {
       cryptoApi.polymarketBuiltinStatus(),
       cryptoApi.polymarketEvents(50),
       cryptoApi.polymarketScanHistory(10),
+      cryptoApi.polymarketLeaderboard(168, 10),
+      cryptoApi.polymarketAdvisorRecommendations(minWinRate.value, 8),
     ]);
     allMarkets.value = scanRes.data?.items ?? [];
     openPositions.value = openRes.data?.items ?? [];
@@ -105,7 +171,10 @@ async function refresh() {
     builtinRunning.value = !!stRes.data?.running;
     events.value = (evRes.data?.items ?? []).reverse();
     scanHistory.value = histRes.data?.items ?? [];
+    leaderboard.value = lbRes.data?.items ?? [];
+    advisorReport.value = advRes.data ?? null;
     lastScanDuration.value = scanRes.data?.duration_sec ?? summary.value?.last_duration_sec ?? null;
+    lastScanMeta.value = scanRes.data ?? {};
   } catch (e) {
     ElMessage.error(extractError(e));
   } finally {
@@ -119,10 +188,13 @@ async function runScan() {
     const { data } = await cryptoApi.polymarketScan(true);
     allMarkets.value = data.items ?? [];
     lastScanDuration.value = data.duration_sec ?? null;
+    lastScanMeta.value = data;
     const dur = data.duration_sec != null ? ` · ${num(data.duration_sec, 1)}s` : "";
     ElMessage.success(`扫描完成：${data.opportunities_count} 个机会${dur}`);
     const sum = await cryptoApi.polymarketStats();
     summary.value = sum.data ?? null;
+    const adv = await cryptoApi.polymarketAdvisorRecommendations(minWinRate.value, 8);
+    advisorReport.value = adv.data ?? null;
     const [openRes, histRes] = await Promise.all([
       cryptoApi.polymarketPositions({ status: "open" }),
       cryptoApi.polymarketScanHistory(10),
@@ -164,6 +236,23 @@ async function toggleBuiltin() {
       config.builtin_scan_enabled = true;
     }
     ElMessage.success(builtinRunning.value ? "内置扫描已启动" : "已停止");
+  } catch (e) {
+    ElMessage.error(extractError(e));
+  }
+}
+
+async function openFromAdvisor(pick: PolymarketAdvisorPick) {
+  const row = allMarkets.value.find(
+    (r) => r.condition_id === pick.condition_id && r.strategy_type === pick.strategy_type,
+  );
+  if (row) await showOpenPreview(row);
+  else ElMessage.warning("请刷新扫描后再试");
+}
+
+async function reloadAdvisor() {
+  try {
+    const { data } = await cryptoApi.polymarketAdvisorRecommendations(minWinRate.value, 8);
+    advisorReport.value = data ?? null;
   } catch (e) {
     ElMessage.error(extractError(e));
   }
@@ -243,7 +332,7 @@ onMounted(async () => {
     <header class="head">
       <div>
         <h1>Polymarket 套利</h1>
-        <p class="sub">二元 YES+NO 卖一之和套利扫描 · 纸面模拟 · 研究用途</p>
+        <p class="sub">多策略套利扫描 · 深度吃单 · 纸面模拟（仅二元买入）</p>
       </div>
       <div class="actions">
         <el-button :loading="loading" @click="refresh">刷新</el-button>
@@ -292,6 +381,15 @@ onMounted(async () => {
       </el-col>
     </el-row>
 
+    <el-alert
+      v-if="lastScanMeta.markets_scanned_ok != null"
+      class="mb scan-health"
+      type="info"
+      :closable="false"
+      show-icon
+      :title="`扫描健康：成功 ${lastScanMeta.markets_scanned_ok ?? 0} · 跳过 ${lastScanMeta.markets_skipped ?? 0} · 错误 ${lastScanMeta.markets_errors ?? 0}`"
+    />
+
     <el-row :gutter="16" class="mb">
       <el-col :span="8">
         <el-card shadow="never">
@@ -302,6 +400,16 @@ onMounted(async () => {
             {{ builtinRunning ? "停止内置扫描" : "启动内置扫描" }}
           </el-button>
           <router-link to="/schedules" class="link">定时任务</router-link>
+        </el-card>
+        <el-card shadow="never" class="mt">
+          <template #header>机会排行榜 (7d)</template>
+          <el-table :data="leaderboard" size="small" max-height="180">
+            <el-table-column prop="question" label="市场" min-width="120" show-overflow-tooltip />
+            <el-table-column prop="hit_count" label="命中" width="50" />
+            <el-table-column label="最佳edge" width="80">
+              <template #default="{ row }">{{ num(row.best_edge_at_size_bps ?? row.best_edge_bps, 0) }}</template>
+            </el-table-column>
+          </el-table>
         </el-card>
         <el-card shadow="never" class="mt">
           <template #header>扫描历史</template>
@@ -383,10 +491,61 @@ onMounted(async () => {
       </el-col>
     </el-row>
 
+    <el-card shadow="never" class="mb advisor-card" v-loading="loading">
+      <template #header>
+        <div class="card-head">
+          <span>投资建议 · 高胜率优选</span>
+          <div class="advisor-controls">
+            <span class="ctrl-label">最低胜率</span>
+            <el-slider v-model="minWinRate" :min="0.4" :max="0.9" :step="0.05" :format-tooltip="(v: number) => `${(v * 100).toFixed(0)}%`" style="width: 140px" @change="reloadAdvisor" />
+            <el-button size="small" @click="reloadAdvisor">刷新</el-button>
+          </div>
+        </div>
+      </template>
+      <p v-if="advisorReport?.disclaimer" class="advisor-disclaimer">{{ advisorReport.disclaimer }}</p>
+      <p v-if="advisorReport" class="advisor-meta">
+        当前 {{ advisorReport.total_opportunities }} 个机会 · 胜率≥{{ (advisorReport.min_win_rate * 100).toFixed(0) }}% 共 {{ advisorReport.high_win_rate_count }} 个
+      </p>
+      <el-empty v-if="!advisorReport?.top_picks?.length" description="暂无高胜率推荐，请先扫描或降低胜率阈值" />
+      <div v-else class="advisor-grid">
+        <div v-for="pick in advisorReport.top_picks" :key="`${pick.condition_id}:${pick.strategy_type}`" class="advisor-item">
+          <div class="advisor-item-head">
+            <el-tag :type="recTagType[pick.recommendation] || 'info'" size="small">{{ pick.recommendation_label }}</el-tag>
+            <span class="advisor-score">评分 {{ num(pick.score, 0) }}</span>
+          </div>
+          <div class="advisor-q">{{ pick.question }}</div>
+          <div class="advisor-metrics">
+            <span>胜率 <strong>{{ num(pick.win_rate_pct, 1) }}%</strong></span>
+            <span>净利 <strong :class="profitClass(pick.profit_analysis?.net_profit_usd)">{{ signedUsd(pick.profit_analysis?.net_profit_usd, 2) }}</strong></span>
+            <span>ROI <strong>{{ num(pick.profit_analysis?.roi_pct, 1) }}%</strong></span>
+            <span>建议 {{ num(pick.profit_analysis?.recommended_size_shares, 0) }} 份</span>
+          </div>
+          <p class="advisor-text">{{ pick.advice }}</p>
+          <el-button
+            v-if="pick.paper_tradable && pick.recommendation !== 'pass' && pick.recommendation !== 'watch'"
+            size="small"
+            type="primary"
+            link
+            @click="openFromAdvisor(pick)"
+          >
+            纸面开仓
+          </el-button>
+        </div>
+      </div>
+    </el-card>
+
     <el-card shadow="never" class="mb" v-loading="loading">
       <template #header>
         <div class="card-head">
-          <span>套利机会</span>
+          <div class="card-head-left">
+            <span>套利机会</span>
+            <el-radio-group v-model="strategyTab" size="small" class="strategy-tabs">
+              <el-radio-button value="all">全部</el-radio-button>
+              <el-radio-button value="binary_ask">二元买入</el-radio-button>
+              <el-radio-button value="binary_bid">二元卖出</el-radio-button>
+              <el-radio-button value="multi_ask">多结果</el-radio-button>
+            </el-radio-group>
+          </div>
           <el-switch
             v-model="showAllMarkets"
             active-text="全部市场"
@@ -395,8 +554,59 @@ onMounted(async () => {
           />
         </div>
       </template>
-      <el-table :data="opportunities" size="small" stripe max-height="420">
-        <el-table-column prop="question" label="市场" min-width="200" show-overflow-tooltip>
+      <el-table
+        :data="opportunities"
+        size="small"
+        stripe
+        max-height="420"
+        :row-key="rowKey"
+        @expand-change="onExpandChange"
+      >
+        <el-table-column type="expand" width="40">
+          <template #default="{ row }">
+            <div class="expand-panel">
+              <div v-if="row.opportunity" class="profit-banner">
+                深度 @{{ config.depth_target_shares }} 份预期收益
+                <strong :class="profitClass(row.profit_at_size_usd ?? row.profit_at_100_usd)">
+                  {{ signedUsd(row.profit_at_size_usd ?? row.profit_at_100_usd, 2) }}
+                </strong>
+                · edge@size {{ num(row.edge_at_size_bps ?? row.edge_bps, 1) }} bps
+                <span v-if="row.slippage_bps != null"> · 滑点 {{ num(row.slippage_bps, 1) }} bps</span>
+              </div>
+              <el-row v-if="row.yes_ladder?.length || row.no_ladder?.length" :gutter="12">
+                <el-col v-if="row.yes_ladder?.length" :span="12">
+                  <div class="ladder-title">YES 深度</div>
+                  <el-table :data="row.yes_ladder" size="small">
+                    <el-table-column prop="price" label="价" width="70" />
+                    <el-table-column prop="size" label="量" width="70" />
+                    <el-table-column prop="take" label="吃单" width="70" />
+                  </el-table>
+                </el-col>
+                <el-col v-if="row.no_ladder?.length" :span="12">
+                  <div class="ladder-title">NO 深度</div>
+                  <el-table :data="row.no_ladder" size="small">
+                    <el-table-column prop="price" label="价" width="70" />
+                    <el-table-column prop="size" label="量" width="70" />
+                    <el-table-column prop="take" label="吃单" width="70" />
+                  </el-table>
+                </el-col>
+              </el-row>
+              <svg
+                v-if="row.condition_id && sparklinePoints(row.condition_id)"
+                class="sparkline"
+                viewBox="0 0 80 22"
+              >
+                <polyline :points="sparklinePoints(row.condition_id)" fill="none" stroke="var(--el-color-primary)" stroke-width="1.5" />
+              </svg>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column label="策略" width="88">
+          <template #default="{ row }">
+            <el-tag size="small" type="info">{{ strategyLabel[row.strategy_type || "binary_ask"] || row.strategy_type }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="question" label="市场" min-width="180" show-overflow-tooltip>
           <template #default="{ row }">
             <a
               v-if="row.market_url"
@@ -417,10 +627,10 @@ onMounted(async () => {
         <el-table-column label="NO" width="70">
           <template #default="{ row }">{{ num(row.ask_no, 3) }}</template>
         </el-table-column>
-        <el-table-column label="edge bps" width="85">
+        <el-table-column label="edge@size" width="85">
           <template #default="{ row }">
-            <el-tag v-if="row.opportunity" type="success">{{ num(row.edge_bps, 1) }}</el-tag>
-            <span v-else>{{ num(row.edge_bps, 1) }}</span>
+            <el-tag v-if="row.opportunity" type="success">{{ num(row.edge_at_size_bps ?? row.edge_bps, 1) }}</el-tag>
+            <span v-else>{{ num(row.edge_at_size_bps ?? row.edge_bps, 1) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="收益@100份" width="110">
@@ -436,13 +646,13 @@ onMounted(async () => {
             <span v-else>—</span>
           </template>
         </el-table-column>
-        <el-table-column label="可成交量" width="80">
-          <template #default="{ row }">{{ num(row.size_cap, 0) }}</template>
+        <el-table-column label="可成交" width="75">
+          <template #default="{ row }">{{ num(row.fillable_shares ?? row.size_cap, 0) }}</template>
         </el-table-column>
         <el-table-column label="操作" width="90" fixed="right">
           <template #default="{ row }">
             <el-button
-              v-if="row.opportunity"
+              v-if="row.opportunity && row.paper_tradable !== false && row.strategy_type !== 'binary_bid' && row.strategy_type !== 'multi_ask'"
               size="small"
               type="primary"
               link
@@ -451,6 +661,9 @@ onMounted(async () => {
             >
               纸面开仓
             </el-button>
+            <el-tooltip v-else-if="row.opportunity" content="该策略仅支持扫描预览">
+              <span class="preview-only">预览</span>
+            </el-tooltip>
           </template>
         </el-table-column>
       </el-table>
@@ -581,6 +794,26 @@ onMounted(async () => {
 .mt { margin-top: 12px; }
 .link { margin-left: 12px; font-size: 13px; }
 .card-head { display: flex; justify-content: space-between; align-items: center; }
+.card-head-left { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.strategy-tabs { margin-left: 8px; }
+.scan-health { margin-bottom: 16px; }
+.expand-panel { padding: 8px 12px 12px; }
+.profit-banner { margin-bottom: 10px; font-size: 13px; padding: 8px 10px; background: var(--el-fill-color-light); border-radius: 6px; }
+.ladder-title { font-size: 12px; color: var(--el-text-color-secondary); margin-bottom: 6px; }
+.sparkline { width: 80px; height: 22px; margin-top: 8px; }
+.preview-only { font-size: 12px; color: var(--el-text-color-secondary); }
+.advisor-card :deep(.el-card__header) { padding-bottom: 8px; }
+.advisor-controls { display: flex; align-items: center; gap: 10px; }
+.ctrl-label { font-size: 12px; color: var(--el-text-color-secondary); }
+.advisor-disclaimer { font-size: 12px; color: var(--el-text-color-secondary); margin: 0 0 8px; }
+.advisor-meta { font-size: 13px; margin: 0 0 12px; }
+.advisor-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+.advisor-item { border: 1px solid var(--el-border-color-lighter); border-radius: 8px; padding: 12px; background: var(--el-fill-color-blank); }
+.advisor-item-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.advisor-score { font-size: 12px; color: var(--el-text-color-secondary); }
+.advisor-q { font-weight: 500; font-size: 14px; margin-bottom: 8px; line-height: 1.4; }
+.advisor-metrics { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; margin-bottom: 8px; }
+.advisor-text { font-size: 12px; color: var(--el-text-color-regular); line-height: 1.5; margin: 0 0 8px; }
 .market-link { color: var(--el-color-primary); text-decoration: none; }
 .market-link:hover { text-decoration: underline; }
 .stats-row .stat-card { text-align: center; }

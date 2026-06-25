@@ -1,0 +1,9 @@
+{
+  "conditionId": "0xmulti123",
+  "question": "Who wins the election?",
+  "slug": "election-2026",
+  "volume24hr": 120000,
+  "acceptingOrders": true,
+  "outcomes": "[\"Alice\", \"Bob\", \"Other\"]",
+  "clobTokenIds": "[\"tok-a\", \"tok-b\", \"tok-c\"]"
+}

@@ -2152,6 +2152,15 @@ class PolymarketConfigUpdate(BaseModel):
     scan_dedupe_sec: int | None = Field(default=None, ge=0, le=600)
     default_paper_size_shares: float | None = Field(default=None, gt=0)
     alert_cooldown_sec: int | None = Field(default=None, ge=0)
+    min_volume24hr_usd: float | None = Field(default=None, ge=0)
+    exclude_slug_patterns: list[str] | None = None
+    require_accepting_orders: bool | None = None
+    skip_no_book: bool | None = None
+    use_depth_for_opportunity: bool | None = None
+    depth_target_shares: float | None = Field(default=None, gt=0)
+    max_depth_levels: int | None = Field(default=None, ge=1, le=50)
+    enabled_strategies: list[str] | None = None
+    min_outcomes_multi: int | None = Field(default=None, ge=2, le=20)
 
 
 class PolymarketOpenRequest(BaseModel):
@@ -2300,6 +2309,65 @@ def crypto_polymarket_events(limit: int = Query(100, ge=1, le=1000)) -> dict[str
     from quant_rd_tool.crypto_polymarket_arb import read_events
 
     return {"items": read_events(limit=limit)}
+
+
+@router.get("/polymarket/analytics/edge-trend")
+def crypto_polymarket_edge_trend(
+    condition_id: str,
+    hours: float = Query(24, ge=1, le=720),
+    strategy_type: str | None = Query(None),
+) -> dict[str, Any]:
+    from quant_rd_tool.crypto_polymarket_analytics import edge_trend
+
+    return {
+        "condition_id": condition_id,
+        "items": edge_trend(condition_id, hours=hours, strategy_type=strategy_type),
+    }
+
+
+@router.get("/polymarket/analytics/leaderboard")
+def crypto_polymarket_leaderboard(
+    hours: float = Query(168, ge=1, le=720),
+    limit: int = Query(20, ge=1, le=100),
+) -> dict[str, Any]:
+    from quant_rd_tool.crypto_polymarket_analytics import leaderboard
+
+    return {"items": leaderboard(hours=hours, limit=limit)}
+
+
+@router.get("/polymarket/advisor/recommendations")
+def crypto_polymarket_advisor_recommendations(
+    min_win_rate: float = Query(0.60, ge=0, le=1),
+    limit: int = Query(10, ge=1, le=50),
+) -> dict[str, Any]:
+    from quant_rd_tool.crypto_polymarket_advisor import build_recommendations
+    from quant_rd_tool.crypto_polymarket_arb import load_config
+
+    return build_recommendations(config=load_config(), min_win_rate=min_win_rate, limit=limit)
+
+
+@router.get("/polymarket/advisor/score")
+def crypto_polymarket_advisor_score(
+    condition_id: str,
+    strategy_type: str | None = Query(None),
+) -> dict[str, Any]:
+    from quant_rd_tool.crypto_polymarket_advisor import score_opportunity
+    from quant_rd_tool.crypto_polymarket_arb import load_config, load_latest_scan
+
+    latest = load_latest_scan()
+    if not latest:
+        raise HTTPException(status_code=404, detail="no scan data")
+    row = None
+    for item in latest.get("items") or []:
+        if str(item.get("condition_id") or "") != condition_id:
+            continue
+        if strategy_type and item.get("strategy_type") != strategy_type:
+            continue
+        row = item
+        break
+    if not row:
+        raise HTTPException(status_code=404, detail="market not in latest scan")
+    return score_opportunity(row, config=load_config())
 
 
 @router.get("/polymarket/builtin/status")

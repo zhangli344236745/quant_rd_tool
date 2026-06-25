@@ -999,6 +999,27 @@ export const cryptoApi = {
 
   polymarketBuiltinStop: () => http.post<PolymarketBuiltinStatus>("/crypto/polymarket/builtin/stop"),
 
+  polymarketEdgeTrend: (conditionId: string, hours = 24, strategyType?: string) =>
+    http.get<{ condition_id: string; items: PolymarketEdgeHistoryPoint[] }>(
+      "/crypto/polymarket/analytics/edge-trend",
+      { params: { condition_id: conditionId, hours, strategy_type: strategyType } },
+    ),
+
+  polymarketLeaderboard: (hours = 168, limit = 20) =>
+    http.get<{ items: PolymarketLeaderboardItem[] }>("/crypto/polymarket/analytics/leaderboard", {
+      params: { hours, limit },
+    }),
+
+  polymarketAdvisorRecommendations: (minWinRate = 0.6, limit = 10) =>
+    http.get<PolymarketAdvisorReport>("/crypto/polymarket/advisor/recommendations", {
+      params: { min_win_rate: minWinRate, limit },
+    }),
+
+  polymarketAdvisorScore: (conditionId: string, strategyType?: string) =>
+    http.get<PolymarketAdvisorPick>("/crypto/polymarket/advisor/score", {
+      params: { condition_id: conditionId, strategy_type: strategyType },
+    }),
+
   marketRadarScan: (force = false) =>
     http.get<MarketRadarScanResult>("/crypto/market-radar/scan", { params: { force } }),
 
@@ -1817,31 +1838,68 @@ export interface PolymarketArbConfig {
   default_paper_size_shares: number;
   alert_cooldown_sec: number;
   last_scan_at?: string | null;
+  min_volume24hr_usd?: number;
+  exclude_slug_patterns?: string[];
+  require_accepting_orders?: boolean;
+  skip_no_book?: boolean;
+  use_depth_for_opportunity?: boolean;
+  depth_target_shares?: number;
+  max_depth_levels?: number;
+  enabled_strategies?: string[];
+  min_outcomes_multi?: number;
+}
+
+export type PolymarketStrategyType = "binary_ask" | "binary_bid" | "multi_ask";
+
+export interface PolymarketDepthLevel {
+  price: number;
+  size: number;
+  take: number;
+  cum_size: number;
 }
 
 export interface PolymarketOpportunity {
   condition_id: string;
   question: string;
+  strategy_type?: PolymarketStrategyType;
   ask_yes?: number;
   ask_no?: number;
+  bid_yes?: number;
+  bid_no?: number;
   edge_bps?: number;
+  edge_at_size_bps?: number;
+  slippage_bps?: number;
+  fillable_shares?: number;
+  depth_levels?: number;
   profit_usd?: number;
   profit_at_100_usd?: number;
+  profit_at_size_usd?: number;
   cost_at_100_usd?: number;
   roi_at_100_pct?: number;
   ref_shares?: number;
   size_cap?: number;
   opportunity?: boolean;
+  paper_tradable?: boolean;
+  book_status?: string;
+  skipped?: boolean;
   market_url?: string | null;
   volume24hr?: number;
+  yes_ladder?: PolymarketDepthLevel[];
+  no_ladder?: PolymarketDepthLevel[];
+  outcome_vwaps?: number[];
   error?: string;
 }
 
 export interface PolymarketScanResult {
   scanned_at: string;
   markets_scanned: number;
+  markets_filtered_pre?: number;
+  markets_scanned_ok?: number;
+  markets_skipped?: number;
+  markets_errors?: number;
   opportunities_count: number;
   best_edge_bps?: number | null;
+  strategy_counts?: Record<string, number>;
   duration_sec?: number;
   errors?: number;
   books_fetched?: number;
@@ -1936,6 +1994,72 @@ export interface PolymarketBuiltinStatus {
   run_count: number;
   last_run_at?: string | null;
   last_error?: string | null;
+}
+
+export interface PolymarketEdgeHistoryPoint {
+  ts?: string;
+  edge_bps?: number;
+  edge_at_size_bps?: number;
+  strategy_type?: string;
+}
+
+export interface PolymarketLeaderboardItem {
+  condition_id: string;
+  question?: string;
+  hit_count: number;
+  best_edge_bps?: number | null;
+  best_edge_at_size_bps?: number | null;
+  strategies?: string[];
+  last_ts?: string;
+}
+
+export type PolymarketRecommendationLevel = "strong_buy" | "buy" | "watch" | "pass";
+
+export interface PolymarketProfitAnalysis {
+  recommended_size_shares: number;
+  cost_usd: number;
+  fee_usd: number;
+  expected_profit_usd: number;
+  net_profit_usd: number;
+  roi_pct: number;
+  edge_at_size_bps?: number;
+}
+
+export interface PolymarketWinRateBreakdown {
+  strategy_certainty: number;
+  persistence_rate: number;
+  execution_confidence: number;
+  win_rate: number;
+  win_rate_pct: number;
+}
+
+export interface PolymarketAdvisorPick {
+  condition_id?: string;
+  question?: string;
+  strategy_type?: string;
+  market_url?: string | null;
+  recommendation: PolymarketRecommendationLevel;
+  recommendation_label: string;
+  score: number;
+  win_rate: number;
+  win_rate_pct: number;
+  win_rate_breakdown: PolymarketWinRateBreakdown;
+  profit_analysis: PolymarketProfitAnalysis;
+  advice: string;
+  paper_tradable?: boolean;
+  opportunity?: boolean;
+}
+
+export interface PolymarketAdvisorReport {
+  generated_at?: string | null;
+  scanned_at?: string | null;
+  total_opportunities: number;
+  high_win_rate_count: number;
+  min_win_rate: number;
+  top_picks: PolymarketAdvisorPick[];
+  all_scored?: PolymarketAdvisorPick[];
+  persistent_leaders?: PolymarketLeaderboardItem[];
+  disclaimer?: string;
 }
 
 export interface MarketRadarConfig {

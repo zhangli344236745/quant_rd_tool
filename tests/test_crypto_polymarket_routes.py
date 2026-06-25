@@ -112,3 +112,62 @@ def test_polymarket_scan_latest_empty(monkeypatch):
     body = r.json()
     assert body["markets_scanned"] == 0
     assert body["items"] == []
+
+
+def test_polymarket_leaderboard_route(monkeypatch, tmp_path):
+    from quant_rd_tool import crypto_polymarket_arb as pa
+
+    monkeypatch.setattr(pa, "POLYMARKET_DIR", tmp_path)
+
+    r = client.get("/api/v1/crypto/polymarket/analytics/leaderboard", params={"limit": 5})
+    assert r.status_code == 200
+    assert "items" in r.json()
+
+
+def test_polymarket_advisor_route(monkeypatch):
+    from quant_rd_tool import crypto_polymarket_arb as pa
+
+    monkeypatch.setattr(
+        pa,
+        "load_latest_scan",
+        lambda: {
+            "scanned_at": "2026-06-25T12:00:00+08:00",
+            "items": [
+                {
+                    "condition_id": "c1",
+                    "question": "Q?",
+                    "strategy_type": "binary_ask",
+                    "opportunity": True,
+                    "paper_tradable": True,
+                    "fillable_shares": 100,
+                    "slippage_bps": 0,
+                    "depth_levels": 2,
+                    "edge_at_size_bps": 200,
+                    "edge_at_size": 0.02,
+                    "vwap_yes": 0.45,
+                    "vwap_no": 0.50,
+                    "profit_at_size_usd": 2.0,
+                }
+            ],
+        },
+    )
+
+    r = client.get("/api/v1/crypto/polymarket/advisor/recommendations", params={"min_win_rate": 0.5})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["total_opportunities"] >= 1
+    assert len(body["top_picks"]) >= 1
+    assert "advice" in body["top_picks"][0]
+
+
+def test_polymarket_edge_trend_route(monkeypatch, tmp_path):
+    from quant_rd_tool import crypto_polymarket_arb as pa
+
+    monkeypatch.setattr(pa, "POLYMARKET_DIR", tmp_path)
+
+    r = client.get(
+        "/api/v1/crypto/polymarket/analytics/edge-trend",
+        params={"condition_id": "c1", "hours": 24},
+    )
+    assert r.status_code == 200
+    assert r.json()["condition_id"] == "c1"

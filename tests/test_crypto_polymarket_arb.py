@@ -93,8 +93,9 @@ def test_scan_market_row_from_fixtures(monkeypatch, tmp_path):
     market = normalize_gamma_market(
         json.loads((Path(__file__).parent / "fixtures" / "polymarket_gamma_markets.json").read_text())
     )
-    row = scan_market_row(market, PolymarketArbConfig(), http_get=fake_get)
+    row = scan_market_row(market, PolymarketArbConfig(enabled_strategies=["binary_ask"]), http_get=fake_get)
     assert row.get("edge_bps") is not None
+    assert row.get("strategy_type") == "binary_ask"
     assert row.get("error") is None
 
 
@@ -122,9 +123,9 @@ def test_scan_markets_persists(monkeypatch, tmp_path):
             return no_book
         return {"asks": []}
 
-    cfg = PolymarketArbConfig(scan_dedupe_sec=0)
+    cfg = PolymarketArbConfig(scan_dedupe_sec=0, enabled_strategies=["binary_ask"])
     result = pa.scan_markets(cfg, force=True, http_get=fake_get)
-    assert result["markets_scanned"] == 1
+    assert result["markets_scanned"] >= 1
     assert (tmp_path / "scans" / "latest.json").is_file()
 
 

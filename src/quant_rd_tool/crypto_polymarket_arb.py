@@ -44,6 +44,19 @@ class PolymarketArbConfig:
     default_paper_size_shares: float = 100.0
     alert_cooldown_sec: int = 900
     last_scan_at: str | None = None
+    min_volume24hr_usd: float = 5000.0
+    exclude_slug_patterns: list[str] = field(
+        default_factory=lambda: ["*-updown-*", "*-5m-*"]
+    )
+    require_accepting_orders: bool = True
+    skip_no_book: bool = True
+    use_depth_for_opportunity: bool = True
+    depth_target_shares: float = 100.0
+    max_depth_levels: int = 10
+    enabled_strategies: list[str] = field(
+        default_factory=lambda: ["binary_ask", "binary_bid", "multi_ask"]
+    )
+    min_outcomes_multi: int = 3
 
 
 def _iso_now() -> str:
@@ -74,6 +87,20 @@ def load_config() -> PolymarketArbConfig:
         default_paper_size_shares=float(raw.get("default_paper_size_shares", 100.0)),
         alert_cooldown_sec=int(raw.get("alert_cooldown_sec", 900)),
         last_scan_at=raw.get("last_scan_at"),
+        min_volume24hr_usd=float(raw.get("min_volume24hr_usd", 5000.0)),
+        exclude_slug_patterns=[
+            str(x) for x in raw.get("exclude_slug_patterns") or ["*-updown-*", "*-5m-*"]
+        ],
+        require_accepting_orders=bool(raw.get("require_accepting_orders", True)),
+        skip_no_book=bool(raw.get("skip_no_book", True)),
+        use_depth_for_opportunity=bool(raw.get("use_depth_for_opportunity", True)),
+        depth_target_shares=float(raw.get("depth_target_shares", 100.0)),
+        max_depth_levels=int(raw.get("max_depth_levels", 10)),
+        enabled_strategies=[
+            str(x)
+            for x in raw.get("enabled_strategies") or ["binary_ask", "binary_bid", "multi_ask"]
+        ],
+        min_outcomes_multi=int(raw.get("min_outcomes_multi", 3)),
     )
 
 
@@ -139,14 +166,20 @@ def normalize_gamma_market(raw: dict[str, Any]) -> dict[str, Any] | None:
     except (TypeError, ValueError):
         volume24hr = 0.0
     slug = str(raw.get("slug") or "")
+    outcome_labels = [str(o) for o in outcomes] if outcomes else ["Yes", "No"]
+    token_id_list = [str(t) for t in token_ids]
+    accepting = raw.get("acceptingOrders", raw.get("accepting_orders"))
     return {
         "condition_id": condition_id,
         "question": question,
         "yes_token_id": yes_token,
         "no_token_id": no_token,
-        "outcomes": [str(o) for o in outcomes] if outcomes else ["Yes", "No"],
+        "token_ids": token_id_list,
+        "outcome_count": len(token_id_list),
+        "outcomes": outcome_labels,
         "volume24hr": volume24hr,
         "slug": slug,
+        "acceptingOrders": accepting,
         "market_url": f"https://polymarket.com/event/{slug}" if slug else None,
     }
 
@@ -171,54 +204,165 @@ def compute_binary_edge(
     ask_no_size: float,
     config: PolymarketArbConfig,
 ) -> dict[str, Any]:
-    fee_yes = ask_yes * config.taker_fee_bps / 10_000.0
-    fee_no = ask_no * config.taker_fee_bps / 10_000.0
-    raw_edge = 1.0 - ask_yes - ask_no
-    edge = raw_edge - fee_yes - fee_no
-    size_cap = min(float(ask_yes_size), float(ask_no_size))
-    edge_bps = edge * 10_000.0
-    liquidity_usd = ask_yes * ask_yes_size + ask_no * ask_no_size
-    profit_usd = edge * size_cap if edge > 0 else 0.0
-    ref_shares = min(REFERENCE_PROFIT_SHARES, size_cap)
-    cost_at_100_usd = ref_shares * (ask_yes + ask_no)
-    profit_at_100_usd = edge * ref_shares if edge > 0 else 0.0
-    roi_at_100_pct = (
-        (profit_at_100_usd / cost_at_100_usd * 100.0) if cost_at_100_usd > 0 and edge > 0 else 0.0
+    from quant_rd_tool.crypto_polymarket_strategies import eval_binary_ask
+
+    return eval_binary_ask(
+        ask_yes=ask_yes,
+        ask_no=ask_no,
+        ask_yes_size=ask_yes_size,
+        ask_no_size=ask_no_size,
+        depth=None,
+        config=config,
     )
-    opportunity = (
-        edge_bps >= config.min_edge_bps
-        and size_cap >= config.min_size_shares
-        and liquidity_usd >= config.min_liquidity_usd
-    )
-    return {
-        "ask_yes": round(ask_yes, 6),
-        "ask_no": round(ask_no, 6),
-        "ask_yes_size": round(ask_yes_size, 4),
-        "ask_no_size": round(ask_no_size, 4),
-        "raw_edge": round(raw_edge, 6),
-        "fee_yes": round(fee_yes, 6),
-        "fee_no": round(fee_no, 6),
-        "edge": round(edge, 6),
-        "edge_bps": round(edge_bps, 2),
-        "size_cap": round(size_cap, 4),
-        "liquidity_usd": round(liquidity_usd, 2),
-        "profit_usd": round(profit_usd, 4),
-        "ref_shares": round(ref_shares, 4),
-        "cost_at_100_usd": round(cost_at_100_usd, 4),
-        "profit_at_100_usd": round(profit_at_100_usd, 4),
-        "roi_at_100_pct": round(roi_at_100_pct, 2),
-        "opportunity": opportunity,
-    }
 
 
-def _best_ask(book: dict[str, Any]) -> tuple[float, float]:
-    asks = book.get("asks") or []
-    if not asks:
-        return 0.0, 0.0
-    row = asks[0]
-    if isinstance(row, dict):
-        return float(row.get("price") or 0), float(row.get("size") or 0)
-    return float(row[0]), float(row[1])
+def _market_filter_config(cfg: PolymarketArbConfig):
+    from quant_rd_tool.crypto_polymarket_scanner import MarketFilterConfig
+
+    return MarketFilterConfig(
+        min_volume24hr_usd=cfg.min_volume24hr_usd,
+        exclude_slug_patterns=list(cfg.exclude_slug_patterns),
+        require_accepting_orders=cfg.require_accepting_orders,
+    )
+
+
+def scan_market_strategies(
+    market: dict[str, Any],
+    config: PolymarketArbConfig,
+    *,
+    http_get: HttpGet | None = None,
+) -> list[dict[str, Any]]:
+    from quant_rd_tool.crypto_polymarket_scanner import (
+        best_ask,
+        best_bid,
+        fetch_clob_book_safe,
+        walk_binary_ask_depth,
+        walk_binary_bid_depth,
+        walk_multi_ask_depth,
+    )
+    from quant_rd_tool.crypto_polymarket_strategies import (
+        eval_binary_ask,
+        eval_binary_bid,
+        eval_multi_ask,
+    )
+
+    getter = http_get or _default_http_get
+    base = {**market}
+    enabled = set(config.enabled_strategies or [])
+    token_ids = list(market.get("token_ids") or [])
+    if not token_ids:
+        token_ids = [str(market.get("yes_token_id") or ""), str(market.get("no_token_id") or "")]
+    token_ids = [t for t in token_ids if t]
+    outcome_count = int(market.get("outcome_count") or len(token_ids))
+
+    if outcome_count >= config.min_outcomes_multi and "multi_ask" in enabled:
+        books_raw = [fetch_clob_book_safe(tid, http_get=getter) for tid in token_ids]
+        if any(r["status"] == "no_book" for r in books_raw):
+            row = {**base, "book_status": "no_book", "strategy_type": "multi_ask"}
+            if config.skip_no_book:
+                row["skipped"] = True
+            else:
+                row["error"] = "no_book"
+            return [row]
+        if any(r["status"] != "ok" for r in books_raw):
+            row = {**base, "book_status": "error", "error": "book_fetch_failed", "strategy_type": "multi_ask"}
+            return [row]
+        books = [r["book"] for r in books_raw]
+        asks = [best_ask(b) for b in books]
+        if any(a[0] <= 0 for a in asks):
+            return [{**base, "book_status": "incomplete", "error": "incomplete_book", "strategy_type": "multi_ask"}]
+        depth = walk_multi_ask_depth(
+            books,
+            target_shares=config.depth_target_shares,
+            max_levels=config.max_depth_levels,
+        )
+        metrics = eval_multi_ask(
+            vwaps=[a[0] for a in asks],
+            sizes=[a[1] for a in asks],
+            outcomes=list(market.get("outcomes") or []),
+            depth=depth,
+            config=config,
+        )
+        return [{**base, **metrics, "book_status": "ok"}]
+
+    if outcome_count < 2:
+        return [{**base, "error": "invalid_market", "book_status": "error"}]
+
+    yes_res = fetch_clob_book_safe(str(market.get("yes_token_id") or token_ids[0]), http_get=getter)
+    no_res = fetch_clob_book_safe(str(market.get("no_token_id") or token_ids[1]), http_get=getter)
+    if yes_res["status"] == "no_book" or no_res["status"] == "no_book":
+        row = {**base, "book_status": "no_book"}
+        if config.skip_no_book:
+            row["skipped"] = True
+        else:
+            row["error"] = yes_res.get("error") or no_res.get("error")
+        return [row]
+    if yes_res["status"] != "ok" or no_res["status"] != "ok":
+        return [
+            {
+                **base,
+                "book_status": "error",
+                "error": yes_res.get("error") or no_res.get("error"),
+            }
+        ]
+
+    yes_book = yes_res["book"]
+    no_book = no_res["book"]
+    ask_yes, ask_yes_size = best_ask(yes_book)
+    ask_no, ask_no_size = best_ask(no_book)
+    bid_yes, bid_yes_size = best_bid(yes_book)
+    bid_no, bid_no_size = best_bid(no_book)
+    if ask_yes <= 0 or ask_no <= 0:
+        return [{**base, "book_status": "incomplete", "error": "incomplete_book"}]
+
+    ask_depth = walk_binary_ask_depth(
+        yes_book,
+        no_book,
+        target_shares=config.depth_target_shares,
+        max_levels=config.max_depth_levels,
+    )
+    bid_depth = walk_binary_bid_depth(
+        yes_book,
+        no_book,
+        target_shares=config.depth_target_shares,
+        max_levels=config.max_depth_levels,
+    )
+
+    rows: list[dict[str, Any]] = []
+    if "binary_ask" in enabled:
+        metrics = eval_binary_ask(
+            ask_yes=ask_yes,
+            ask_no=ask_no,
+            ask_yes_size=ask_yes_size,
+            ask_no_size=ask_no_size,
+            depth=ask_depth,
+            config=config,
+        )
+        rows.append({**base, **metrics, "book_status": "ok"})
+    if "binary_bid" in enabled and bid_yes > 0 and bid_no > 0:
+        metrics = eval_binary_bid(
+            bid_yes=bid_yes,
+            bid_no=bid_no,
+            bid_yes_size=bid_yes_size,
+            bid_no_size=bid_no_size,
+            depth=bid_depth,
+            config=config,
+        )
+        rows.append({**base, **metrics, "book_status": "ok"})
+    return rows or [{**base, "book_status": "ok", "error": "no_strategies_enabled"}]
+
+
+def scan_market_row(
+    market: dict[str, Any],
+    config: PolymarketArbConfig,
+    *,
+    http_get: HttpGet | None = None,
+) -> dict[str, Any]:
+    rows = scan_market_strategies(market, config, http_get=http_get)
+    for row in rows:
+        if row.get("strategy_type") == "binary_ask" and not row.get("error"):
+            return row
+    return rows[0] if rows else {**market, "error": "scan_failed"}
 
 
 def fetch_gamma_markets(
@@ -278,42 +422,15 @@ def fetch_clob_book(token_id: str, *, http_get: HttpGet | None = None) -> dict[s
     return getter(f"{CLOB_API}/book", {"token_id": token_id})
 
 
-def scan_market_row(
-    market: dict[str, Any],
-    config: PolymarketArbConfig,
-    *,
-    http_get: HttpGet | None = None,
-) -> dict[str, Any]:
-    getter = http_get or _default_http_get
-    base = {**market}
-    try:
-        yes_book = fetch_clob_book(market["yes_token_id"], http_get=getter)
-        no_book = fetch_clob_book(market["no_token_id"], http_get=getter)
-        ask_yes, ask_yes_size = _best_ask(yes_book)
-        ask_no, ask_no_size = _best_ask(no_book)
-        if ask_yes <= 0 or ask_no <= 0:
-            base["error"] = "incomplete_book"
-            return base
-        metrics = compute_binary_edge(
-            ask_yes=ask_yes,
-            ask_no=ask_no,
-            ask_yes_size=ask_yes_size,
-            ask_no_size=ask_no_size,
-            config=config,
-        )
-        base.update(metrics)
-        return base
-    except Exception as e:  # noqa: BLE001
-        base["error"] = str(e)
-        return base
-
-
 def scan_markets(
     config: PolymarketArbConfig | None = None,
     *,
     force: bool = False,
     http_get: HttpGet | None = None,
 ) -> dict[str, Any]:
+    from quant_rd_tool.crypto_polymarket_analytics import append_edge_history
+    from quant_rd_tool.crypto_polymarket_scanner import filter_markets
+
     cfg = config or load_config()
     if not force and cfg.last_scan_at and cfg.scan_dedupe_sec > 0:
         try:
@@ -333,38 +450,67 @@ def scan_markets(
         http_get=http_get,
     )
     universe = merge_market_universe(top, watchlist)
+    watchlist_ids = set(cfg.watchlist_condition_ids)
+    filtered, markets_filtered_pre = filter_markets(
+        universe,
+        _market_filter_config(cfg),
+        watchlist_ids=watchlist_ids,
+    )
+
     items: list[dict[str, Any]] = []
-    errors = 0
+    markets_errors = 0
+    markets_skipped = markets_filtered_pre
+    markets_scanned_ok = 0
     books_fetched = 0
+    strategy_counts: dict[str, int] = {}
     t0 = time.perf_counter()
 
-    def _scan_one(m: dict[str, Any]) -> dict[str, Any]:
-        return scan_market_row(m, cfg, http_get=http_get)
+    def _scan_one(m: dict[str, Any]) -> list[dict[str, Any]]:
+        return scan_market_strategies(m, cfg, http_get=http_get)
 
-    workers = min(BOOK_FETCH_WORKERS, max(len(universe), 1))
+    workers = min(BOOK_FETCH_WORKERS, max(len(filtered), 1))
     with ThreadPoolExecutor(max_workers=workers) as pool:
-        futures = {pool.submit(_scan_one, m): m for m in universe}
+        futures = {pool.submit(_scan_one, m): m for m in filtered}
         for fut in as_completed(futures):
-            row = fut.result()
-            if row.get("error"):
-                errors += 1
-            else:
-                books_fetched += 2
-            items.append(row)
+            rows = fut.result()
+            for row in rows:
+                if row.get("skipped"):
+                    markets_skipped += 1
+                elif row.get("error") or row.get("book_status") in ("error", "incomplete"):
+                    markets_errors += 1
+                elif row.get("book_status") == "ok":
+                    markets_scanned_ok += 1
+                    if row.get("strategy_type") == "binary_ask":
+                        books_fetched += 2
+                    st = str(row.get("strategy_type") or "unknown")
+                    strategy_counts[st] = strategy_counts.get(st, 0) + 1
+                items.append(row)
 
     duration_sec = round(time.perf_counter() - t0, 3)
 
-    items.sort(key=lambda r: float(r.get("edge_bps") or -1e9), reverse=True)
+    items.sort(
+        key=lambda r: float(r.get("edge_at_size_bps") or r.get("edge_bps") or -1e9),
+        reverse=True,
+    )
     opportunities = [r for r in items if r.get("opportunity")]
     ts = _iso_now()
     payload = {
         "scanned_at": ts,
         "markets_scanned": len(items),
+        "markets_filtered_pre": markets_filtered_pre,
+        "markets_scanned_ok": markets_scanned_ok,
+        "markets_skipped": markets_skipped,
+        "markets_errors": markets_errors,
         "opportunities_count": len(opportunities),
-        "best_edge_bps": float(opportunities[0]["edge_bps"]) if opportunities else None,
-        "errors": errors,
+        "best_edge_bps": float(
+            opportunities[0].get("edge_at_size_bps") or opportunities[0].get("edge_bps")
+        )
+        if opportunities
+        else None,
+        "strategy_counts": strategy_counts,
+        "errors": markets_errors,
         "books_fetched": books_fetched,
-        "books_failed": errors * 2,
+        "books_failed": markets_skipped + markets_errors,
         "duration_sec": duration_sec,
         "items": items,
         "config": asdict(cfg),
@@ -374,6 +520,7 @@ def scan_markets(
     save_config(cfg)
     for opp in opportunities:
         append_opportunity(opp)
+        append_edge_history(opp)
     return payload
 
 
@@ -398,8 +545,13 @@ def empty_scan_result() -> dict[str, Any]:
     return {
         "scanned_at": None,
         "markets_scanned": 0,
+        "markets_filtered_pre": 0,
+        "markets_scanned_ok": 0,
+        "markets_skipped": 0,
+        "markets_errors": 0,
         "opportunities_count": 0,
         "best_edge_bps": None,
+        "strategy_counts": {},
         "errors": 0,
         "books_fetched": 0,
         "books_failed": 0,
@@ -452,13 +604,23 @@ def list_positions(*, status: PositionStatus | None = None, limit: int = 50) -> 
     return items
 
 
-def _scan_row_by_condition(scan: dict[str, Any] | None, condition_id: str) -> dict[str, Any] | None:
+def _scan_row_by_condition(
+    scan: dict[str, Any] | None,
+    condition_id: str,
+    *,
+    strategy_type: str = "binary_ask",
+) -> dict[str, Any] | None:
     if not scan:
         return None
+    fallback: dict[str, Any] | None = None
     for row in scan.get("items") or []:
-        if str(row.get("condition_id") or "") == condition_id:
+        if str(row.get("condition_id") or "") != condition_id:
+            continue
+        if row.get("strategy_type") == strategy_type:
             return row
-    return None
+        if fallback is None:
+            fallback = row
+    return fallback
 
 
 def build_position_live_status(
@@ -656,8 +818,8 @@ def preview_paper_open(
 ) -> dict[str, Any]:
     cfg = config or load_config()
     size = float(size_shares or cfg.default_paper_size_shares)
-    ask_yes = float(opportunity.get("ask_yes") or 0)
-    ask_no = float(opportunity.get("ask_no") or 0)
+    ask_yes = float(opportunity.get("vwap_yes") or opportunity.get("ask_yes") or 0)
+    ask_no = float(opportunity.get("vwap_no") or opportunity.get("ask_no") or 0)
     if ask_yes <= 0 or ask_no <= 0:
         raise ValueError("invalid opportunity prices")
     cost = size * (ask_yes + ask_no)
@@ -688,6 +850,8 @@ def open_paper_position(
     cid = str(opportunity.get("condition_id") or "")
     if not cid:
         raise ValueError("condition_id required")
+    if opportunity.get("strategy_type") not in (None, "binary_ask"):
+        raise ValueError("paper positions only supported for binary_ask strategy")
     if _has_open_position(cid):
         raise ValueError(f"open position already exists for {cid}")
     preview = preview_paper_open(opportunity, size_shares, cfg)
