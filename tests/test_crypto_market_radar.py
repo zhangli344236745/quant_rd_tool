@@ -126,6 +126,40 @@ def test_scan_markets_with_mocks(radar_tmp):
     assert any(r["high_vol"] for r in result["high_volatility"])
 
 
+def test_scan_markets_coingecko_failure_partial(radar_tmp):
+    import httpx
+
+    spot_info = json.loads((FIX / "binance_spot_exchange_info.json").read_text())
+    perp_info = json.loads((FIX / "binance_perp_exchange_info.json").read_text())
+    tickers = [
+        {
+            "symbol": "BTCUSDT",
+            "lastPrice": "50000",
+            "priceChangePercent": "10.5",
+            "quoteVolume": "1000000000",
+        },
+    ]
+
+    def http_get(url: str, params=None):
+        if "coingecko.com" in url:
+            raise httpx.ConnectError("connection reset")
+        if "fapi" in url and "exchangeInfo" in url:
+            return perp_info
+        if "exchangeInfo" in url:
+            return spot_info
+        if "ticker/24hr" in url:
+            return tickers
+        if "klines" in url:
+            return [[0, 1, 1, 1, 100, 0]] * 25
+        raise AssertionError(url)
+
+    cfg = MarketRadarConfig(scan_dedupe_sec=0, vol_top_n_compute=1)
+    result = scan_markets(cfg, force=True, http_get=http_get)
+    assert result["coingecko_new"] == []
+    assert result["errors"]
+    assert "coingecko" in result["errors"][0]
+
+
 def test_empty_scan_result():
     empty = empty_scan_result()
     assert empty["binance_new"] == []

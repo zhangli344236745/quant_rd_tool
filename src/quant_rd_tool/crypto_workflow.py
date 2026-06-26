@@ -68,6 +68,14 @@ STEP_CATALOG: list[dict[str, Any]] = [
         "params_schema": {},
     },
     {
+        "id": "volume_analysis",
+        "name": "量价分析",
+        "description": "成交量 / 成交额趋势、价量配合与现货建议（BTC/ETH）",
+        "params_schema": {
+            "include_ticker": {"type": "boolean", "default": True},
+        },
+    },
+    {
         "id": "advice_synth",
         "name": "投资建议合成",
         "description": "汇总各步产出综合研判与仓位建议",
@@ -391,6 +399,47 @@ def _step_options_vol(ctx: dict[str, Any], params: dict[str, Any]) -> dict[str, 
     }
 
 
+def _step_volume_analysis(ctx: dict[str, Any], params: dict[str, Any]) -> dict[str, Any]:
+    from quant_rd_tool.crypto_volume_advisor import (
+        advise_spot_volume,
+        build_volume_advice,
+        classify_volume_scheme,
+        compute_volume_metrics,
+    )
+
+    sym = str(ctx["symbol"]).strip().upper()
+    if sym not in {"BTC", "ETH"}:
+        df = ctx["df"]
+        metrics = compute_volume_metrics(df, timeframe=ctx["timeframe"])
+        scheme = classify_volume_scheme(metrics)
+        tech_out = ctx["steps"].get("technical", {}).get("output") or {}
+        tech_stance = str(tech_out.get("stance") or "中性")
+        advice = build_volume_advice(metrics, scheme=scheme, technical_stance=tech_stance)
+        return {
+            "metrics": metrics,
+            "scheme": scheme,
+            "advice": advice,
+            "skipped_ticker": True,
+            "note": f"量价建议模板对 {sym} 使用通用规则（24h 成交额需 BTC/ETH）",
+        }
+
+    out = advise_spot_volume(
+        sym,
+        data_dir=ctx["data_dir"],
+        timeframe=ctx["timeframe"],
+        limit=len(ctx["df"]) + 5,
+        refresh=False,
+        include_ticker=bool(params.get("include_ticker", True)),
+    )
+    return {
+        "metrics": out["metrics"],
+        "scheme": out["advice"]["scheme"],
+        "advice": out["advice"],
+        "ticker_24h": out.get("ticker_24h"),
+        "technical_stance": out.get("technical_stance"),
+    }
+
+
 def _stance_to_score(stance: str | None) -> int:
     if stance == "看涨":
         return 1
@@ -479,6 +528,26 @@ def synthesize_advice(ctx: dict[str, Any], params: dict[str, Any]) -> dict[str, 
             if cross.get("summary"):
                 bullets.append(f"期权：{cross['summary']}")
             sources["options_vol"] = {"cross_summary": cross.get("summary")}
+
+    vol = ctx["steps"].get("volume_analysis", {})
+    if vol.get("status") == "ok":
+        out = vol.get("output") or {}
+        adv = out.get("advice") or {}
+        vol_level = str(adv.get("level") or "watch")
+        vol_stance = str(adv.get("stance") or "中性")
+        if vol_level in {"strong_buy", "buy"}:
+            score += 1
+            stances.append(vol_stance)
+        elif vol_level == "pass":
+            score -= 1
+            if vol_stance == "看跌":
+                stances.append("看跌")
+        sources["volume_analysis"] = {
+            "scheme": out.get("scheme"),
+            "level": vol_level,
+            "stance": vol_stance,
+        }
+        bullets.append(f"量价：{adv.get('scheme_label')} → {adv.get('level_label')}")
 
     if score >= 2:
         stance, action = "看涨", "buy"
@@ -663,6 +732,7 @@ _STEP_HANDLERS: dict[str, Callable[[dict[str, Any], dict[str, Any]], dict[str, A
     "zipline_strategy": _step_zipline_strategy,
     "var_symbol": _step_var_symbol,
     "options_vol": _step_options_vol,
+    "volume_analysis": _step_volume_analysis,
 }
 
 

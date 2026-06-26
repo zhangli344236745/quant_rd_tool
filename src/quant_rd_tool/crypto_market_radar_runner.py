@@ -7,6 +7,8 @@ import threading
 import time
 from typing import Any
 
+import httpx
+
 from quant_rd_tool.crypto_market_radar import load_config
 from quant_rd_tool.crypto_market_radar_scheduler import run_market_radar_scan_cycle
 from quant_rd_tool.time_util import now_iso
@@ -64,7 +66,10 @@ class MarketRadarRunner:
             return result
         except Exception as e:  # noqa: BLE001
             self.last_error = str(e)
-            logger.exception("Market radar scan failed")
+            if isinstance(e, httpx.HTTPError):
+                logger.warning("Market radar scan failed: %s", e)
+            else:
+                logger.exception("Market radar scan failed")
             raise
 
     def _loop(self) -> None:

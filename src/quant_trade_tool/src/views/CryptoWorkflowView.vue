@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
 import {
   cryptoApi,
+  type CryptoVolumeAdviseResult,
   type CryptoWorkflowRunResult,
   type CryptoWorkflowRunSummary,
   type CryptoWorkflowStepConfig,
@@ -40,6 +41,10 @@ const runProgress = ref(0);
 const runMessage = ref("");
 let pollTimer: ReturnType<typeof setTimeout> | null = null;
 
+const volumeAdvice = ref<CryptoVolumeAdviseResult | null>(null);
+const volumeLoading = ref(false);
+const volumeFocusSymbol = computed(() => ["BTC", "ETH"].includes(symbol.value.toUpperCase()));
+
 const tvStrategies = computed(() =>
   strategies.value.filter((s) => !s.id.startsWith("opt_") && s.category !== "options"),
 );
@@ -61,6 +66,27 @@ function loadTemplateIntoEditor(tpl: CryptoWorkflowTemplate) {
     order: s.order ?? i,
     params: { ...(s.params || {}) },
   }));
+}
+
+async function loadVolumeAdvice() {
+  if (!volumeFocusSymbol.value) {
+    volumeAdvice.value = null;
+    return;
+  }
+  volumeLoading.value = true;
+  try {
+    const { data } = await cryptoApi.volumeAdvise({
+      symbol: symbol.value,
+      timeframe: timeframe.value,
+      refresh: refreshOhlcv.value,
+    });
+    volumeAdvice.value = data;
+  } catch (e) {
+    volumeAdvice.value = null;
+    ElMessage.error(extractError(e));
+  } finally {
+    volumeLoading.value = false;
+  }
 }
 
 async function loadCatalog() {
@@ -161,6 +187,9 @@ function buildRunPayload() {
       ensureParam(step, "tp_sigma", 1.5);
       ensureParam(step, "entry_sigma", 0.35);
     }
+    if (step.id === "volume_analysis") {
+      ensureParam(step, "include_ticker", true);
+    }
   }
   return {
     symbol: symbol.value,
@@ -250,6 +279,14 @@ function fmtPrice(v: unknown) {
   return n.toFixed(6);
 }
 
+function fmtUsdt(v: unknown) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return "—";
+  if (n >= 1e9) return (n / 1e9).toFixed(2) + "B";
+  if (n >= 1e6) return (n / 1e6).toFixed(2) + "M";
+  return n.toLocaleString(undefined, { maximumFractionDigits: 0 });
+}
+
 const priceGuidance = computed(() => result.value?.advice?.price_guidance);
 
 function statusTagType(status: string) {
@@ -278,11 +315,16 @@ onMounted(async () => {
   loading.value = true;
   try {
     await loadCatalog();
+    await loadVolumeAdvice();
   } catch (e) {
     ElMessage.error(extractError(e));
   } finally {
     loading.value = false;
   }
+});
+
+watch([symbol, timeframe], () => {
+  loadVolumeAdvice();
 });
 </script>
 
@@ -290,8 +332,51 @@ onMounted(async () => {
   <div v-loading="loading">
     <h1 class="page-title">Workflow 分析</h1>
     <p class="page-desc">
-      可配置分析流水线：技术面 → qlib ML → 策略信号 → VaR → 期权波动 → 综合投资建议（支持 VaR 风险门控）。
+      可配置分析流水线：技术面 → qlib ML → 策略信号 → VaR → 期权波动 → 量价分析 → 综合投资建议（支持 VaR 风险门控）。
     </p>
+
+    <el-card
+      v-if="volumeFocusSymbol"
+      v-loading="volumeLoading"
+      shadow="never"
+      class="panel-card mb"
+    >
+      <template #header>
+        <span>现货量价诊断 · {{ symbol }}</span>
+        <el-button link type="primary" class="header-btn" @click="loadVolumeAdvice">刷新</el-button>
+      </template>
+      <template v-if="volumeAdvice?.advice">
+        <el-alert
+          :title="volumeAdvice.advice.headline"
+          :type="
+            volumeAdvice.advice.level === 'strong_buy' || volumeAdvice.advice.level === 'buy'
+              ? 'success'
+              : volumeAdvice.advice.level === 'pass'
+                ? 'warning'
+                : 'info'
+          "
+          :closable="false"
+          show-icon
+        />
+        <div class="advice-metrics mt">
+          <el-tag>{{ volumeAdvice.advice.scheme_label }}</el-tag>
+          <el-tag type="info">方向 {{ volumeAdvice.advice.stance }}</el-tag>
+          <el-tag type="info">
+            建议上限仓位 {{ pct(volumeAdvice.advice.suggested_max_position_pct) }}
+          </el-tag>
+          <el-tag v-if="volumeAdvice.metrics.volume_ratio_5d_vs_20d != null" type="info">
+            量比 {{ Number(volumeAdvice.metrics.volume_ratio_5d_vs_20d).toFixed(2) }}
+          </el-tag>
+          <el-tag v-if="volumeAdvice.ticker_24h?.quote_volume_usdt" type="info">
+            24h 成交额 {{ fmtUsdt(volumeAdvice.ticker_24h.quote_volume_usdt) }}
+          </el-tag>
+        </div>
+        <ul class="bullet-list mt">
+          <li v-for="(r, i) in volumeAdvice.advice.reasons.slice(0, 4)" :key="i">{{ r }}</li>
+        </ul>
+        <p class="muted small mt">{{ volumeAdvice.advice.disclaimer }}</p>
+      </template>
+    </el-card>
 
     <el-row :gutter="16">
       <el-col :span="10">
@@ -560,6 +645,14 @@ onMounted(async () => {
 }
 .mt {
   margin-top: 12px;
+}
+.mb {
+  margin-bottom: 16px;
+}
+.bullet-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
 }
 .muted {
   color: var(--text-muted);

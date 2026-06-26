@@ -43,3 +43,39 @@ def test_zipline_backtest_mock(tmp_path, monkeypatch):
         )
     assert r.status_code == 200, r.text
     assert r.json()["run_id"] == "r1"
+
+
+def test_zipline_tune_strategies_route():
+    r = client.get("/api/v1/crypto/zipline/tune/strategies")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert len(body.get("strategies", [])) >= 12
+    assert body["strategies"][0]["param_schema"]
+
+
+def test_zipline_tune_submit_route():
+    with patch("quant_rd_tool.crypto_zipline_optuna.get_tune_manager") as mock_mgr:
+        mgr = mock_mgr.return_value
+        mgr.submit.return_value = {"job_id": "job-1", "status": "queued"}
+        r = client.post(
+            "/api/v1/crypto/zipline/tune",
+            json={
+                "symbol": "BTC",
+                "strategy_id": "ma_crossover",
+                "start": "2026-01-01",
+                "end": "2026-02-01",
+                "n_trials": 5,
+            },
+        )
+    assert r.status_code == 200, r.text
+    assert r.json()["job_id"] == "job-1"
+
+
+def test_zipline_tune_runs_route():
+    with patch(
+        "quant_rd_tool.crypto_zipline_optuna.list_tune_runs",
+        return_value=[{"run_id": "r1", "strategy_id": "ma_crossover"}],
+    ):
+        r = client.get("/api/v1/crypto/zipline/tune/runs")
+    assert r.status_code == 200, r.text
+    assert r.json()["items"][0]["run_id"] == "r1"

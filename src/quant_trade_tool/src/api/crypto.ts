@@ -184,6 +184,96 @@ export interface CryptoZiplineStrategy {
   tv_ref?: string;
 }
 
+export interface CryptoZiplineParamSchemaField {
+  name: string;
+  type: "int" | "float";
+  min: number;
+  max: number;
+  default: number;
+  label: string;
+}
+
+export interface CryptoZiplineTunableStrategy extends CryptoZiplineStrategy {
+  param_schema: CryptoZiplineParamSchemaField[];
+}
+
+export interface CryptoZiplineTuneSubmitResult {
+  job_id: string;
+  status: string;
+}
+
+export interface CryptoZiplineTuneJob {
+  job_id: string;
+  status: "queued" | "running" | "completed" | "failed";
+  symbol: string;
+  start: string;
+  end: string;
+  strategy_id: string;
+  n_trials: number;
+  train_ratio: number;
+  objective: "sharpe" | "total_return" | "calmar";
+  current_trial: number;
+  best_value?: number | null;
+  error?: string | null;
+  run_id?: string;
+  result?: CryptoZiplineTuneResult | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CryptoZiplineTuneResult {
+  run_id: string;
+  symbol: string;
+  strategy_id: string;
+  strategy_name: string;
+  timeframe: string;
+  objective: string;
+  best_params: Record<string, number>;
+  best_value: number;
+  train_metrics: Record<string, number>;
+  test_metrics: Record<string, number>;
+  n_trials: number;
+  train_ratio: number;
+  train_start?: string;
+  train_end?: string;
+  test_start?: string;
+  test_end?: string;
+}
+
+export interface CryptoVolumeAdvice {
+  level: "strong_buy" | "buy" | "watch" | "pass";
+  level_label: string;
+  stance: string;
+  scheme: string;
+  scheme_label: string;
+  headline: string;
+  advice: string;
+  reasons: string[];
+  actions: string[];
+  risks: string[];
+  confidence: number;
+  suggested_max_position_pct: number;
+  disclaimer: string;
+}
+
+export interface CryptoVolumeAdviseResult {
+  symbol: string;
+  pair: string;
+  timeframe: string;
+  metrics: Record<string, number | string | null>;
+  technical_stance?: string;
+  technical_action?: string;
+  ticker_24h?: {
+    pair?: string;
+    last?: number;
+    quote_volume_usdt?: number;
+    base_volume?: number;
+    percentage?: number;
+  } | null;
+  advice: CryptoVolumeAdvice;
+  generated_at: string;
+}
+
 export interface CryptoZiplineTimeframeOption {
   id: string;
   label: string;
@@ -337,6 +427,15 @@ export const cryptoApi = {
     http.get("/crypto/connectivity", { params }),
 
   analyze: (body: AnalyzeRequest) => http.post("/crypto/analyze", body),
+
+  volumeAdvise: (params: {
+    symbol?: string;
+    timeframe?: string;
+    data_dir?: string;
+    limit?: number;
+    refresh?: boolean;
+    include_ticker?: boolean;
+  }) => http.get<CryptoVolumeAdviseResult>("/crypto/volume/advise", { params }),
 
   spotBotRun: (body: Record<string, unknown>) => http.post("/crypto/bot/run", body),
 
@@ -914,6 +1013,29 @@ export const cryptoApi = {
 
   ziplineRun: (run_id: string, data_dir = "data/crypto") =>
     http.get<CryptoZiplineBacktestResult>("/crypto/zipline/runs/" + run_id, { params: { data_dir } }),
+
+  ziplineTuneStrategies: () =>
+    http.get<{ strategies: CryptoZiplineTunableStrategy[] }>("/crypto/zipline/tune/strategies"),
+
+  ziplineTuneStart: (body: {
+    symbol: string;
+    start: string;
+    end: string;
+    strategy_id: string;
+    n_trials?: number;
+    train_ratio?: number;
+    capital_base?: number;
+    lookback_days?: number;
+    timeframe?: string;
+    objective?: "sharpe" | "total_return" | "calmar";
+    data_dir?: string;
+  }) => http.post<CryptoZiplineTuneSubmitResult>("/crypto/zipline/tune", body),
+
+  ziplineTuneJob: (job_id: string) =>
+    http.get<CryptoZiplineTuneJob>("/crypto/zipline/tune/" + job_id),
+
+  ziplineTuneRuns: (limit = 20) =>
+    http.get<{ items: CryptoZiplineTuneResult[] }>("/crypto/zipline/tune/runs", { params: { limit } }),
 
   carryScan: () =>
     http.get<CarryScanResult>("/crypto/carry/scan"),

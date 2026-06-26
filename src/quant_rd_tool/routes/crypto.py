@@ -201,6 +201,60 @@ def crypto_analyze(req: CryptoAnalyzeRequest) -> dict[str, Any]:
         raise HTTPException(status_code=503, detail=str(e)) from e
 
 
+class CryptoVolumeAdviseRequest(BaseModel):
+    symbol: str = Field("BTC", description="v1 支持 BTC / ETH")
+    timeframe: str = "1d"
+    data_dir: str = "data/crypto"
+    limit: int = Field(120, ge=30, le=1000)
+    refresh: bool = True
+    include_ticker: bool = True
+
+
+@router.get("/volume/advise")
+def crypto_volume_advise_get(
+    symbol: str = Query("BTC"),
+    timeframe: str = Query("1d"),
+    data_dir: str = Query("data/crypto"),
+    limit: int = Query(120, ge=30, le=1000),
+    refresh: bool = Query(True),
+    include_ticker: bool = Query(True),
+) -> dict[str, Any]:
+    from quant_rd_tool.crypto_volume_advisor import advise_spot_volume
+
+    try:
+        return advise_spot_volume(
+            symbol,
+            data_dir=data_dir,
+            timeframe=timeframe,
+            limit=limit,
+            refresh=refresh,
+            include_ticker=include_ticker,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+@router.post("/volume/advise")
+def crypto_volume_advise_post(req: CryptoVolumeAdviseRequest) -> dict[str, Any]:
+    from quant_rd_tool.crypto_volume_advisor import advise_spot_volume
+
+    try:
+        return advise_spot_volume(
+            req.symbol,
+            data_dir=req.data_dir,
+            timeframe=req.timeframe,
+            limit=req.limit,
+            refresh=req.refresh,
+            include_ticker=req.include_ticker,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+
 @router.post("/ml")
 def crypto_ml(req: CryptoMlRequest) -> dict[str, Any]:
     from pathlib import Path
@@ -1483,6 +1537,66 @@ def crypto_zipline_run_get(run_id: str, data_dir: str = "data/crypto") -> dict[s
     if not run:
         raise HTTPException(status_code=404, detail="Run not found")
     return run
+
+
+class CryptoZiplineTuneRequest(BaseModel):
+    symbol: str = "BTC"
+    strategy_id: str = "ma_crossover"
+    start: str = "2026-01-01"
+    end: str = "2026-06-03"
+    n_trials: int = Field(15, ge=3, le=30)
+    train_ratio: float = Field(0.7, ge=0.5, le=0.9)
+    capital_base: float = Field(100_000.0, gt=0)
+    data_dir: str = "data/crypto"
+    lookback_days: int = Field(90, ge=7, le=365)
+    timeframe: str = "15m"
+    objective: str = Field("sharpe", pattern="^(sharpe|total_return|calmar)$")
+
+
+@router.get("/zipline/tune/strategies")
+def crypto_zipline_tune_strategies_get() -> dict[str, Any]:
+    from quant_rd_tool.crypto_zipline_param_schema import list_tunable_strategies
+
+    return {"strategies": list_tunable_strategies()}
+
+
+@router.post("/zipline/tune")
+def crypto_zipline_tune_post(req: CryptoZiplineTuneRequest) -> dict[str, Any]:
+    from quant_rd_tool.crypto_zipline_optuna import get_tune_manager
+
+    try:
+        return get_tune_manager().submit(
+            symbol=req.symbol,
+            start=req.start,
+            end=req.end,
+            strategy_id=req.strategy_id,
+            n_trials=req.n_trials,
+            train_ratio=req.train_ratio,
+            capital_base=req.capital_base,
+            data_dir=req.data_dir,
+            lookback_days=req.lookback_days,
+            timeframe=req.timeframe,
+            objective=req.objective,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@router.get("/zipline/tune/runs")
+def crypto_zipline_tune_runs_get(limit: int = Query(20, ge=1, le=100)) -> dict[str, Any]:
+    from quant_rd_tool.crypto_zipline_optuna import list_tune_runs
+
+    return {"items": list_tune_runs(limit=limit)}
+
+
+@router.get("/zipline/tune/{job_id}")
+def crypto_zipline_tune_job_get(job_id: str) -> dict[str, Any]:
+    from quant_rd_tool.crypto_zipline_optuna import get_tune_manager
+
+    job = get_tune_manager().get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Tune job not found")
+    return job
 
 
 @router.get("/zipline/data/export")

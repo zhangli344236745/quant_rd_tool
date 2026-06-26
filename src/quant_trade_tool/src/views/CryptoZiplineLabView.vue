@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { ElMessage } from "element-plus";
 import {
   cryptoApi,
@@ -8,6 +8,9 @@ import {
   type CryptoZiplineRunSummary,
   type CryptoZiplineStrategy,
   type CryptoZiplineTimeframeOption,
+  type CryptoZiplineTuneJob,
+  type CryptoZiplineTuneResult,
+  type CryptoZiplineTunableStrategy,
 } from "@/api/crypto";
 import { extractError } from "@/api/http";
 import { formatBeijing } from "@/utils/datetime";
@@ -117,6 +120,33 @@ const form = ref({
   train_bars: 2000,
   retrain_every: 500,
   ml_base_strategy: "supertrend",
+});
+
+const tunableStrategies = ref<CryptoZiplineTunableStrategy[]>([]);
+const tuneForm = ref({
+  symbol: "BTC",
+  timeframe: "15m",
+  strategy_id: "ma_crossover",
+  start: "2026-01-01",
+  end: "2026-06-03",
+  n_trials: 15,
+  train_ratio: 0.7,
+  objective: "sharpe" as "sharpe" | "total_return" | "calmar",
+});
+const tuneRunning = ref(false);
+const tuneJob = ref<CryptoZiplineTuneJob | null>(null);
+const tuneResult = ref<CryptoZiplineTuneResult | null>(null);
+let tunePollTimer: ReturnType<typeof setInterval> | null = null;
+
+const OBJECTIVE_LABELS: Record<string, string> = {
+  sharpe: "夏普比率",
+  total_return: "总收益",
+  calmar: "Calmar",
+};
+
+const tuneProgressPct = computed(() => {
+  if (!tuneJob.value?.n_trials) return 0;
+  return Math.round(((tuneJob.value.current_trial || 0) / tuneJob.value.n_trials) * 100);
 });
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -394,6 +424,130 @@ async function loadRuns() {
   }
 }
 
+async function loadTunableStrategies() {
+  try {
+    const { data } = await cryptoApi.ziplineTuneStrategies();
+    tunableStrategies.value = data.strategies ?? [];
+  } catch {
+    tunableStrategies.value = [];
+  }
+}
+
+function stopTunePoll() {
+  if (tunePollTimer) {
+    clearInterval(tunePollTimer);
+    tunePollTimer = null;
+  }
+}
+
+async function pollTuneJob(jobId: string) {
+  try {
+    const { data } = await cryptoApi.ziplineTuneJob(jobId);
+    tuneJob.value = data;
+    if (data.status === "completed" && data.result) {
+      tuneResult.value = data.result;
+      tuneRunning.value = false;
+      stopTunePoll();
+      ElMessage.success("Optuna 调参完成");
+    } else if (data.status === "failed") {
+      tuneRunning.value = false;
+      stopTunePoll();
+      ElMessage.error(data.error || "调参失败");
+    }
+  } catch (e) {
+    tuneRunning.value = false;
+    stopTunePoll();
+    ElMessage.error(extractError(e));
+  }
+}
+
+async function runTune() {
+  if (!status.value?.zipline_installed) {
+    ElMessage.warning("请先安装 Zipline 环境后再调参");
+    return;
+  }
+  tuneRunning.value = true;
+  tuneJob.value = null;
+  tuneResult.value = null;
+  stopTunePoll();
+  try {
+    const { data } = await cryptoApi.ziplineTuneStart({
+      symbol: tuneForm.value.symbol.trim(),
+      start: tuneForm.value.start,
+      end: tuneForm.value.end,
+      strategy_id: tuneForm.value.strategy_id,
+      n_trials: tuneForm.value.n_trials,
+      train_ratio: tuneForm.value.train_ratio,
+      timeframe: tuneForm.value.timeframe,
+      objective: tuneForm.value.objective,
+      data_dir: dataDir,
+    });
+    tuneJob.value = {
+      job_id: data.job_id,
+      status: "queued",
+      symbol: tuneForm.value.symbol,
+      start: tuneForm.value.start,
+      end: tuneForm.value.end,
+      strategy_id: tuneForm.value.strategy_id,
+      n_trials: tuneForm.value.n_trials,
+      train_ratio: tuneForm.value.train_ratio,
+      objective: tuneForm.value.objective,
+      current_trial: 0,
+    };
+    tunePollTimer = setInterval(() => pollTuneJob(data.job_id), 2500);
+    await pollTuneJob(data.job_id);
+  } catch (e) {
+    tuneRunning.value = false;
+    ElMessage.error(extractError(e));
+  }
+}
+
+function applyBestParams(params: Record<string, number>, strategyId: string) {
+  form.value.strategy = strategyId;
+  form.value.use_combo = false;
+  if ("fast" in params && ["ma_crossover", "ema_trend", "ema_rsi_filter"].includes(strategyId)) {
+    form.value.fast = params.fast;
+    form.value.slow = params.slow;
+  }
+  if ("fast" in params && ["macd_cross", "macd_rsi_confirm"].includes(strategyId)) {
+    form.value.macd_fast = params.fast;
+    form.value.macd_slow = params.slow;
+    if ("signal" in params) form.value.macd_signal = params.signal;
+  }
+  if ("period" in params && strategyId === "momentum_rsi") {
+    form.value.rsi_period = params.period;
+  }
+  if ("period" in params && strategyId === "bollinger_revert") {
+    form.value.bb_period = params.period;
+    if ("std_mult" in params) form.value.bb_std = params.std_mult;
+  }
+  if ("channel" in params) form.value.channel = params.channel;
+  if ("atr_len" in params) form.value.atr_len = params.atr_len;
+  if ("factor" in params && strategyId === "supertrend") form.value.atr_factor = params.factor;
+  if ("lookback" in params && strategyId === "volume_breakout") form.value.vol_lookback = params.lookback;
+  if ("vol_mult" in params) form.value.vol_mult = params.vol_mult;
+  if ("rsi_period" in params) form.value.rsi_period = params.rsi_period;
+  if ("rsi_min" in params) form.value.rsi_min = params.rsi_min;
+  if ("rsi_max" in params) form.value.rsi_max = params.rsi_max;
+  if ("rsi_floor" in params) form.value.rsi_floor = params.rsi_floor;
+  if ("rsi_cap" in params) form.value.rsi_cap = params.rsi_cap;
+  if ("adx_threshold" in params) form.value.adx_threshold = params.adx_threshold;
+  if ("bb_period" in params) form.value.bb_period = params.bb_period;
+  if ("bb_std" in params) form.value.bb_std = params.bb_std;
+  if ("squeeze_lookback" in params) form.value.squeeze_lookback = params.squeeze_lookback;
+}
+
+function applyTuneToBacktest() {
+  if (!tuneResult.value) return;
+  form.value.symbol = tuneResult.value.symbol;
+  form.value.timeframe = tuneResult.value.timeframe;
+  form.value.start = tuneForm.value.start;
+  form.value.end = tuneForm.value.end;
+  form.value.engine = "zipline";
+  applyBestParams(tuneResult.value.best_params, tuneResult.value.strategy_id);
+  ElMessage.success("已填入最优参数，可运行 Zipline 回测");
+}
+
 async function syncData() {
   syncing.value = true;
   error.value = "";
@@ -472,13 +626,22 @@ function pct(v: number | undefined) {
   return `${(v * 100).toFixed(2)}%`;
 }
 
+function num(v: number | undefined | null) {
+  if (v == null || Number.isNaN(v)) return "—";
+  return v.toFixed(4);
+}
+
 onMounted(async () => {
   loading.value = true;
   try {
-    await Promise.all([loadStrategies(), loadStatus(), loadRuns()]);
+    await Promise.all([loadStrategies(), loadTunableStrategies(), loadStatus(), loadRuns()]);
   } finally {
     loading.value = false;
   }
+});
+
+onUnmounted(() => {
+  stopTunePoll();
 });
 </script>
 
@@ -963,6 +1126,110 @@ onMounted(async () => {
     </el-card>
 
     <el-card shadow="never" class="panel-card mt">
+      <template #header>Optuna 自动调参（Zipline 引擎）</template>
+      <el-row :gutter="16">
+        <el-col :span="10">
+          <el-form label-width="100px" size="small">
+            <el-form-item label="标的">
+              <el-select v-model="tuneForm.symbol" style="width: 120px">
+                <el-option label="BTC" value="BTC" />
+                <el-option label="ETH" value="ETH" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="周期">
+              <el-select v-model="tuneForm.timeframe" style="width: 90px">
+                <el-option
+                  v-for="tf in timeframeOptions"
+                  :key="tf.id"
+                  :label="tf.label"
+                  :value="tf.id"
+                />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="区间">
+              <el-input v-model="tuneForm.start" style="width: 130px" /> —
+              <el-input v-model="tuneForm.end" style="width: 130px" />
+            </el-form-item>
+            <el-form-item label="策略">
+              <el-select v-model="tuneForm.strategy_id" filterable style="width: 100%">
+                <el-option
+                  v-for="s in tunableStrategies"
+                  :key="s.id"
+                  :label="s.name"
+                  :value="s.id"
+                />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="目标函数">
+              <el-select v-model="tuneForm.objective" style="width: 140px">
+                <el-option label="夏普比率" value="sharpe" />
+                <el-option label="总收益" value="total_return" />
+                <el-option label="Calmar" value="calmar" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="试验次数">
+              <el-input-number v-model="tuneForm.n_trials" :min="3" :max="30" />
+            </el-form-item>
+            <el-form-item label="训练占比">
+              <el-input-number v-model="tuneForm.train_ratio" :min="0.5" :max="0.9" :step="0.05" />
+            </el-form-item>
+            <el-form-item>
+              <el-button
+                type="primary"
+                :loading="tuneRunning"
+                :disabled="!status?.zipline_installed"
+                @click="runTune"
+              >
+                开始调参
+              </el-button>
+            </el-form-item>
+          </el-form>
+          <p v-if="tuneJob && tuneRunning" class="muted small">
+            进度 {{ tuneJob.current_trial }}/{{ tuneJob.n_trials }}
+            · 当前最优 {{ tuneJob.best_value != null ? num(tuneJob.best_value) : "—" }}
+          </p>
+          <el-progress
+            v-if="tuneJob && tuneRunning"
+            :percentage="tuneProgressPct"
+            :stroke-width="8"
+            class="mt"
+          />
+        </el-col>
+        <el-col :span="14">
+          <el-card v-if="tuneResult" shadow="never">
+            <template #header>
+              最优参数（{{ OBJECTIVE_LABELS[tuneResult.objective] || tuneResult.objective }}
+              {{ num(tuneResult.best_value) }}）
+            </template>
+            <p><strong>参数：</strong>{{ JSON.stringify(tuneResult.best_params) }}</p>
+            <el-row :gutter="12" class="mt">
+              <el-col :span="12">
+                <div class="metric-label">训练集夏普</div>
+                <div class="metric-value">{{ num(tuneResult.train_metrics?.sharpe) }}</div>
+              </el-col>
+              <el-col :span="12">
+                <div class="metric-label">测试集夏普</div>
+                <div class="metric-value">{{ num(tuneResult.test_metrics?.sharpe) }}</div>
+              </el-col>
+            </el-row>
+            <el-row :gutter="12" class="mt">
+              <el-col :span="12">
+                <div class="metric-label">训练集收益</div>
+                <div class="metric-value">{{ pct(tuneResult.train_metrics?.total_return) }}</div>
+              </el-col>
+              <el-col :span="12">
+                <div class="metric-label">测试集收益</div>
+                <div class="metric-value">{{ pct(tuneResult.test_metrics?.total_return) }}</div>
+              </el-col>
+            </el-row>
+            <el-button class="mt" type="primary" @click="applyTuneToBacktest">用最优参数回测</el-button>
+          </el-card>
+          <el-empty v-else description="后台调参完成后显示结果（每 trial 走 Zipline 子进程）" />
+        </el-col>
+      </el-row>
+    </el-card>
+
+    <el-card shadow="never" class="panel-card mt">
       <template #header>历史回测</template>
       <el-empty v-if="!runs.length" description="暂无记录" />
       <el-table v-else :data="runs" size="small" @row-click="(row: CryptoZiplineRunSummary) => openRun(row.run_id)">
@@ -1031,5 +1298,13 @@ onMounted(async () => {
 }
 .ml {
   margin-left: 8px;
+}
+.metric-label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.metric-value {
+  font-size: 18px;
+  font-weight: 600;
 }
 </style>

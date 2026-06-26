@@ -17,3 +17,7 @@ dist/
 data/crypto/zipline/bundles/
 .venv-zipline/
 src/data/
+.understand-anything/
+data/
+data/stock/
+data/crypto/

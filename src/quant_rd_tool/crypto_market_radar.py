@@ -13,6 +13,7 @@ from typing import Any, Callable
 
 import httpx
 
+from quant_rd_tool.config import settings
 from quant_rd_tool.time_util import now_iso
 
 logger = logging.getLogger(__name__)
@@ -22,6 +23,8 @@ BINANCE_SPOT = "https://api.binance.com"
 BINANCE_FUTURES = "https://fapi.binance.com"
 COINGECKO_API = "https://api.coingecko.com/api/v3"
 HTTP_TIMEOUT = 15.0
+HTTP_RETRIES = 3
+HTTP_RETRY_BACKOFF = 1.0
 
 HttpGet = Callable[[str, dict[str, Any] | None], Any]
 
@@ -75,11 +78,31 @@ def save_config(cfg: MarketRadarConfig) -> MarketRadarConfig:
     return cfg
 
 
+def _http_client() -> httpx.Client:
+    kwargs: dict[str, Any] = {"timeout": HTTP_TIMEOUT, "follow_redirects": True}
+    proxy = settings.https_proxy or settings.http_proxy
+    if proxy:
+        kwargs["proxy"] = proxy
+    return httpx.Client(**kwargs)
+
+
 def _default_http_get(url: str, params: dict[str, Any] | None = None) -> Any:
-    with httpx.Client(timeout=HTTP_TIMEOUT) as client:
-        resp = client.get(url, params=params)
-        resp.raise_for_status()
-        return resp.json()
+    last_err: Exception | None = None
+    for attempt in range(HTTP_RETRIES):
+        try:
+            with _http_client() as client:
+                resp = client.get(url, params=params)
+                resp.raise_for_status()
+                return resp.json()
+        except (httpx.ConnectError, httpx.TimeoutException, httpx.RemoteProtocolError) as exc:
+            last_err = exc
+            if attempt + 1 < HTTP_RETRIES:
+                time.sleep(HTTP_RETRY_BACKOFF * (attempt + 1))
+                continue
+            raise
+    if last_err:
+        raise last_err
+    raise RuntimeError("http_get failed without error")
 
 
 def _load_json(path: Path, default: Any) -> Any:
@@ -455,12 +478,23 @@ def scan_markets(
             pass
 
     started = time.time()
+    errors: list[str] = []
     binance_new, _ = diff_binance_listings(http_get=http_get)
-    coingecko_new, _ = diff_coingecko_new_coins(
-        http_get=http_get,
-        per_page=cfg.coingecko_per_page,
-    )
-    high_vol = scan_high_volatility(cfg, http_get=http_get)
+    try:
+        coingecko_new, _ = diff_coingecko_new_coins(
+            http_get=http_get,
+            per_page=cfg.coingecko_per_page,
+        )
+    except httpx.HTTPError as exc:
+        logger.warning("CoinGecko market radar fetch failed: %s", exc)
+        errors.append(f"coingecko: {exc}")
+        coingecko_new = []
+    try:
+        high_vol = scan_high_volatility(cfg, http_get=http_get)
+    except httpx.HTTPError as exc:
+        logger.warning("Binance volatility radar fetch failed: %s", exc)
+        errors.append(f"high_volatility: {exc}")
+        high_vol = []
     high_vol_flagged = [r for r in high_vol if r.get("high_vol")]
 
     scan_id = str(uuid.uuid4())
@@ -476,6 +510,8 @@ def scan_markets(
         "coingecko_new_count": len(coingecko_new),
         "duration_sec": round(time.time() - started, 2),
     }
+    if errors:
+        result["errors"] = errors
     result["alerts"] = evaluate_market_radar_alerts(result, cfg)
 
     scan_path = RADAR_DIR / "scans" / f"{scanned_at.replace(':', '-')}.json"
