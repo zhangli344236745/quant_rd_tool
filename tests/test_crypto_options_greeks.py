@@ -63,13 +63,8 @@ def test_build_greeks_chain_aligned(monkeypatch):
     with (
         patch("quant_rd_tool.crypto_options_greeks.fetch_mark_rows", return_value=marks),
         patch("quant_rd_tool.crypto_options_greeks.fetch_book_summary", return_value=deribit),
-        patch("quant_rd_tool.crypto_options_greeks.list_common_expiries") as mock_common,
         patch("quant_rd_tool.crypto_options_greeks._load_venue_expiry_groups", side_effect=fake_b_grouped),
     ):
-        mock_common.return_value = {
-            "expiries": [{"expiry_date": date_key, "dte": 28}],
-            "default_expiry_date": date_key,
-        }
         out = build_greeks_chain("BTC", n=0)
 
     assert out["available"]
@@ -79,3 +74,25 @@ def test_build_greeks_chain_aligned(monkeypatch):
     assert call_b["greeks"]["delta"] == 0.52
     put_d = out["rows"][0]["put"]["deribit"]
     assert put_d["greeks"]["delta"] == -0.49
+
+
+def test_build_greeks_chain_missing_venue_expiry_graceful(monkeypatch):
+    now = datetime.now(UTC)
+    exp_b = (now + timedelta(days=28)).replace(hour=8, minute=0, second=0, microsecond=0)
+    date_key = exp_b.date().isoformat()
+
+    def fake_load(*_a, **_k):
+        return (
+            {exp_b: [{"strike": 100_000.0, "mark_iv": 0.55, "side": "C", "symbol": "BTC-x-C"}]},
+            {},
+            100_000.0,
+            None,
+        )
+
+    monkeypatch.setattr(
+        "quant_rd_tool.crypto_options_greeks._load_venue_expiry_groups",
+        fake_load,
+    )
+    out = build_greeks_chain("BTC", expiry_date=date_key)
+    assert not out["available"]
+    assert "expiry" in out["reason"].lower() or "common" in out["reason"].lower()

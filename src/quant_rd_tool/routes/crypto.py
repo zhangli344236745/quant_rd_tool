@@ -1860,13 +1860,24 @@ def crypto_options_portfolio_greeks(
     base_u = base.strip().upper()
     pack = None
     if use_strategy_pack:
-        from quant_rd_tool.crypto_options_strategies import build_strategy_pack
-        from quant_rd_tool.crypto_options_vol_scan import run_volatility_scan
+        import logging
 
-        scan = run_volatility_scan(symbols=[base_u], persist_snapshot=False)
-        item = next((i for i in scan.get("items") or [] if i.get("base") == base_u), None)
-        if item:
-            pack = build_strategy_pack(scan_item=item, spot_stance=spot_stance)
+        from quant_rd_tool.crypto_options_strategies import build_strategy_pack
+        from quant_rd_tool.crypto_options_vol_scan import get_or_run_volatility_scan
+
+        try:
+            scan = get_or_run_volatility_scan(
+                symbols=[base_u],
+                persist_snapshot=False,
+                data_dir=data_dir,
+            )
+            item = next((i for i in scan.get("items") or [] if i.get("base") == base_u), None)
+            if item:
+                pack = build_strategy_pack(scan_item=item, spot_stance=spot_stance)
+        except Exception as e:
+            logging.getLogger(__name__).warning(
+                "strategy pack vol scan failed for %s: %s", base_u, e
+            )
 
     mode = scale_mode if scale_mode in ("notional", "margin") else "notional"
     try:

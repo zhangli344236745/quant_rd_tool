@@ -10,10 +10,11 @@ from typing import Any, Literal
 from quant_rd_tool.crypto_options_strike_probs import norm_cdf
 
 from quant_rd_tool.crypto_options_compare import (
+    _common_expiries_from_groups,
     _expiry_date_key,
     _load_venue_expiry_groups,
     _resolve_expiry_date,
-    list_common_expiries,
+    _resolve_venue_expiries,
 )
 from quant_rd_tool.crypto_options_data import fetch_mark_rows, parse_option_symbol
 from quant_rd_tool.crypto_options_deribit_data import fetch_book_summary, parse_deribit_instrument
@@ -166,17 +167,51 @@ def build_greeks_chain(
 ) -> dict[str, Any]:
     """ATM ±N call/put Greeks on aligned expiry from Binance and Deribit."""
     base_u = base.upper()
-    common = list_common_expiries(base_u, min_dte=min_dte, client=client)
+    try:
+        b_grouped, d_grouped, b_spot, d_spot = _load_venue_expiry_groups(
+            base_u, min_dte=min_dte, client=client
+        )
+    except Exception as e:
+        return {
+            "base": base_u,
+            "available": False,
+            "reason": str(e),
+            "disclaimer": _DISCLAIMER,
+        }
+
+    common = _common_expiries_from_groups(base_u, b_grouped, d_grouped, b_spot, d_spot)
     date_key = _resolve_expiry_date(expiry_date, common)
     if not date_key:
         return {
             "base": base_u,
             "available": False,
             "reason": "no common expiry between venues",
+            "common_expiries": common.get("expiries") or [],
             "disclaimer": _DISCLAIMER,
         }
 
-    marks = fetch_mark_rows(client=client)
+    pair = _resolve_venue_expiries(b_grouped, d_grouped, date_key)
+    if pair is None:
+        return {
+            "base": base_u,
+            "available": False,
+            "reason": "expiry unavailable on one venue",
+            "expiry_date": date_key,
+            "common_expiries": common.get("expiries") or [],
+            "disclaimer": _DISCLAIMER,
+        }
+    b_exp, d_exp = pair
+
+    try:
+        marks = fetch_mark_rows(client=client)
+    except Exception as e:
+        return {
+            "base": base_u,
+            "available": False,
+            "reason": str(e),
+            "expiry_date": date_key,
+            "disclaimer": _DISCLAIMER,
+        }
     b_index = _binance_mark_index(marks, base_u)
     try:
         d_rows = fetch_book_summary(base_u, client=client)
@@ -185,15 +220,10 @@ def build_greeks_chain(
             "base": base_u,
             "available": False,
             "reason": str(e),
+            "expiry_date": date_key,
             "disclaimer": _DISCLAIMER,
         }
     d_index = _deribit_summary_index(d_rows, base_u)
-
-    b_grouped, d_grouped, b_spot, d_spot = _load_venue_expiry_groups(
-        base_u, min_dte=min_dte, client=client
-    )
-    b_exp = next(k for k in b_grouped if _expiry_date_key(k) == date_key)
-    d_exp = next(k for k in d_grouped if _expiry_date_key(k) == date_key)
 
     b_strikes = {float(r["strike"]) for r in b_grouped[b_exp]}
     d_strikes = {float(r["strike"]) for r in d_grouped[d_exp]}

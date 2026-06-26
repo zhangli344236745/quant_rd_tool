@@ -116,17 +116,14 @@ def _load_venue_expiry_groups(
     return b_grouped, d_grouped, b_spot, d_spot
 
 
-def list_common_expiries(
-    base: str,
-    *,
-    min_dte: int = 7,
-    client: Any = None,
+def _common_expiries_from_groups(
+    base_u: str,
+    b_grouped: dict[datetime, list[dict[str, Any]]],
+    d_grouped: dict[datetime, list[dict[str, Any]]],
+    b_spot: float | None,
+    d_spot: float | None,
 ) -> dict[str, Any]:
-    """Calendar dates where both venues list options with mark IV."""
-    base_u = base.upper()
-    b_grouped, d_grouped, b_spot, d_spot = _load_venue_expiry_groups(
-        base_u, min_dte=min_dte, client=client
-    )
+    """Build common-expiry metadata from a single venue snapshot."""
     b_by_date = {_expiry_date_key(k): k for k in b_grouped}
     d_by_date = {_expiry_date_key(k): k for k in d_grouped}
     common_dates = sorted(set(b_by_date) & set(d_by_date))
@@ -174,6 +171,35 @@ def list_common_expiries(
     }
 
 
+def _resolve_venue_expiries(
+    b_grouped: dict[datetime, list[dict[str, Any]]],
+    d_grouped: dict[datetime, list[dict[str, Any]]],
+    date_key: str,
+) -> tuple[datetime, datetime] | None:
+    """Map a calendar date to Binance/Deribit expiry datetimes from one snapshot."""
+    b_by_date = {_expiry_date_key(k): k for k in b_grouped}
+    d_by_date = {_expiry_date_key(k): k for k in d_grouped}
+    b_exp = b_by_date.get(date_key)
+    d_exp = d_by_date.get(date_key)
+    if b_exp is None or d_exp is None:
+        return None
+    return b_exp, d_exp
+
+
+def list_common_expiries(
+    base: str,
+    *,
+    min_dte: int = 7,
+    client: Any = None,
+) -> dict[str, Any]:
+    """Calendar dates where both venues list options with mark IV."""
+    base_u = base.upper()
+    b_grouped, d_grouped, b_spot, d_spot = _load_venue_expiry_groups(
+        base_u, min_dte=min_dte, client=client
+    )
+    return _common_expiries_from_groups(base_u, b_grouped, d_grouped, b_spot, d_spot)
+
+
 def _resolve_expiry_date(
     expiry_date: str | None,
     common: dict[str, Any],
@@ -197,7 +223,19 @@ def build_aligned_expiry_compare(
     Compare Binance vs Deribit on the **same calendar expiry** and **same strikes**.
     """
     base_u = base.upper()
-    common = list_common_expiries(base_u, min_dte=min_dte, client=client)
+    try:
+        b_grouped, d_grouped, b_spot, d_spot = _load_venue_expiry_groups(
+            base_u, min_dte=min_dte, client=client
+        )
+    except Exception as e:
+        return {
+            "base": base_u,
+            "available": False,
+            "reason": str(e),
+            "disclaimer": _DISCLAIMER,
+        }
+
+    common = _common_expiries_from_groups(base_u, b_grouped, d_grouped, b_spot, d_spot)
     date_key = _resolve_expiry_date(expiry_date, common)
     if not date_key:
         return {
@@ -208,11 +246,17 @@ def build_aligned_expiry_compare(
             "disclaimer": _DISCLAIMER,
         }
 
-    b_grouped, d_grouped, b_spot, d_spot = _load_venue_expiry_groups(
-        base_u, min_dte=min_dte, client=client
-    )
-    b_exp = next(k for k in b_grouped if _expiry_date_key(k) == date_key)
-    d_exp = next(k for k in d_grouped if _expiry_date_key(k) == date_key)
+    pair = _resolve_venue_expiries(b_grouped, d_grouped, date_key)
+    if pair is None:
+        return {
+            "base": base_u,
+            "available": False,
+            "reason": "expiry unavailable on one venue",
+            "expiry_date": date_key,
+            "common_expiries": common.get("expiries") or [],
+            "disclaimer": _DISCLAIMER,
+        }
+    b_exp, d_exp = pair
     b_rows = b_grouped[b_exp]
     d_rows = d_grouped[d_exp]
 
