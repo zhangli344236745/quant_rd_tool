@@ -15,7 +15,6 @@ from quant_rd_tool.crypto_analysis import crypto_root, format_period_bounds
 from quant_rd_tool.crypto_analyzer import analyze_crypto_ohlcv, derive_trading_signal
 from quant_rd_tool.crypto_ml import merge_crypto_signals, run_crypto_ml_analysis
 from quant_rd_tool.crypto_time import utc_now_beijing_str
-from quant_rd_tool.crypto_var import build_symbol_var_report_from_df, parse_confidence_levels
 from quant_rd_tool.crypto_workflow_price_levels import compute_iv_price_guidance
 from quant_rd_tool.crypto_workflow_storage import save_run
 from quant_rd_tool.openbb_equity import compute_technical_overlay
@@ -55,8 +54,10 @@ STEP_CATALOG: list[dict[str, Any]] = [
         "description": "历史模拟 VaR / CVaR 与回测违规率",
         "params_schema": {
             "notional_usdt": {"type": "number", "default": 10_000},
-            "lookback_bars": {"type": "integer", "default": 252},
+            "timeframe": {"type": "string", "default": "4h"},
+            "lookback_bars": {"type": "integer", "default": 0},
             "horizon_days": {"type": "integer", "default": 1},
+            "horizon_bars": {"type": "integer", "default": 1},
             "confidence": {"type": "string", "default": "0.95,0.99"},
             "mc_n_sims": {"type": "integer", "default": 3000},
         },
@@ -172,6 +173,9 @@ def _compact_output(sid: str, output: dict[str, Any]) -> dict[str, Any]:
             "var_99_pct": output.get("var_99_pct"),
             "var_99_usdt": output.get("var_99_usdt"),
             "var_ratio": output.get("var_ratio"),
+            "var_timeframe": output.get("var_timeframe"),
+            "var_breach": output.get("var_breach"),
+            "var_actual_return": output.get("var_actual_return"),
             "headline": narr.get("headline"),
         }
     if sid == "options_vol":
@@ -200,6 +204,7 @@ def _compact_output(sid: str, output: dict[str, Any]) -> dict[str, Any]:
                 "bullets",
                 "advice",
                 "price_guidance",
+                "segments",
                 "disclaimer",
             )
             if k in output
@@ -344,28 +349,71 @@ def _step_zipline_strategy(ctx: dict[str, Any], params: dict[str, Any]) -> dict[
 
 
 def _step_var_symbol(ctx: dict[str, Any], params: dict[str, Any]) -> dict[str, Any]:
+    from quant_rd_tool.crypto_var import (
+        build_symbol_var_breach,
+        build_symbol_var_report_from_df,
+        default_lookback_bars,
+        fetch_ohlcv_df,
+        normalize_var_timeframe,
+        parse_confidence_levels,
+    )
+
     levels = parse_confidence_levels(str(params.get("confidence") or "0.95,0.99"))
-    lookback = int(params.get("lookback_bars") or 252)
+    var_tf = normalize_var_timeframe(str(params.get("timeframe") or "4h"))
+    lookback = int(params.get("lookback_bars") or 0)
+    lb = default_lookback_bars(var_tf, lookback if lookback > 0 else None)
+    horizon_bars = int(params.get("horizon_bars") or 1)
+    horizon_days = int(params.get("horizon_days") or 1)
+    notional = float(params.get("notional_usdt") or 10_000)
+
+    if var_tf == str(ctx.get("timeframe") or "").lower():
+        df = ctx["df"]
+    else:
+        df = fetch_ohlcv_df(ctx["symbol"], timeframe=var_tf, limit=lb + 1)
+
     report = build_symbol_var_report_from_df(
-        ctx["df"],
+        df,
         ctx["symbol"],
-        notional_usdt=float(params.get("notional_usdt") or 10_000),
-        lookback_bars=lookback,
-        horizon_days=int(params.get("horizon_days") or 1),
-        timeframe=ctx["timeframe"],
+        notional_usdt=notional,
+        lookback_bars=lb,
+        horizon_days=horizon_days,
+        horizon_bars=horizon_bars,
+        timeframe=var_tf,
         confidence_levels=levels,
         mc_n_sims=int(params.get("mc_n_sims") or 3000),
     )
     hi = report.get("metrics", {}).get("0.99") or report.get("metrics", {}).get("0.95") or {}
     var_pct = float(hi.get("var_pct") or 0.0)
-    notional = float(report.get("notional_usdt") or 1.0)
-    var_ratio = var_pct  # var_pct is already loss fraction
+    var_ratio = var_pct
+
+    breach_fields: dict[str, Any] = {}
+    try:
+        breach = build_symbol_var_breach(
+            ctx["symbol"],
+            confidence=0.99 if "0.99" in report.get("metrics", {}) else float(levels[-1]),
+            lookback_bars=lb,
+            horizon_days=horizon_days,
+            horizon_bars=horizon_bars,
+            timeframe=var_tf,
+            notional_usdt=notional,
+        )
+        breach_fields = {
+            "var_breach": breach.get("breached"),
+            "var_actual_return": breach.get("actual_return"),
+            "var_exceedance_pct": breach.get("exceedance_pct"),
+            "var_breach_severity": breach.get("severity"),
+        }
+    except Exception as e:
+        breach_fields = {"var_breach_error": str(e)}
+
     return {
         "var_report": report,
         "var_99_pct": var_pct,
         "var_99_usdt": hi.get("var_usdt"),
         "var_ratio": var_ratio,
+        "var_timeframe": var_tf,
         "narrative": report.get("narrative"),
+        **breach_fields,
     }
 
 
@@ -448,6 +496,282 @@ def _stance_to_score(stance: str | None) -> int:
     return 0
 
 
+def _score_to_stance_action(score: int) -> tuple[str, str]:
+    if score >= 2:
+        return "看涨", "buy"
+    if score <= -2:
+        return "看跌", "sell"
+    return "中性", "hold"
+
+
+_SPOT_ADVICE = {
+    "看涨": "现货可小仓位分批建仓，结合 IV 参考价位设止损；勿一次性满仓。",
+    "看跌": "现货建议减仓或观望，避免逆势抄底。",
+    "中性": "现货宜维持现有仓位或轻仓，等待技术面、ML 与量价信号一致。",
+}
+
+_PERP_ADVICE = {
+    "看涨": "永续/合约可小仓位顺势，严格止损与杠杆上限；VaR 突破时勿加仓。",
+    "看跌": "建议减多或轻仓空单，控制杠杆与强平距离。",
+    "中性": "合约宜轻仓或对冲，等待策略目标与风控信号一致后再调整。",
+}
+
+
+def _segment_confidence(score: int, *, cap: float = 1.0) -> float:
+    return round(min(abs(score) / 4.0, cap), 4)
+
+
+def _synthesize_spot_advice(
+    *,
+    symbol: str,
+    tech_out: dict[str, Any] | None,
+    ml_out: dict[str, Any] | None,
+    vol_out: dict[str, Any] | None,
+    price_guidance: dict[str, Any] | None,
+    max_position_pct: float,
+) -> dict[str, Any]:
+    score = 0
+    bullets: list[str] = []
+    available = False
+
+    if tech_out:
+        available = True
+        score += int(tech_out.get("score") or 0)
+        bullets.append(f"技术面：{tech_out.get('stance')}（score {tech_out.get('score')}）")
+
+    if ml_out:
+        available = True
+        if ml_out.get("skipped"):
+            bullets.append(f"qlib ML：跳过（{ml_out.get('reason', '样本不足')}）")
+        else:
+            comb = ml_out.get("combined_signal") or {}
+            ml_stance = (comb.get("ml") or {}).get("stance")
+            if ml_stance:
+                score += _stance_to_score(str(ml_stance))
+            bullets.append(f"qlib ML：{comb.get('stance')}（与技术面 {comb.get('agreement')}）")
+
+    if vol_out:
+        available = True
+        adv = vol_out.get("advice") or {}
+        vol_level = str(adv.get("level") or "watch")
+        if vol_level in {"strong_buy", "buy"}:
+            score += 1
+        elif vol_level == "pass":
+            score -= 1
+        bullets.append(f"量价：{adv.get('scheme_label')} → {adv.get('level_label')}")
+
+    stance, action = _score_to_stance_action(score)
+    if stance == "看跌":
+        suggested = 0.0
+    elif stance == "中性":
+        suggested = min(0.15, max_position_pct * 0.3)
+    else:
+        suggested = min(max_position_pct, 0.2 + max(0, score) * 0.05)
+
+    pg = price_guidance if price_guidance and price_guidance.get("available") else None
+    headline = f"{symbol} 现货：{stance}（建议仓位 {suggested * 100:.0f}%）"
+
+    return {
+        "segment": "spot",
+        "label": "现货",
+        "available": available,
+        "stance": stance,
+        "action": action,
+        "score": score,
+        "confidence": _segment_confidence(score),
+        "suggested_position_pct": round(suggested, 4),
+        "headline": headline,
+        "bullets": bullets,
+        "advice": _SPOT_ADVICE[stance],
+        "price_guidance": pg,
+    }
+
+
+def _synthesize_perp_advice(
+    *,
+    symbol: str,
+    strat_out: dict[str, Any] | None,
+    var_out: dict[str, Any] | None,
+    tech_out: dict[str, Any] | None,
+    var_gate_pct: float,
+    max_position_pct: float,
+) -> dict[str, Any]:
+    score = 0
+    bullets: list[str] = []
+    available = False
+    var_triggered = False
+    var_ratio = 0.0
+    strategy_target = float(strat_out.get("target_pct") or 0.0) if strat_out else 0.0
+
+    if strat_out:
+        available = True
+        if strategy_target >= 0.5:
+            score += 1
+        elif strategy_target <= 0.1:
+            score -= 1
+        bullets.append(
+            f"策略 {strat_out.get('strategy_id')}：目标仓位 {strategy_target * 100:.0f}%"
+        )
+
+    if var_out:
+        available = True
+        var_ratio = float(var_out.get("var_ratio") or 0.0)
+        tf = var_out.get("var_timeframe") or "1d"
+        bullets.append(
+            f"99% VaR（{tf}）：{var_ratio * 100:.2f}%（约 {var_out.get('var_99_usdt')} USDT）"
+        )
+        if var_out.get("var_breach"):
+            var_triggered = True
+            score -= 1
+            bullets.append(
+                f"滚动 VaR 突破：最新 K 线收益 {float(var_out.get('var_actual_return') or 0) * 100:.2f}%"
+            )
+        if var_ratio > var_gate_pct:
+            var_triggered = True
+            score -= 1
+            bullets.append(f"VaR 超阈（>{var_gate_pct * 100:.0f}%），建议降杠杆、勿加仓")
+
+    if tech_out:
+        tech_stance = str(tech_out.get("stance") or "中性")
+        if tech_stance == "看涨":
+            score += 1
+        elif tech_stance == "看跌":
+            score -= 1
+        if strat_out or var_out:
+            bullets.append(f"技术趋势参考：{tech_stance}")
+
+    stance, action = _score_to_stance_action(score)
+    if var_triggered and stance == "看涨":
+        stance, action = "中性", "hold"
+        bullets.append("VaR 门控：看多信号已降级为观望")
+
+    if stance == "看跌":
+        suggested = 0.0
+    elif stance == "中性":
+        base = strategy_target if strategy_target > 0 else 0.1
+        suggested = min(base, 0.15)
+    else:
+        base = strategy_target if strategy_target > 0 else 0.3
+        suggested = min(max_position_pct, base)
+    if var_triggered:
+        suggested = min(suggested, 0.1)
+
+    if var_ratio > var_gate_pct * 1.5:
+        risk_level = "高"
+    elif var_ratio > var_gate_pct * 0.5:
+        risk_level = "中"
+    else:
+        risk_level = "低"
+
+    confidence = _segment_confidence(score)
+    if var_triggered:
+        confidence = round(confidence * 0.7, 4)
+
+    headline = (
+        f"{symbol} 合约：{stance}（建议仓位 {suggested * 100:.0f}%）"
+        f"，风险等级 {risk_level}"
+    )
+
+    return {
+        "segment": "perp",
+        "label": "合约",
+        "available": available,
+        "stance": stance,
+        "action": action,
+        "score": score,
+        "confidence": confidence,
+        "suggested_position_pct": round(suggested, 4),
+        "risk_level": risk_level,
+        "var_gate_triggered": var_triggered,
+        "headline": headline,
+        "bullets": bullets,
+        "advice": _PERP_ADVICE[stance],
+    }
+
+
+def _synthesize_options_advice(
+    *,
+    symbol: str,
+    opt_out: dict[str, Any] | None,
+    spot_stance: str,
+) -> dict[str, Any]:
+    if not opt_out or not opt_out.get("enabled"):
+        return {
+            "segment": "options",
+            "label": "期权",
+            "available": False,
+            "stance": "不可用",
+            "action": "hold",
+            "headline": f"{symbol} 期权：数据不可用",
+            "bullets": ["期权波动扫描未启用或数据不可用。"],
+            "advice": "暂无法给出期权侧建议，请启用 options_vol 步骤或检查 Binance 期权 API。",
+        }
+
+    cross = opt_out.get("cross_view") or {}
+    scan = opt_out.get("scan_item") or {}
+    opt_block = opt_out.get("options_vol") or {}
+    advice_item = opt_block.get("advice") or {}
+
+    bullets: list[str] = []
+    if cross.get("summary"):
+        bullets.append(str(cross["summary"]))
+    for note in cross.get("notes") or []:
+        bullets.append(str(note))
+    for act in advice_item.get("actions") or []:
+        bullets.append(str(act))
+
+    opt_stance = str(
+        advice_item.get("stance") or cross.get("options_stance") or "中性"
+    )
+    alignment = str(cross.get("alignment") or "补充")
+    headline = f"{symbol} 期权：{opt_stance}（与现货 {alignment}）"
+
+    advice_text = str(
+        advice_item.get("summary") or cross.get("summary") or "维持常规期权风控与仓位管理。"
+    )
+
+    return {
+        "segment": "options",
+        "label": "期权",
+        "available": True,
+        "stance": opt_stance,
+        "action": "hold",
+        "alignment": alignment,
+        "spot_stance": spot_stance,
+        "iv_percentile": scan.get("iv_percentile"),
+        "atm_iv": scan.get("atm_iv"),
+        "confidence": advice_item.get("confidence"),
+        "headline": headline,
+        "bullets": bullets,
+        "advice": advice_text,
+        "risks": advice_item.get("risks"),
+    }
+
+
+def _render_segment_markdown(seg: dict[str, Any]) -> list[str]:
+    lines = [
+        f"### {seg.get('label', seg.get('segment', ''))}",
+        "",
+        f"**{seg.get('headline', '')}**",
+        "",
+        str(seg.get("advice") or ""),
+        "",
+    ]
+    for b in seg.get("bullets") or []:
+        lines.append(f"- {b}")
+    pg = seg.get("price_guidance")
+    if pg and pg.get("available"):
+        lines.extend(
+            [
+                "",
+                f"- 参考买入：**{pg.get('entry_price')}**，止损 **{pg.get('stop_loss_price')}**，"
+                f"止盈 **{pg.get('take_profit_price')}**",
+            ]
+        )
+    lines.append("")
+    return lines
+
+
 def synthesize_advice(ctx: dict[str, Any], params: dict[str, Any]) -> dict[str, Any]:
     var_gate_pct = float(params.get("var_gate_pct") or 0.08)
     max_position_pct = float(params.get("max_position_pct") or 0.5)
@@ -514,7 +838,13 @@ def synthesize_advice(ctx: dict[str, Any], params: dict[str, Any]) -> dict[str, 
         out = var_step.get("output") or {}
         var_ratio = float(out.get("var_ratio") or 0.0)
         sources["var_symbol"] = {"var_99_pct": out.get("var_99_pct"), "var_99_usdt": out.get("var_99_usdt")}
-        bullets.append(f"99% VaR：{var_ratio * 100:.2f}%（约 {out.get('var_99_usdt')} USDT）")
+        bullets.append(f"99% VaR（{out.get('var_timeframe') or '1d'}）：{var_ratio * 100:.2f}%（约 {out.get('var_99_usdt')} USDT）")
+        if out.get("var_breach"):
+            var_triggered = True
+            score -= 1
+            bullets.append(
+                f"滚动 VaR 突破：最新 K 线收益 {float(out.get('var_actual_return') or 0) * 100:.2f}%"
+            )
         if var_ratio > var_gate_pct:
             var_triggered = True
             score -= 1
@@ -680,6 +1010,32 @@ def synthesize_advice(ctx: dict[str, Any], params: dict[str, Any]) -> dict[str, 
     ]
     for b in bullets:
         markdown_lines.append(f"- {b}")
+    spot_seg = _synthesize_spot_advice(
+        symbol=str(ctx["symbol"]),
+        tech_out=(tech.get("output") or {}) if tech.get("status") == "ok" else None,
+        ml_out=(ml.get("output") or {}) if ml.get("status") in ("ok", "skipped") else None,
+        vol_out=(vol.get("output") or {}) if vol.get("status") == "ok" else None,
+        price_guidance=price_guidance,
+        max_position_pct=max_position_pct,
+    )
+    perp_seg = _synthesize_perp_advice(
+        symbol=str(ctx["symbol"]),
+        strat_out=(strat.get("output") or {}) if strat.get("status") == "ok" else None,
+        var_out=(var_step.get("output") or {}) if var_step.get("status") == "ok" else None,
+        tech_out=(tech.get("output") or {}) if tech.get("status") == "ok" else None,
+        var_gate_pct=var_gate_pct,
+        max_position_pct=max_position_pct,
+    )
+    opt_out = (opt.get("output") or {}) if opt.get("status") == "ok" else None
+    options_seg = _synthesize_options_advice(
+        symbol=str(ctx["symbol"]),
+        opt_out=opt_out,
+        spot_stance=str(spot_seg.get("stance") or stance),
+    )
+    segments = {"spot": spot_seg, "perp": perp_seg, "options": options_seg}
+    markdown_lines.extend(["", "## 分市场建议", ""])
+    for seg in (spot_seg, perp_seg, options_seg):
+        markdown_lines.extend(_render_segment_markdown(seg))
     if price_guidance.get("available"):
         markdown_lines.extend(
             [
@@ -720,6 +1076,7 @@ def synthesize_advice(ctx: dict[str, Any], params: dict[str, Any]) -> dict[str, 
         "bullets": bullets,
         "advice": advice_map[stance],
         "price_guidance": price_guidance,
+        "segments": segments,
         "sources": sources,
         "markdown": "\n".join(markdown_lines),
         "disclaimer": "研究用途，非投资建议。",

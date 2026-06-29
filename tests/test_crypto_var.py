@@ -4,8 +4,10 @@ import pytest
 
 from quant_rd_tool.crypto_var import (
     backtest_var,
+    bars_per_day,
     build_portfolio_returns,
     build_portfolio_var_report,
+    build_symbol_var_breach,
     build_symbol_var_report,
     compute_cvar,
     compute_historical_var,
@@ -14,6 +16,7 @@ from quant_rd_tool.crypto_var import (
     confidence_key,
     correlation_matrix,
     parse_confidence_levels,
+    resolve_horizon_days,
     returns_from_close,
     stress_scenarios,
 )
@@ -260,3 +263,66 @@ def test_build_symbol_var_history(monkeypatch):
     assert len(out["series"]) > 0
     assert "var_pct" in out["series"][0]
     assert out["series"][0]["var_usdt"] > 0
+
+
+def test_resolve_horizon_days_intraday():
+    assert resolve_horizon_days(horizon_bars=6, timeframe="4h") == pytest.approx(1.0)
+    assert resolve_horizon_days(horizon_bars=24, timeframe="1h") == pytest.approx(1.0)
+    assert resolve_horizon_days(horizon_days=3, timeframe="1d") == 3.0
+    assert bars_per_day("4h") == 6.0
+
+
+def test_horizon_bars_scales_var():
+    rng = np.random.default_rng(11)
+    rets = pd.Series(rng.normal(0, 0.02, 200))
+    v1 = compute_historical_var(rets, confidence=0.95, horizon_days=1.0)
+    v4h = compute_historical_var(rets, confidence=0.95, horizon_days=4 / 24)
+    v4d = compute_historical_var(rets, confidence=0.95, horizon_days=4.0)
+    assert v4h <= v1
+    assert v4d >= v1
+
+
+def test_build_symbol_var_breach_detects_tail(monkeypatch):
+    from quant_rd_tool import crypto_var as cv
+
+    n = 80
+    dates = pd.date_range("2024-01-01", periods=n, freq="4h")
+    rng = np.random.default_rng(5)
+    rets_raw = rng.normal(0, 0.005, n)
+    rets_raw[-1] = -0.12
+    close = pd.Series(100 * (1 + rets_raw).cumprod(), index=dates)
+    df = pd.DataFrame({"date": dates, "close": close})
+    monkeypatch.setattr(cv, "fetch_ohlcv_df", lambda **kw: df)
+
+    out = cv.build_symbol_var_breach(
+        "BTC",
+        confidence=0.95,
+        lookback_bars=60,
+        horizon_bars=1,
+        timeframe="4h",
+        notional_usdt=10_000,
+    )
+    assert out["breached"] is True
+    assert out["actual_return"] < 0
+    assert out["var_usdt"] > 0
+
+
+def test_build_symbol_var_breach_no_breach(monkeypatch):
+    from quant_rd_tool import crypto_var as cv
+
+    n = 80
+    dates = pd.date_range("2024-01-01", periods=n, freq="h")
+    close = pd.Series(100 * (1 + np.random.default_rng(2).normal(0, 0.002, n)).cumprod(), index=dates)
+    df = pd.DataFrame({"date": dates, "close": close})
+    monkeypatch.setattr(cv, "fetch_ohlcv_df", lambda **kw: df)
+
+    out = cv.build_symbol_var_breach(
+        "ETH",
+        confidence=0.99,
+        lookback_bars=60,
+        horizon_bars=1,
+        timeframe="1h",
+        notional_usdt=5000,
+    )
+    assert out["breached"] is False
+    assert out["severity"] == "none"

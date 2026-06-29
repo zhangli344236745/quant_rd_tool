@@ -77,3 +77,5 @@ def test_synthesize_advice_includes_price_guidance():
     assert pg.get("stop_loss_price")
     assert pg.get("take_profit_price")
     assert any("IV 价位参考" in b for b in advice.get("bullets") or [])
+    segs = advice.get("segments") or {}
+    assert segs.get("spot", {}).get("price_guidance", {}).get("available")

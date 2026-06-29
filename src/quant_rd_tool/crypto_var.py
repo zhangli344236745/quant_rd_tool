@@ -16,14 +16,68 @@ DEFAULT_MC_SIMS = 10_000
 STRESS_SHOCKS = (-0.03, -0.05, -0.10, -0.20)
 NORMAL_Z: dict[float, float] = {0.90: 1.282, 0.95: 1.645, 0.99: 2.326}
 TRADING_DAYS_PER_YEAR = 252
+SUPPORTED_VAR_TIMEFRAMES = ("1d", "4h", "1h", "15m")
+TIMEFRAME_BARS_PER_DAY: dict[str, float] = {
+    "1d": 1.0,
+    "4h": 6.0,
+    "1h": 24.0,
+    "15m": 96.0,
+}
+DEFAULT_LOOKBACK_BARS: dict[str, int] = {
+    "1d": 252,
+    "4h": 360,
+    "1h": 720,
+    "15m": 960,
+}
+DEFAULT_ROLLING_WINDOWS: dict[str, int] = {
+    "1d": 60,
+    "4h": 90,
+    "1h": 168,
+    "15m": 192,
+}
+
+
+def normalize_var_timeframe(timeframe: str) -> str:
+    tf = (timeframe or "1d").strip().lower()
+    if tf not in TIMEFRAME_BARS_PER_DAY:
+        raise ValueError(f"unsupported timeframe: {timeframe} (use 1d, 4h, 1h, 15m)")
+    return tf
+
+
+def bars_per_day(timeframe: str) -> float:
+    return TIMEFRAME_BARS_PER_DAY[normalize_var_timeframe(timeframe)]
+
+
+def default_lookback_bars(timeframe: str, explicit: int | None = None) -> int:
+    if explicit is not None and int(explicit) > 0:
+        return int(explicit)
+    return DEFAULT_LOOKBACK_BARS.get(normalize_var_timeframe(timeframe), 252)
+
+
+def default_rolling_window(timeframe: str, explicit: int | None = None) -> int:
+    if explicit is not None and int(explicit) > 0:
+        return int(explicit)
+    return DEFAULT_ROLLING_WINDOWS.get(normalize_var_timeframe(timeframe), 60)
+
+
+def resolve_horizon_days(
+    *,
+    horizon_days: int = 1,
+    horizon_bars: int | None = None,
+    timeframe: str = "1d",
+) -> float:
+    """Convert bar holding period to equivalent day fraction for sqrt(T) scaling."""
+    if horizon_bars is not None and int(horizon_bars) > 0:
+        return int(horizon_bars) / bars_per_day(timeframe)
+    return float(max(1, int(horizon_days)))
 
 
 def returns_from_close(close: pd.Series) -> pd.Series:
     return close.astype(float).pct_change().dropna()
 
 
-def _scale_returns(returns: pd.Series, horizon_days: int) -> pd.Series:
-    if horizon_days <= 1:
+def _scale_returns(returns: pd.Series, horizon_days: float) -> pd.Series:
+    if horizon_days <= 1.0:
         return returns
     return returns * (horizon_days**0.5)
 
@@ -32,7 +86,7 @@ def compute_historical_var(
     returns: pd.Series,
     *,
     confidence: float,
-    horizon_days: int = 1,
+    horizon_days: float = 1.0,
 ) -> float:
     r = _scale_returns(returns.dropna(), horizon_days)
     if len(r) < MIN_OBSERVATIONS:
@@ -45,7 +99,7 @@ def compute_cvar(
     returns: pd.Series,
     *,
     confidence: float,
-    horizon_days: int = 1,
+    horizon_days: float = 1.0,
 ) -> float:
     r = _scale_returns(returns.dropna(), horizon_days)
     if len(r) < MIN_OBSERVATIONS:
@@ -117,7 +171,7 @@ def compute_monte_carlo_var(
     returns: pd.Series,
     *,
     confidence: float,
-    horizon_days: int = 1,
+    horizon_days: float = 1.0,
     n_sims: int = DEFAULT_MC_SIMS,
     seed: int = 42,
 ) -> dict[str, Any]:
@@ -128,7 +182,7 @@ def compute_monte_carlo_var(
     r = returns.dropna()
     if len(r) < MIN_OBSERVATIONS:
         raise ValueError(f"insufficient data: need >={MIN_OBSERVATIONS}, got {len(r)}")
-    h = max(1, int(horizon_days))
+    h = max(1e-9, float(horizon_days))
     mu_d = float(r.mean())
     sigma_d = float(r.std(ddof=1))
     if sigma_d <= 0:
@@ -156,7 +210,7 @@ def compute_monte_carlo_var(
     return {
         "n_simulations": n,
         "seed": seed,
-        "horizon_days": h,
+        "horizon_days": round(h, 6),
         "gbm": {
             "var_pct": gbm_var,
             "cvar_pct": gbm_cvar,
@@ -175,7 +229,7 @@ def compute_parametric_var(
     returns: pd.Series,
     *,
     confidence: float,
-    horizon_days: int = 1,
+    horizon_days: float = 1.0,
 ) -> float:
     """Variance-covariance VaR assuming normal returns (positive = loss fraction)."""
     r = _scale_returns(returns.dropna(), horizon_days)
@@ -287,7 +341,7 @@ def _metrics_block(
     *,
     notional_usdt: float,
     confidence_levels: list[float],
-    horizon_days: int,
+    horizon_days: float,
     mc_n_sims: int = DEFAULT_MC_SIMS,
     mc_seed: int = 42,
 ) -> dict[str, dict[str, Any]]:
@@ -433,15 +487,23 @@ def build_symbol_var_report_from_df(
     symbol: str,
     *,
     notional_usdt: float,
-    lookback_bars: int = 252,
+    lookback_bars: int = 0,
     confidence_levels: list[float] | None = None,
     horizon_days: int = 1,
+    horizon_bars: int | None = None,
     timeframe: str = "1d",
     mc_n_sims: int = DEFAULT_MC_SIMS,
     mc_seed: int = 42,
 ) -> dict[str, Any]:
     confidence_levels = confidence_levels or [0.95, 0.99]
-    work = df.tail(lookback_bars + 1)
+    tf = normalize_var_timeframe(timeframe)
+    lb = min(default_lookback_bars(tf, lookback_bars if lookback_bars > 0 else None), 2000)
+    eff_horizon = resolve_horizon_days(
+        horizon_days=horizon_days,
+        horizon_bars=horizon_bars,
+        timeframe=tf,
+    )
+    work = df.tail(lb + 1)
     close = _close_series(work)
     rets = returns_from_close(close)
     if len(rets.dropna()) < MIN_OBSERVATIONS:
@@ -454,7 +516,7 @@ def build_symbol_var_report_from_df(
         rets,
         notional_usdt=effective_notional,
         confidence_levels=confidence_levels,
-        horizon_days=horizon_days,
+        horizon_days=eff_horizon,
         mc_n_sims=mc_n_sims,
         mc_seed=mc_seed,
     )
@@ -463,10 +525,13 @@ def build_symbol_var_report_from_df(
         "symbol": symbol.upper(),
         "method": "historical_simulation",
         "params": {
-            "lookback_bars": lookback_bars,
+            "lookback_bars": lb,
             "horizon_days": horizon_days,
+            "horizon_bars": horizon_bars if horizon_bars and horizon_bars > 0 else None,
+            "effective_horizon_days": round(eff_horizon, 6),
             "confidence_levels": confidence_levels,
-            "timeframe": timeframe,
+            "timeframe": tf,
+            "bars_per_day": bars_per_day(tf),
             "mc_n_sims": min(max(int(mc_n_sims), 1000), 100_000),
             "mc_seed": mc_seed,
         },
@@ -486,22 +551,26 @@ def build_symbol_var_report(
     symbol: str,
     *,
     notional_usdt: float,
-    lookback_bars: int = 252,
+    lookback_bars: int = 0,
     confidence_levels: list[float] | None = None,
     horizon_days: int = 1,
+    horizon_bars: int | None = None,
     timeframe: str = "1d",
     mc_n_sims: int = DEFAULT_MC_SIMS,
     mc_seed: int = 42,
 ) -> dict[str, Any]:
-    df = fetch_ohlcv_df(symbol=symbol, timeframe=timeframe, limit=lookback_bars + 1)
+    tf = normalize_var_timeframe(timeframe)
+    lb = min(default_lookback_bars(tf, lookback_bars if lookback_bars > 0 else None), 2000)
+    df = fetch_ohlcv_df(symbol=symbol, timeframe=tf, limit=lb + 1)
     return build_symbol_var_report_from_df(
         df,
         symbol,
         notional_usdt=notional_usdt,
-        lookback_bars=lookback_bars,
+        lookback_bars=lb,
         confidence_levels=confidence_levels,
         horizon_days=horizon_days,
-        timeframe=timeframe,
+        horizon_bars=horizon_bars,
+        timeframe=tf,
         mc_n_sims=mc_n_sims,
         mc_seed=mc_seed,
     )
@@ -671,13 +740,21 @@ def build_portfolio_var_report(
     *,
     testnet: bool = False,
     timeframe: str = "1d",
-    lookback_bars: int = 252,
+    lookback_bars: int = 0,
     horizon_days: int = 1,
+    horizon_bars: int | None = None,
     confidence_levels: list[float] | None = None,
     mc_n_sims: int = DEFAULT_MC_SIMS,
     mc_seed: int = 42,
 ) -> dict[str, Any]:
     confidence_levels = confidence_levels or [0.95, 0.99]
+    tf = normalize_var_timeframe(timeframe)
+    lb = min(default_lookback_bars(tf, lookback_bars if lookback_bars > 0 else None), 2000)
+    eff_horizon = resolve_horizon_days(
+        horizon_days=horizon_days,
+        horizon_bars=horizon_bars,
+        timeframe=tf,
+    )
 
     if not (settings.binance_api_key and settings.binance_api_secret):
         return {
@@ -695,11 +772,16 @@ def build_portfolio_var_report(
             "metrics": None,
             "message": "no open positions",
             "params": {
-                "lookback_bars": lookback_bars,
+                "lookback_bars": lb,
                 "horizon_days": horizon_days,
+                "horizon_bars": horizon_bars if horizon_bars and horizon_bars > 0 else None,
+                "effective_horizon_days": round(eff_horizon, 6),
                 "confidence_levels": confidence_levels,
-                "timeframe": timeframe,
+                "timeframe": tf,
+                "bars_per_day": bars_per_day(tf),
                 "testnet": testnet,
+                "mc_n_sims": min(max(int(mc_n_sims), 1000), 100_000),
+                "mc_seed": mc_seed,
             },
         }
 
@@ -717,14 +799,14 @@ def build_portfolio_var_report(
 
     weights = {p["base"]: p["signed_notional_usdt"] / gross for p in positions}
     bases = list(weights.keys())
-    rets_map = _returns_map_for_bases(bases, timeframe=timeframe, lookback_bars=lookback_bars)
+    rets_map = _returns_map_for_bases(bases, timeframe=tf, lookback_bars=lb)
     port_rets = build_portfolio_returns(weights, rets_map)
 
     metrics = _metrics_block(
         port_rets,
         notional_usdt=gross,
         confidence_levels=confidence_levels,
-        horizon_days=horizon_days,
+        horizon_days=eff_horizon,
         mc_n_sims=mc_n_sims,
         mc_seed=mc_seed,
     )
@@ -735,7 +817,9 @@ def build_portfolio_var_report(
         base = p["base"]
         if base not in rets_map:
             continue
-        sym_var = compute_historical_var(rets_map[base], confidence=hi_conf, horizon_days=horizon_days)
+        sym_var = compute_historical_var(
+            rets_map[base], confidence=hi_conf, horizon_days=eff_horizon
+        )
         individual_vars[base] = abs(p["signed_notional_usdt"]) * sym_var
 
     hi_key = confidence_key(hi_conf)
@@ -764,10 +848,13 @@ def build_portfolio_var_report(
         "enabled": True,
         "method": "historical_simulation",
         "params": {
-            "lookback_bars": lookback_bars,
+            "lookback_bars": lb,
             "horizon_days": horizon_days,
+            "horizon_bars": horizon_bars if horizon_bars and horizon_bars > 0 else None,
+            "effective_horizon_days": round(eff_horizon, 6),
             "confidence_levels": confidence_levels,
-            "timeframe": timeframe,
+            "timeframe": tf,
+            "bars_per_day": bars_per_day(tf),
             "testnet": testnet,
             "mc_n_sims": min(max(int(mc_n_sims), 1000), 100_000),
             "mc_seed": mc_seed,
@@ -793,25 +880,36 @@ def build_symbol_var_history(
     *,
     window: int = 60,
     confidence: float = 0.99,
-    lookback_bars: int = 252,
+    lookback_bars: int = 0,
     horizon_days: int = 1,
+    horizon_bars: int | None = None,
     timeframe: str = "1d",
     notional_usdt: float = 0.0,
 ) -> dict[str, Any]:
-    total_limit = lookback_bars + window + 1
-    df = fetch_ohlcv_df(symbol=symbol, timeframe=timeframe, limit=total_limit)
+    tf = normalize_var_timeframe(timeframe)
+    lb = min(default_lookback_bars(tf, lookback_bars if lookback_bars > 0 else None), 2000)
+    win = min(default_rolling_window(tf, window if window > 0 else None), 500)
+    eff_horizon = resolve_horizon_days(
+        horizon_days=horizon_days,
+        horizon_bars=horizon_bars,
+        timeframe=tf,
+    )
+    total_limit = lb + win + 1
+    df = fetch_ohlcv_df(symbol=symbol, timeframe=tf, limit=total_limit)
     close = _close_series(df)
     rets = returns_from_close(close)
     latest_price = float(close.iloc[-1])
     effective_notional = float(notional_usdt) if float(notional_usdt) > 0 else latest_price
 
     series: list[dict[str, Any]] = []
-    end_indices = range(max(0, len(rets) - window), len(rets))
+    end_indices = range(max(0, len(rets) - win), len(rets))
     for i in end_indices:
-        window_rets = rets.iloc[max(0, i - lookback_bars + 1) : i + 1]
+        window_rets = rets.iloc[max(0, i - lb + 1) : i + 1]
         if len(window_rets.dropna()) < MIN_OBSERVATIONS:
             continue
-        var_pct = compute_historical_var(window_rets, confidence=confidence, horizon_days=horizon_days)
+        var_pct = compute_historical_var(
+            window_rets, confidence=confidence, horizon_days=eff_horizon
+        )
         actual_ret = float(rets.iloc[i])
         date_val = rets.index[i]
         if hasattr(date_val, "isoformat"):
@@ -831,9 +929,162 @@ def build_symbol_var_history(
     return {
         "symbol": symbol.upper(),
         "confidence": confidence,
-        "window": window,
-        "lookback_bars": lookback_bars,
+        "timeframe": tf,
+        "window": win,
+        "lookback_bars": lb,
+        "horizon_bars": horizon_bars if horizon_bars and horizon_bars > 0 else None,
+        "effective_horizon_days": round(eff_horizon, 6),
         "notional_usdt": effective_notional,
         "breach_count": sum(1 for s in series if s.get("breach")),
         "series": series,
+    }
+
+
+def build_symbol_var_breach(
+    symbol: str,
+    *,
+    confidence: float = 0.99,
+    lookback_bars: int = 0,
+    horizon_days: int = 1,
+    horizon_bars: int | None = None,
+    timeframe: str = "1d",
+    notional_usdt: float = 0.0,
+) -> dict[str, Any]:
+    """Compare latest bar return against VaR estimated from prior history."""
+    tf = normalize_var_timeframe(timeframe)
+    lb = min(default_lookback_bars(tf, lookback_bars if lookback_bars > 0 else None), 2000)
+    eff_horizon = resolve_horizon_days(
+        horizon_days=horizon_days,
+        horizon_bars=horizon_bars,
+        timeframe=tf,
+    )
+    df = fetch_ohlcv_df(symbol=symbol, timeframe=tf, limit=lb + 2)
+    close = _close_series(df)
+    rets = returns_from_close(close)
+    clean = rets.dropna()
+    if len(clean) < MIN_OBSERVATIONS + 1:
+        raise ValueError(
+            f"insufficient data for breach check: need >={MIN_OBSERVATIONS + 1}, got {len(clean)}"
+        )
+
+    hist_rets = clean.iloc[:-1].tail(lb)
+    actual_ret = float(clean.iloc[-1])
+    latest_price = float(close.iloc[-1])
+    effective_notional = float(notional_usdt) if float(notional_usdt) > 0 else latest_price
+
+    var_pct = compute_historical_var(hist_rets, confidence=confidence, horizon_days=eff_horizon)
+    cvar_pct = compute_cvar(hist_rets, confidence=confidence, horizon_days=eff_horizon)
+    breached = bool(actual_ret < -var_pct)
+    exceedance_pct = round(-actual_ret - var_pct, 6) if breached else 0.0
+    severity = "none"
+    if breached:
+        severity = "critical" if exceedance_pct > var_pct * 0.5 else "warning"
+
+    date_val = clean.index[-1]
+    bar_time = date_val.isoformat() if hasattr(date_val, "isoformat") else str(date_val)
+
+    return {
+        "symbol": symbol.upper(),
+        "timeframe": tf,
+        "confidence": confidence,
+        "lookback_bars": lb,
+        "horizon_bars": horizon_bars if horizon_bars and horizon_bars > 0 else None,
+        "effective_horizon_days": round(eff_horizon, 6),
+        "notional_usdt": effective_notional,
+        "bar_time": bar_time,
+        "actual_return": round(actual_ret, 6),
+        "var_pct": var_pct,
+        "var_usdt": round(effective_notional * var_pct, 4),
+        "cvar_pct": cvar_pct,
+        "cvar_usdt": round(effective_notional * cvar_pct, 4),
+        "breached": breached,
+        "exceedance_pct": exceedance_pct,
+        "severity": severity,
+        "disclaimer": "滚动突破：最新一根 K 线收益低于当前 VaR 阈值。",
+    }
+
+
+def build_portfolio_var_breach(
+    *,
+    testnet: bool = False,
+    confidence: float = 0.99,
+    lookback_bars: int = 0,
+    horizon_days: int = 1,
+    horizon_bars: int | None = None,
+    timeframe: str = "1d",
+) -> dict[str, Any]:
+    """Rolling VaR breach for live perpetual portfolio."""
+    tf = normalize_var_timeframe(timeframe)
+    lb = min(default_lookback_bars(tf, lookback_bars if lookback_bars > 0 else None), 2000)
+    eff_horizon = resolve_horizon_days(
+        horizon_days=horizon_days,
+        horizon_bars=horizon_bars,
+        timeframe=tf,
+    )
+
+    if not (settings.binance_api_key and settings.binance_api_secret):
+        return {
+            "enabled": False,
+            "error": "missing api key/secret",
+            "breached": False,
+        }
+
+    positions = fetch_all_open_positions(testnet=testnet)
+    if not positions:
+        return {
+            "enabled": True,
+            "breached": False,
+            "message": "no open positions",
+            "positions": [],
+        }
+
+    gross = sum(abs(p["signed_notional_usdt"]) for p in positions)
+    if gross <= 0:
+        return {
+            "enabled": True,
+            "breached": False,
+            "message": "no open positions",
+            "positions": positions,
+        }
+
+    weights = {p["base"]: p["signed_notional_usdt"] / gross for p in positions}
+    bases = list(weights.keys())
+    rets_map = _returns_map_for_bases(bases, timeframe=tf, lookback_bars=lb + 1)
+
+    aligned = pd.concat(
+        [rets_map[b].rename(b) * weights[b] for b in bases if b in rets_map],
+        axis=1,
+        join="inner",
+    )
+    port_rets = aligned.sum(axis=1).dropna()
+    if len(port_rets) < MIN_OBSERVATIONS + 1:
+        raise ValueError(
+            f"insufficient aligned returns: need >={MIN_OBSERVATIONS + 1}, got {len(port_rets)}"
+        )
+
+    hist_rets = port_rets.iloc[:-1].tail(lb)
+    actual_ret = float(port_rets.iloc[-1])
+    var_pct = compute_historical_var(hist_rets, confidence=confidence, horizon_days=eff_horizon)
+    breached = bool(actual_ret < -var_pct)
+    var_usdt = round(gross * var_pct, 4)
+    exceedance_pct = round(-actual_ret - var_pct, 6) if breached else 0.0
+
+    return {
+        "enabled": True,
+        "timeframe": tf,
+        "confidence": confidence,
+        "lookback_bars": lb,
+        "horizon_bars": horizon_bars if horizon_bars and horizon_bars > 0 else None,
+        "effective_horizon_days": round(eff_horizon, 6),
+        "gross_exposure_usdt": round(gross, 4),
+        "actual_return": round(actual_ret, 6),
+        "var_pct": var_pct,
+        "var_usdt": var_usdt,
+        "breached": breached,
+        "exceedance_pct": exceedance_pct,
+        "severity": "critical" if breached and exceedance_pct > var_pct * 0.5 else (
+            "warning" if breached else "none"
+        ),
+        "positions": positions,
+        "disclaimer": "组合滚动突破：最新一根加权组合收益低于组合 VaR。",
     }

@@ -811,6 +811,7 @@ export const cryptoApi = {
     timeframe?: string;
     lookback_bars?: number;
     horizon_days?: number;
+    horizon_bars?: number;
     confidence?: string;
     mc_n_sims?: number;
     mc_seed?: number;
@@ -821,6 +822,7 @@ export const cryptoApi = {
     timeframe?: string;
     lookback_bars?: number;
     horizon_days?: number;
+    horizon_bars?: number;
     confidence?: string;
     mc_n_sims?: number;
     mc_seed?: number;
@@ -833,8 +835,28 @@ export const cryptoApi = {
     timeframe?: string;
     lookback_bars?: number;
     horizon_days?: number;
+    horizon_bars?: number;
     notional_usdt?: number;
   }) => http.get<SymbolVarHistory>("/crypto/var/symbol/history", { params }),
+
+  varSymbolBreach: (params?: {
+    symbol?: string;
+    confidence?: number;
+    timeframe?: string;
+    lookback_bars?: number;
+    horizon_days?: number;
+    horizon_bars?: number;
+    notional_usdt?: number;
+  }) => http.get<SymbolVarBreach>("/crypto/var/symbol/breach", { params }),
+
+  varPortfolioBreach: (params?: {
+    testnet?: boolean;
+    confidence?: number;
+    timeframe?: string;
+    lookback_bars?: number;
+    horizon_days?: number;
+    horizon_bars?: number;
+  }) => http.get<PortfolioVarBreach>("/crypto/var/portfolio/breach", { params }),
 
   workflowSteps: () => http.get<{ steps: CryptoWorkflowStepDef[] }>("/crypto/workflow/steps"),
 
@@ -1774,8 +1796,11 @@ export interface SymbolVarReport {
   params: {
     lookback_bars: number;
     horizon_days: number;
+    horizon_bars?: number | null;
+    effective_horizon_days?: number;
     confidence_levels: number[];
     timeframe: string;
+    bars_per_day?: number;
   };
   notional_usdt: number;
   latest_price: number;
@@ -1831,11 +1856,51 @@ export interface VarHistoryPoint {
 export interface SymbolVarHistory {
   symbol: string;
   confidence: number;
+  timeframe?: string;
   window: number;
   lookback_bars: number;
+  horizon_bars?: number | null;
+  effective_horizon_days?: number;
   notional_usdt: number;
   breach_count?: number;
   series: VarHistoryPoint[];
+}
+
+export interface SymbolVarBreach {
+  symbol: string;
+  timeframe: string;
+  confidence: number;
+  lookback_bars: number;
+  horizon_bars?: number | null;
+  effective_horizon_days?: number;
+  notional_usdt: number;
+  bar_time?: string;
+  actual_return: number;
+  var_pct: number;
+  var_usdt: number;
+  cvar_pct?: number;
+  cvar_usdt?: number;
+  breached: boolean;
+  exceedance_pct?: number;
+  severity: "none" | "warning" | "critical";
+  disclaimer?: string;
+}
+
+export interface PortfolioVarBreach {
+  enabled: boolean;
+  error?: string;
+  message?: string;
+  timeframe?: string;
+  confidence?: number;
+  gross_exposure_usdt?: number;
+  actual_return?: number;
+  var_pct?: number;
+  var_usdt?: number;
+  breached?: boolean;
+  exceedance_pct?: number;
+  severity?: string;
+  positions?: PortfolioVarPosition[];
+  disclaimer?: string;
 }
 
 export interface CryptoWorkflowStepDef {
@@ -1884,6 +1949,28 @@ export interface CryptoWorkflowPriceGuidance {
   reason?: string;
 }
 
+export interface CryptoWorkflowAdviceSegment {
+  segment: "spot" | "perp" | "options";
+  label: string;
+  available?: boolean;
+  stance: string;
+  action?: string;
+  score?: number;
+  confidence?: number;
+  suggested_position_pct?: number;
+  risk_level?: string;
+  var_gate_triggered?: boolean;
+  alignment?: string;
+  spot_stance?: string;
+  iv_percentile?: number;
+  atm_iv?: number;
+  headline: string;
+  bullets: string[];
+  advice: string;
+  price_guidance?: CryptoWorkflowPriceGuidance | null;
+  risks?: string[];
+}
+
 export interface CryptoWorkflowAdvice {
   stance: string;
   action: string;
@@ -1894,6 +1981,11 @@ export interface CryptoWorkflowAdvice {
   var_gate_triggered?: boolean;
   signal_agreement?: string;
   price_guidance?: CryptoWorkflowPriceGuidance;
+  segments?: {
+    spot: CryptoWorkflowAdviceSegment;
+    perp: CryptoWorkflowAdviceSegment;
+    options: CryptoWorkflowAdviceSegment;
+  };
   headline: string;
   bullets: string[];
   advice: string;

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useRouter } from "vue-router";
-import { cryptoApi, type PortfolioVarReport } from "@/api/crypto";
+import { cryptoApi, type PortfolioVarBreach, type PortfolioVarReport } from "@/api/crypto";
 import { extractError } from "@/api/http";
 import { formatBeijing } from "@/utils/datetime";
 
@@ -62,6 +62,7 @@ const acctTradeBase = ref("ETH");
 const acctTrades = ref<Record<string, unknown>[]>([]);
 const acctDaily = ref<{ day: string; realizedPnl: number; funding: number; fees: number; net: number }[]>([]);
 const portfolioVar = ref<PortfolioVarReport | null>(null);
+const portfolioVarBreach = ref<PortfolioVarBreach | null>(null);
 
 function decisionTagType(d: string) {
   if (d === "opened" || d === "flipped") return "success";
@@ -278,15 +279,27 @@ async function loadAccountPanel() {
 
     if (bRes.status === "fulfilled" && bRes.value.data.enabled) {
       try {
-        const { data } = await cryptoApi.varPortfolio({
-          testnet: false,
-          confidence: "0.99",
-          lookback_bars: 252,
-          horizon_days: 1,
-        });
-        portfolioVar.value = data;
+        const [varRes, breachRes] = await Promise.all([
+          cryptoApi.varPortfolio({
+            testnet: false,
+            confidence: "0.99",
+            lookback_bars: 0,
+            horizon_bars: 1,
+            timeframe: "4h",
+          }),
+          cryptoApi.varPortfolioBreach({
+            testnet: false,
+            confidence: 0.99,
+            lookback_bars: 0,
+            horizon_bars: 1,
+            timeframe: "4h",
+          }),
+        ]);
+        portfolioVar.value = varRes.data;
+        portfolioVarBreach.value = breachRes.data;
       } catch {
         portfolioVar.value = null;
+        portfolioVarBreach.value = null;
       }
     }
   } catch (e) {
@@ -446,7 +459,7 @@ onUnmounted(() => {
           </div>
         </el-col>
         <el-col :span="6">
-          <div class="stat-label">组合 1 日 99% VaR</div>
+          <div class="stat-label">组合 4h 99% VaR</div>
           <div v-if="portfolioVar?.enabled && portfolioVar.metrics" class="stat-val warn">
             {{ portfolioVar99Usdt()?.toLocaleString(undefined, { maximumFractionDigits: 2 }) ?? "—" }} USDT
           </div>
@@ -454,6 +467,7 @@ onUnmounted(() => {
             {{ portfolioVar.error || "未配置 API" }}
           </div>
           <div v-else class="muted small">—</div>
+          <p v-if="portfolioVarBreach?.breached" class="breach-hint">⚠ 最新 4h K 线突破 VaR</p>
           <router-link
             v-if="portfolioVar?.enabled"
             to="/crypto-var?tab=portfolio"
@@ -677,6 +691,11 @@ onUnmounted(() => {
 }
 .var-link:hover {
   text-decoration: underline;
+}
+.breach-hint {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--el-color-danger);
 }
 .state-card {
   border: 1px solid var(--border);

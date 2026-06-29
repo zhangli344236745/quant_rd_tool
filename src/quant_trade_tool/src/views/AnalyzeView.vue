@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { reactive, ref } from "vue";
-import { cryptoApi, type CryptoNewsDigest, type SymbolVarReport } from "@/api/crypto";
+import { cryptoApi, type CryptoNewsDigest, type SymbolVarBreach, type SymbolVarReport } from "@/api/crypto";
 import { jobsApi } from "@/api/jobs";
 import { useJobSubmit } from "@/composables/useJobSubmit";
 import CryptoAnalysisSummary, {
@@ -10,6 +10,7 @@ import ResultPanel from "@/components/ResultPanel.vue";
 import SignalSummary from "@/components/SignalSummary.vue";
 
 const symbolVar = ref<SymbolVarReport | null>(null);
+const symbolVarBreach = ref<SymbolVarBreach | null>(null);
 const symbolVarError = ref("");
 
 const form = reactive({
@@ -30,17 +31,29 @@ const error = ref("");
 
 async function loadSymbolVarSummary(symbol: string) {
   symbolVar.value = null;
+  symbolVarBreach.value = null;
   symbolVarError.value = "";
   try {
-    const { data } = await cryptoApi.varSymbol({
-      symbol,
-      notional_usdt: 10000,
-      confidence: "0.99",
-      horizon_days: 1,
-      lookback_bars: 252,
-      timeframe: "1d",
-    });
-    symbolVar.value = data;
+    const [symRes, breachRes] = await Promise.all([
+      cryptoApi.varSymbol({
+        symbol,
+        notional_usdt: 10000,
+        confidence: "0.99",
+        horizon_bars: 1,
+        lookback_bars: 0,
+        timeframe: "4h",
+      }),
+      cryptoApi.varSymbolBreach({
+        symbol,
+        confidence: 0.99,
+        timeframe: "4h",
+        horizon_bars: 1,
+        lookback_bars: 0,
+        notional_usdt: 10000,
+      }),
+    ]);
+    symbolVar.value = symRes.data;
+    symbolVarBreach.value = breachRes.data;
   } catch (e) {
     symbolVarError.value = String(e);
   }
@@ -157,8 +170,16 @@ function optAlertType(level: string) {
         <el-card v-if="symbolVar || symbolVarError" shadow="never" class="panel-card mt">
           <template #header>风险 VaR 摘要</template>
           <template v-if="symbolVar">
+            <el-alert
+              v-if="symbolVarBreach?.breached"
+              type="error"
+              :title="`4h 滚动 VaR 突破：实际 ${((symbolVarBreach.actual_return || 0) * 100).toFixed(2)}%`"
+              show-icon
+              :closable="false"
+              class="mb"
+            />
             <p class="cross-summary">
-              1 日 99% VaR（名义 10,000 USDT）：
+              4h · 99% VaR（名义 10,000 USDT）：
               <strong>{{ var99Usdt()?.toLocaleString(undefined, { maximumFractionDigits: 2 }) }} USDT</strong>
             </p>
             <router-link

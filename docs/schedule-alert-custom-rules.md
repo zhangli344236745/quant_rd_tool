@@ -84,12 +84,15 @@
       "enabled": true,
       "on_symbol_var_breach": true,
       "on_portfolio_var_breach": false,
+      "on_rolling_var_breach": true,
       "max_var_pct": 0.05,
       "max_portfolio_var_pct_of_equity": 0.10,
       "confidence": 0.99,
       "notional_usdt": 10000,
-      "lookback_bars": 252,
+      "lookback_bars": 360,
       "horizon_days": 1,
+      "horizon_bars": 1,
+      "timeframe": "4h",
       "mc_n_sims": 3000
     }
   }
@@ -97,8 +100,10 @@
 ```
 
 - **on_symbol_var_breach**：任一标的 `var_pct >= max_var_pct` 时 Webhook 告警（`decision: var_symbol_breach`）。
+- **on_rolling_var_breach**：最新一根 K 线实际收益低于当前 VaR 时告警（`decision: var_rolling_breach`）；需配置 `timeframe` / `horizon_bars`。
 - **on_portfolio_var_breach**：永续账户组合 VaR 占权益 ≥ 阈值时告警（需 API Key）。
-- **enabled**：为 true 时每个调度周期为各标的计算 VaR 并写入周期摘要，供自定义规则使用。
+- **timeframe / horizon_bars**：支持 `1d` / `4h` / `1h` 日内 VaR；`horizon_bars` 为持有期（K 线根数）。
+- **enabled**：为 true 时每个调度周期为各标的计算 VaR 并写入周期摘要（含 `var_breach`、`var_actual_return`），供自定义规则使用。
 
 ## 示例
 

@@ -593,6 +593,12 @@ def _summarize_results(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
             "parametric_var_pct",
             "mc_gbm_var_pct",
             "mc_t_var_pct",
+            "var_timeframe",
+            "var_breach",
+            "var_actual_return",
+            "var_exceedance_pct",
+            "var_breach_severity",
+            "var_horizon_bars",
         ):
             if r.get(key) is not None:
                 entry[key] = r.get(key)

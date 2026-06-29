@@ -541,6 +541,7 @@ onMounted(async () => {
                   <li><strong>message</strong>：占位符含 <code>{var_pct} {var_usdt}</code> 等</li>
                   <li><strong>VaR 字段</strong>：<code>var_pct</code> / <code>var_usdt</code> / <code>var_99_pct</code> — 需在保存的 JSON 根对象加 <code>var.enabled: true</code>（见文档）</li>
                   <li><strong>内置 VaR 超限</strong>：<code>var.on_symbol_var_breach</code> + <code>max_var_pct</code>（如 0.05）</li>
+                  <li><strong>滚动 VaR 突破</strong>：<code>var.on_rolling_var_breach</code> + <code>timeframe</code>（4h/1h）+ <code>horizon_bars</code></li>
                 </ul>
                 <p class="hint">完整说明见 <code>docs/schedule-alert-custom-rules.md</code> · API <code>GET .../alerts/rules/format</code></p>
               </div>

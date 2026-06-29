@@ -21,6 +21,7 @@ RULE_META: dict[str, dict[str, str]] = {
     "stance_changed": {"label": "立场变化", "emoji": "🔀", "severity": "warning"},
     "custom_signal": {"label": "自定义信号", "emoji": "🎯", "severity": "warning"},
     "var_breach": {"label": "VaR 超限", "emoji": "⚠️", "severity": "warning"},
+    "var_rolling_breach": {"label": "滚动 VaR 突破", "emoji": "🚨", "severity": "warning"},
     "news_high_impact": {"label": "高影响舆情", "emoji": "📰", "severity": "warning"},
     "announcement_high_impact": {"label": "高影响公告", "emoji": "📢", "severity": "warning"},
     "options_spread_alert": {"label": "期权价差", "emoji": "📐", "severity": "warning"},

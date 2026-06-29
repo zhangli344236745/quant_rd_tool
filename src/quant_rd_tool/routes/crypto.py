@@ -607,12 +607,15 @@ def schedule_alerts_rules_format() -> dict[str, Any]:
             "enabled": True,
             "on_symbol_var_breach": True,
             "on_portfolio_var_breach": False,
+            "on_rolling_var_breach": True,
             "max_var_pct": 0.05,
             "max_portfolio_var_pct_of_equity": 0.10,
             "confidence": 0.99,
             "notional_usdt": 10000,
-            "lookback_bars": 252,
+            "lookback_bars": 360,
             "horizon_days": 1,
+            "horizon_bars": 1,
+            "timeframe": "4h",
             "mc_n_sims": 3000,
         },
     }
@@ -1065,8 +1068,9 @@ def crypto_var_symbol(
     symbol: str = "BTC",
     notional_usdt: float = 0.0,
     timeframe: str = "1d",
-    lookback_bars: int = 252,
+    lookback_bars: int = 0,
     horizon_days: int = 1,
+    horizon_bars: int = 0,
     confidence: str = "0.95,0.99",
     mc_n_sims: int = 10_000,
     mc_seed: int = 42,
@@ -1074,13 +1078,16 @@ def crypto_var_symbol(
     from quant_rd_tool.crypto_var import build_symbol_var_report, parse_confidence_levels
 
     levels = parse_confidence_levels(confidence)
+    hb = int(horizon_bars) if horizon_bars and horizon_bars > 0 else None
+    lb = int(lookback_bars) if lookback_bars and lookback_bars > 0 else None
     try:
         return build_symbol_var_report(
             symbol=symbol,
             notional_usdt=notional_usdt,
             timeframe=timeframe,
-            lookback_bars=min(lookback_bars, 2000),
+            lookback_bars=lb or 0,
             horizon_days=horizon_days,
+            horizon_bars=hb,
             confidence_levels=levels,
             mc_n_sims=mc_n_sims,
             mc_seed=mc_seed,
@@ -1093,8 +1100,9 @@ def crypto_var_symbol(
 def crypto_var_portfolio(
     testnet: bool = False,
     timeframe: str = "1d",
-    lookback_bars: int = 252,
+    lookback_bars: int = 0,
     horizon_days: int = 1,
+    horizon_bars: int = 0,
     confidence: str = "0.95,0.99",
     mc_n_sims: int = 10_000,
     mc_seed: int = 42,
@@ -1102,12 +1110,15 @@ def crypto_var_portfolio(
     from quant_rd_tool.crypto_var import build_portfolio_var_report, parse_confidence_levels
 
     levels = parse_confidence_levels(confidence)
+    hb = int(horizon_bars) if horizon_bars and horizon_bars > 0 else None
+    lb = int(lookback_bars) if lookback_bars and lookback_bars > 0 else None
     try:
         return build_portfolio_var_report(
             testnet=testnet,
             timeframe=timeframe,
-            lookback_bars=min(lookback_bars, 2000),
+            lookback_bars=lb or 0,
             horizon_days=horizon_days,
+            horizon_bars=hb,
             confidence_levels=levels,
             mc_n_sims=mc_n_sims,
             mc_seed=mc_seed,
@@ -1119,24 +1130,83 @@ def crypto_var_portfolio(
 @router.get("/var/symbol/history")
 def crypto_var_symbol_history(
     symbol: str = "BTC",
-    window: int = 60,
+    window: int = 0,
     confidence: float = 0.99,
     timeframe: str = "1d",
-    lookback_bars: int = 252,
+    lookback_bars: int = 0,
     horizon_days: int = 1,
+    horizon_bars: int = 0,
     notional_usdt: float = 0.0,
 ) -> dict[str, Any]:
     from quant_rd_tool.crypto_var import build_symbol_var_history
 
+    hb = int(horizon_bars) if horizon_bars and horizon_bars > 0 else None
+    lb = int(lookback_bars) if lookback_bars and lookback_bars > 0 else None
+    win = int(window) if window and window > 0 else None
     try:
         return build_symbol_var_history(
             symbol=symbol,
-            window=min(window, 500),
+            window=win or 60,
             confidence=confidence,
             timeframe=timeframe,
-            lookback_bars=min(lookback_bars, 2000),
+            lookback_bars=lb or 0,
             horizon_days=horizon_days,
+            horizon_bars=hb,
             notional_usdt=notional_usdt,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@router.get("/var/symbol/breach")
+def crypto_var_symbol_breach(
+    symbol: str = "BTC",
+    confidence: float = 0.99,
+    timeframe: str = "1d",
+    lookback_bars: int = 0,
+    horizon_days: int = 1,
+    horizon_bars: int = 0,
+    notional_usdt: float = 0.0,
+) -> dict[str, Any]:
+    from quant_rd_tool.crypto_var import build_symbol_var_breach
+
+    hb = int(horizon_bars) if horizon_bars and horizon_bars > 0 else None
+    lb = int(lookback_bars) if lookback_bars and lookback_bars > 0 else None
+    try:
+        return build_symbol_var_breach(
+            symbol=symbol,
+            confidence=confidence,
+            timeframe=timeframe,
+            lookback_bars=lb or 0,
+            horizon_days=horizon_days,
+            horizon_bars=hb,
+            notional_usdt=notional_usdt,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@router.get("/var/portfolio/breach")
+def crypto_var_portfolio_breach(
+    testnet: bool = False,
+    confidence: float = 0.99,
+    timeframe: str = "1d",
+    lookback_bars: int = 0,
+    horizon_days: int = 1,
+    horizon_bars: int = 0,
+) -> dict[str, Any]:
+    from quant_rd_tool.crypto_var import build_portfolio_var_breach
+
+    hb = int(horizon_bars) if horizon_bars and horizon_bars > 0 else None
+    lb = int(lookback_bars) if lookback_bars and lookback_bars > 0 else None
+    try:
+        return build_portfolio_var_breach(
+            testnet=testnet,
+            confidence=confidence,
+            timeframe=timeframe,
+            lookback_bars=lb or 0,
+            horizon_days=horizon_days,
+            horizon_bars=hb,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e

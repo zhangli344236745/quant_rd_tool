@@ -4,8 +4,10 @@ import { useRoute, useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
 import {
   cryptoApi,
+  type PortfolioVarBreach,
   type PortfolioVarReport,
   type ReturnHistogramBin,
+  type SymbolVarBreach,
   type SymbolVarHistory,
   type SymbolVarReport,
   type VarMetric,
@@ -20,13 +22,18 @@ const activeTab = ref<"symbol" | "portfolio">("symbol");
 const symbolForm = ref({
   symbol: "BTC",
   notional_usdt: 10000,
-  lookback_bars: 252,
+  timeframe: "1d" as "1d" | "4h" | "1h",
+  lookback_bars: 0,
   horizon_days: 1,
+  horizon_bars: 1,
   conf90: false,
   conf95: true,
   conf99: true,
   mc_n_sims: 10000,
 });
+
+const defaultLookback = (tf: string) => ({ "1d": 252, "4h": 360, "1h": 720 }[tf] ?? 252);
+const defaultRollingWindow = (tf: string) => ({ "1d": 60, "4h": 90, "1h": 168 }[tf] ?? 60);
 
 const symbolLoading = ref(false);
 const symbolError = ref("");
@@ -34,10 +41,35 @@ const symbolReport = ref<SymbolVarReport | null>(null);
 
 const historyLoading = ref(false);
 const symbolHistory = ref<SymbolVarHistory | null>(null);
+const symbolBreach = ref<SymbolVarBreach | null>(null);
 
 const portfolioLoading = ref(false);
 const portfolioError = ref("");
 const portfolioReport = ref<PortfolioVarReport | null>(null);
+const portfolioBreach = ref<PortfolioVarBreach | null>(null);
+
+function varParams() {
+  const tf = symbolForm.value.timeframe;
+  const lb = symbolForm.value.lookback_bars > 0 ? symbolForm.value.lookback_bars : defaultLookback(tf);
+  return {
+    timeframe: tf,
+    lookback_bars: lb,
+    horizon_days: symbolForm.value.horizon_days,
+    horizon_bars: symbolForm.value.horizon_bars,
+    confidence: confidenceParam(),
+    mc_n_sims: symbolForm.value.mc_n_sims,
+  };
+}
+
+function primaryConfidence() {
+  return symbolForm.value.conf99 ? 0.99 : symbolForm.value.conf95 ? 0.95 : 0.9;
+}
+
+function rollingWindowLabel() {
+  const tf = symbolForm.value.timeframe;
+  const win = symbolHistory.value?.window ?? defaultRollingWindow(tf);
+  return `滚动 VaR（近 ${win} 根 ${tf} K 线）`;
+}
 
 function confidenceParam(): string {
   const levels: string[] = [];
@@ -110,19 +142,17 @@ async function loadSymbolVar() {
   symbolError.value = "";
   symbolReport.value = null;
   symbolHistory.value = null;
+  symbolBreach.value = null;
   pushRouteQuery();
   try {
+    const p = varParams();
     const { data } = await cryptoApi.varSymbol({
       symbol: symbolForm.value.symbol,
       notional_usdt: symbolForm.value.notional_usdt,
-      lookback_bars: symbolForm.value.lookback_bars,
-      horizon_days: symbolForm.value.horizon_days,
-      confidence: confidenceParam(),
-      timeframe: "1d",
-      mc_n_sims: symbolForm.value.mc_n_sims,
+      ...p,
     });
     symbolReport.value = data;
-    await loadSymbolHistory();
+    await Promise.all([loadSymbolHistory(), loadSymbolBreach()]);
   } catch (e) {
     symbolError.value = extractError(e);
     ElMessage.error(symbolError.value);
@@ -132,17 +162,19 @@ async function loadSymbolVar() {
 }
 
 async function loadSymbolHistory() {
-  const conf = symbolForm.value.conf99 ? 0.99 : symbolForm.value.conf95 ? 0.95 : 0.9;
+  const tf = symbolForm.value.timeframe;
+  const lb = symbolForm.value.lookback_bars > 0 ? symbolForm.value.lookback_bars : defaultLookback(tf);
   historyLoading.value = true;
   try {
     const { data } = await cryptoApi.varSymbolHistory({
       symbol: symbolForm.value.symbol,
-      window: 60,
-      confidence: conf,
-      lookback_bars: symbolForm.value.lookback_bars,
+      window: defaultRollingWindow(tf),
+      confidence: primaryConfidence(),
+      lookback_bars: lb,
       horizon_days: symbolForm.value.horizon_days,
+      horizon_bars: symbolForm.value.horizon_bars,
       notional_usdt: symbolForm.value.notional_usdt,
-      timeframe: "1d",
+      timeframe: tf,
     });
     symbolHistory.value = data;
   } catch {
@@ -152,21 +184,51 @@ async function loadSymbolHistory() {
   }
 }
 
+async function loadSymbolBreach() {
+  const tf = symbolForm.value.timeframe;
+  const lb = symbolForm.value.lookback_bars > 0 ? symbolForm.value.lookback_bars : defaultLookback(tf);
+  try {
+    const { data } = await cryptoApi.varSymbolBreach({
+      symbol: symbolForm.value.symbol,
+      confidence: primaryConfidence(),
+      timeframe: tf,
+      lookback_bars: lb,
+      horizon_days: symbolForm.value.horizon_days,
+      horizon_bars: symbolForm.value.horizon_bars,
+      notional_usdt: symbolForm.value.notional_usdt,
+    });
+    symbolBreach.value = data;
+  } catch {
+    symbolBreach.value = null;
+  }
+}
+
 async function loadPortfolioVar() {
   portfolioLoading.value = true;
   portfolioError.value = "";
   portfolioReport.value = null;
+  portfolioBreach.value = null;
   pushRouteQuery();
   try {
+    const p = varParams();
     const { data } = await cryptoApi.varPortfolio({
       testnet: false,
-      lookback_bars: symbolForm.value.lookback_bars,
-      horizon_days: symbolForm.value.horizon_days,
-      confidence: confidenceParam(),
-      timeframe: "1d",
-      mc_n_sims: symbolForm.value.mc_n_sims,
+      ...p,
     });
     portfolioReport.value = data;
+    try {
+      const breachRes = await cryptoApi.varPortfolioBreach({
+        testnet: false,
+        confidence: primaryConfidence(),
+        timeframe: p.timeframe,
+        lookback_bars: p.lookback_bars,
+        horizon_days: p.horizon_days,
+        horizon_bars: p.horizon_bars,
+      });
+      portfolioBreach.value = breachRes.data;
+    } catch {
+      portfolioBreach.value = null;
+    }
   } catch (e) {
     portfolioError.value = extractError(e);
     ElMessage.error(portfolioError.value);
@@ -202,7 +264,7 @@ onMounted(() => {
   <div>
     <h1 class="page-title">风险 VaR</h1>
     <p class="page-desc">
-      历史模拟 + 参数法 + 蒙特卡洛（GBM / Student-t）对照、CVaR、回测与压力情景；组合含边际 VaR 与相关性。
+      历史模拟 + 参数法 + 蒙特卡洛对照；支持 1d / 4h / 1h 周期、bar 级持有期、滚动 VaR 突破检测与调度告警。
     </p>
 
     <el-card shadow="never" class="panel-card">
@@ -221,22 +283,43 @@ onMounted(() => {
                 </el-form-item>
               </el-col>
               <el-col :span="6">
+                <el-form-item label="K 线周期">
+                  <el-select v-model="symbolForm.timeframe" style="width: 100%">
+                    <el-option label="日线 1d" value="1d" />
+                    <el-option label="4 小时 4h" value="4h" />
+                    <el-option label="1 小时 1h" value="1h" />
+                  </el-select>
+                </el-form-item>
+              </el-col>
+              <el-col :span="6">
                 <el-form-item label="名义 (USDT)">
                   <el-input-number v-model="symbolForm.notional_usdt" :min="0" :step="1000" style="width: 100%" />
                 </el-form-item>
               </el-col>
               <el-col :span="6">
                 <el-form-item label="回看 K 线">
-                  <el-input-number v-model="symbolForm.lookback_bars" :min="30" :max="2000" style="width: 100%" />
+                  <el-input-number
+                    v-model="symbolForm.lookback_bars"
+                    :min="0"
+                    :max="2000"
+                    :placeholder="String(defaultLookback(symbolForm.timeframe))"
+                    style="width: 100%"
+                  />
                 </el-form-item>
               </el-col>
               <el-col :span="6">
-                <el-form-item label="持有期 (天)">
-                  <el-input-number v-model="symbolForm.horizon_days" :min="1" :max="30" style="width: 100%" />
+                <el-form-item label="持有期 (bar)">
+                  <el-input-number v-model="symbolForm.horizon_bars" :min="1" :max="96" style="width: 100%" />
                 </el-form-item>
               </el-col>
             </el-row>
             <el-row :gutter="16">
+              <el-col :span="6">
+                <el-form-item label="持有期 (天)">
+                  <el-input-number v-model="symbolForm.horizon_days" :min="1" :max="30" style="width: 100%" />
+                  <div class="muted small">未设 bar 时生效</div>
+                </el-form-item>
+              </el-col>
               <el-col :span="12">
                 <el-form-item label="置信水平">
                   <el-checkbox v-model="symbolForm.conf90">90%</el-checkbox>
@@ -261,6 +344,15 @@ onMounted(() => {
 
           <template v-if="symbolReport">
             <el-alert
+              v-if="symbolBreach?.breached"
+              type="error"
+              :title="`最新 ${symbolBreach.timeframe} K 线突破 VaR：实际 ${pct(symbolBreach.actual_return)}，VaR ${pct(symbolBreach.var_pct)}`"
+              show-icon
+              :closable="false"
+              class="mb"
+            />
+
+            <el-alert
               v-if="symbolReport.narrative?.headline"
               type="info"
               :title="symbolReport.narrative.headline"
@@ -274,8 +366,12 @@ onMounted(() => {
             </el-alert>
 
             <p class="muted small mb">
-              {{ symbolReport.symbol }} · 现货 {{ symbolReport.latest_price }} · 名义
-              {{ usdt(symbolReport.notional_usdt) }} USDT · 样本 {{ symbolReport.observations }} 期
+              {{ symbolReport.symbol }} · {{ symbolReport.params?.timeframe }} · 现货
+              {{ symbolReport.latest_price }} · 名义 {{ usdt(symbolReport.notional_usdt) }} USDT · 样本
+              {{ symbolReport.observations }} 期
+              <span v-if="symbolReport.params?.effective_horizon_days != null">
+                · 有效持有 {{ symbolReport.params.effective_horizon_days }} 天
+              </span>
               <span v-if="symbolReport.return_stats?.annualized_volatility != null">
                 · 年化波动 {{ pct(symbolReport.return_stats.annualized_volatility) }}
               </span>
@@ -385,7 +481,7 @@ onMounted(() => {
 
             <el-card v-loading="historyLoading" shadow="never" class="panel-card mt inner-card">
               <template #header>
-                滚动 VaR（近 60 窗）
+                {{ rollingWindowLabel() }}
                 <span v-if="symbolHistory?.breach_count != null" class="muted small">
                   · 窗口内突破 {{ symbolHistory.breach_count }} 次
                 </span>
@@ -457,6 +553,15 @@ onMounted(() => {
             />
 
             <template v-if="portfolioReport.enabled">
+              <el-alert
+                v-if="portfolioBreach?.breached"
+                type="error"
+                :title="`组合最新 ${portfolioBreach.timeframe} K 线突破 VaR：实际 ${pct(portfolioBreach.actual_return)}，VaR ${pct(portfolioBreach.var_pct)}`"
+                show-icon
+                :closable="false"
+                class="mb mt"
+              />
+
               <el-alert
                 v-if="portfolioReport.narrative?.headline"
                 type="info"

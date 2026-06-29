@@ -219,9 +219,11 @@ HTTP（单次执行，不注册任务）：
 - `POST /api/v1/crypto/perp-bot/run` — `{"base":"BTC","timeframe":"5m","dry_run":true}`
 - `POST /api/v1/crypto/perp-portfolio/run` — `{"symbols":["BTC","ETH"],"dry_run":true,"signal_only":false}`
 - `GET /api/v1/crypto/ops/summary` — 调度 + 永续状态 + 遥测摘要（Web **Crypto 运营** 看板）
-- `GET /api/v1/crypto/var/symbol` — 单标的 VaR/CVaR：历史 + 参数法 + 蒙特卡洛（GBM / Student-t，`mc_n_sims` / `mc_seed`）对照
+- `GET /api/v1/crypto/var/symbol` — 单标的 VaR/CVaR：支持 `1d`/`4h`/`1h` 与 `horizon_bars`
 - `GET /api/v1/crypto/var/portfolio` — 组合 VaR：持仓边际贡献、相关性矩阵、占权益比例（需 API Key）
 - `GET /api/v1/crypto/var/symbol/history` — 滚动 VaR 序列（含实际收益与突破标记）
+- `GET /api/v1/crypto/var/symbol/breach` — 最新 K 线是否突破 VaR
+- `GET /api/v1/crypto/var/portfolio/breach` — 组合滚动 VaR 突破检测
 - Web 侧栏：**风险 VaR**（`/crypto-var`）；**Crypto 行情** / **Crypto 运营** 页含 VaR 摘要卡片
 - `GET /api/v1/crypto/options/volatility-scan` — Binance 期权 ATM IV 扫描（分位 / 24h 变化 / 横向排名 + 研究性建议）
 - `GET /api/v1/crypto/options/strike-probability?base=BTC&n=5` — ATM±N 行权价：qlib+GBM 模型概率 vs IV 隐含概率（到期 ITM + 触达）

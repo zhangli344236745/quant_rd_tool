@@ -786,14 +786,43 @@ def evaluate_var_breaches(
             ):
                 fired.append({"rule": "var_symbol_breach", "message": msg, "symbol": sym})
 
+    if cfg.get("on_rolling_var_breach"):
+        for row in last_cycle_summary:
+            if row.get("error") or row.get("var_enabled") is False:
+                continue
+            if row.get("var_breach") is not True:
+                continue
+            sym = row.get("symbol", "")
+            actual = row.get("var_actual_return")
+            var_pct = row.get("var_pct")
+            tf = row.get("var_timeframe") or cfg.get("timeframe", "1d")
+            msg = (
+                f"[{job_id}] {sym} 滚动 VaR 突破 ({tf}): "
+                f"实际 {float(actual) * 100:.2f}% < VaR {float(var_pct) * 100:.2f}%"
+            )
+            if _fire_alert(
+                job_id=job_id,
+                rule="var_rolling_breach",
+                message=msg,
+                detail={"symbol_row": row, "var_config": cfg},
+                state_path=state_path,
+                rules=rules,
+            ):
+                fired.append({"rule": "var_rolling_breach", "message": msg, "symbol": sym})
+
     if cfg["on_portfolio_var_breach"]:
         try:
             from quant_rd_tool.crypto_var import build_portfolio_var_report, confidence_key
 
+            tf = str(cfg.get("timeframe", "1d"))
+            horizon_bars = int(cfg.get("horizon_bars") or 0) or None
+            lb = int(cfg.get("lookback_bars", 252))
             report = build_portfolio_var_report(
                 testnet=False,
-                lookback_bars=cfg["lookback_bars"],
+                timeframe=tf,
+                lookback_bars=lb,
                 horizon_days=cfg["horizon_days"],
+                horizon_bars=horizon_bars,
                 confidence_levels=[cfg["confidence"], 0.95],
                 mc_n_sims=cfg["mc_n_sims"],
                 mc_seed=cfg["mc_seed"],

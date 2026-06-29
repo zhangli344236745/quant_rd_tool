@@ -5,6 +5,7 @@ import { ElMessage } from "element-plus";
 import {
   cryptoApi,
   type CryptoVolumeAdviseResult,
+  type CryptoWorkflowAdviceSegment,
   type CryptoWorkflowRunResult,
   type CryptoWorkflowRunSummary,
   type CryptoWorkflowStepConfig,
@@ -175,7 +176,11 @@ function buildRunPayload() {
   const steps = sortedSteps.value.map((s, i) => ({ ...s, order: i }));
   for (const step of steps) {
     if (step.id === "zipline_strategy") ensureParam(step, "strategy_id", "ma_crossover");
-    if (step.id === "var_symbol") ensureParam(step, "notional_usdt", 10000);
+    if (step.id === "var_symbol") {
+      ensureParam(step, "notional_usdt", 10000);
+      ensureParam(step, "timeframe", "4h");
+      ensureParam(step, "horizon_bars", 1);
+    }
     if (step.id === "qlib_ml") {
       ensureParam(step, "algorithm", "both");
       ensureParam(step, "use_cache", true);
@@ -288,6 +293,21 @@ function fmtUsdt(v: unknown) {
 }
 
 const priceGuidance = computed(() => result.value?.advice?.price_guidance);
+
+const adviceSegments = computed(() => {
+  const segs = result.value?.advice?.segments;
+  if (!segs) return [] as CryptoWorkflowAdviceSegment[];
+  return [segs.spot, segs.perp, segs.options].filter(Boolean);
+});
+
+function segmentAlertType(seg: CryptoWorkflowAdviceSegment) {
+  if (!seg.available) return "info";
+  const s = seg.stance;
+  if (s === "看涨" || s.includes("偏多")) return "success";
+  if (s === "看跌" || s.includes("偏空")) return "warning";
+  if (s.includes("偏高") || s.includes("高波动")) return "warning";
+  return "info";
+}
 
 function statusTagType(status: string) {
   if (status === "ok") return "success";
@@ -461,6 +481,19 @@ watch([symbol, timeframe], () => {
                 :step="1000"
                 size="small"
               />
+              <p class="param-label">VaR 周期</p>
+              <el-select v-model="stepParams(step).timeframe" size="small" style="width: 88px">
+                <el-option label="1d" value="1d" />
+                <el-option label="4h" value="4h" />
+                <el-option label="1h" value="1h" />
+              </el-select>
+              <p class="param-label">持有 (bar)</p>
+              <el-input-number
+                v-model="stepParams(step).horizon_bars"
+                :min="1"
+                :max="96"
+                size="small"
+              />
             </template>
             <template v-if="step.enabled && step.id === 'qlib_ml'">
               <p class="param-label">ML 算法</p>
@@ -580,6 +613,65 @@ watch([symbol, timeframe], () => {
           <ul class="bullets">
             <li v-for="(b, i) in result.advice.bullets" :key="i">{{ b }}</li>
           </ul>
+
+          <el-card v-if="adviceSegments.length" shadow="never" class="segment-card mt">
+            <template #header>分市场建议</template>
+            <el-tabs>
+              <el-tab-pane
+                v-for="seg in adviceSegments"
+                :key="seg.segment"
+                :label="seg.label"
+              >
+                <el-alert
+                  :title="seg.headline"
+                  :type="segmentAlertType(seg)"
+                  :closable="false"
+                  show-icon
+                  class="mb"
+                />
+                <div v-if="seg.available" class="advice-metrics">
+                  <el-tag>方向 {{ seg.stance }}</el-tag>
+                  <el-tag
+                    v-if="seg.suggested_position_pct != null"
+                    type="info"
+                  >
+                    建议仓位 {{ pct(seg.suggested_position_pct) }}
+                  </el-tag>
+                  <el-tag v-if="seg.risk_level" :type="seg.risk_level === '高' ? 'danger' : 'info'">
+                    风险 {{ seg.risk_level }}
+                  </el-tag>
+                  <el-tag v-if="seg.alignment" type="info">与现货 {{ seg.alignment }}</el-tag>
+                  <el-tag v-if="seg.var_gate_triggered" type="danger">VaR 门控</el-tag>
+                  <el-tag v-if="seg.confidence != null" type="info">
+                    置信 {{ pct(seg.confidence) }}
+                  </el-tag>
+                </div>
+                <p class="mt">{{ seg.advice }}</p>
+                <ul v-if="seg.bullets?.length" class="bullets">
+                  <li v-for="(b, i) in seg.bullets" :key="i">{{ b }}</li>
+                </ul>
+                <el-card
+                  v-if="seg.price_guidance?.available"
+                  shadow="never"
+                  class="price-card mt"
+                >
+                  <template #header>IV 参考价位（现货）</template>
+                  <el-descriptions :column="2" size="small" border>
+                    <el-descriptions-item label="参考买入">
+                      <strong>{{ fmtPrice(seg.price_guidance.entry_price) }}</strong>
+                    </el-descriptions-item>
+                    <el-descriptions-item label="止损">
+                      {{ fmtPrice(seg.price_guidance.stop_loss_price) }}
+                    </el-descriptions-item>
+                    <el-descriptions-item label="止盈">
+                      {{ fmtPrice(seg.price_guidance.take_profit_price) }}
+                    </el-descriptions-item>
+                  </el-descriptions>
+                </el-card>
+              </el-tab-pane>
+            </el-tabs>
+          </el-card>
+
           <pre v-if="showMarkdown && result.advice.markdown" class="md-preview">{{ result.advice.markdown }}</pre>
           <p class="muted small">{{ result.advice.disclaimer }}</p>
         </el-card>

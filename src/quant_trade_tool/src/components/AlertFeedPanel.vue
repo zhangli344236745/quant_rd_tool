@@ -30,6 +30,7 @@ const RULE_FALLBACK: Record<string, { label: string; emoji: string; severity: st
   cycle_complete: { label: "分析完成", emoji: "📊", severity: "success" },
   custom_signal: { label: "自定义信号", emoji: "🎯", severity: "warning" },
   var_breach: { label: "VaR 超限", emoji: "⚠️", severity: "warning" },
+  var_rolling_breach: { label: "滚动 VaR 突破", emoji: "🚨", severity: "warning" },
 };
 
 const rows = computed(() =>

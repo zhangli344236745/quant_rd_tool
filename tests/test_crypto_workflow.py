@@ -62,6 +62,85 @@ def test_synthesize_advice_var_gate():
     advice = synthesize_advice(ctx, {"var_gate_pct": 0.08})
     assert advice["var_gate_triggered"] is True
     assert advice["suggested_position_pct"] <= 0.1
+    segs = advice.get("segments") or {}
+    assert segs["spot"]["label"] == "现货"
+    assert segs["perp"]["label"] == "合约"
+    assert segs["perp"]["var_gate_triggered"] is True
+    assert segs["options"]["label"] == "期权"
+
+
+def test_synthesize_advice_segments_spot_perp_options():
+    ctx = {
+        "symbol": "BTC",
+        "timeframe": "1d",
+        "steps": {
+            "technical": {
+                "status": "ok",
+                "output": {"stance": "看涨", "score": 3},
+            },
+            "qlib_ml": {
+                "status": "ok",
+                "output": {
+                    "combined_signal": {
+                        "stance": "看涨",
+                        "agreement": "一致",
+                        "ml": {"stance": "看涨"},
+                    },
+                },
+            },
+            "volume_analysis": {
+                "status": "ok",
+                "output": {
+                    "advice": {
+                        "level": "buy",
+                        "stance": "看涨",
+                        "scheme_label": "放量突破",
+                        "level_label": "建议参与",
+                    },
+                },
+            },
+            "zipline_strategy": {
+                "status": "ok",
+                "output": {"strategy_id": "ma_crossover", "target_pct": 0.5},
+            },
+            "var_symbol": {
+                "status": "ok",
+                "output": {"var_ratio": 0.03, "var_99_pct": 0.03, "var_99_usdt": 300},
+            },
+            "options_vol": {
+                "status": "ok",
+                "output": {
+                    "enabled": True,
+                    "cross_view": {
+                        "summary": "方向偏多且 IV 未极端",
+                        "alignment": "共振",
+                        "notes": ["IV 历史分位约 55%。"],
+                        "options_stance": "中性",
+                    },
+                    "scan_item": {"atm_iv": 0.45, "iv_percentile": 55},
+                    "options_vol": {
+                        "advice": {
+                            "stance": "中性",
+                            "summary": "BTC：中性。",
+                            "actions": ["维持常规仓位管理。"],
+                            "confidence": 0.45,
+                        },
+                    },
+                },
+            },
+        },
+    }
+    advice = synthesize_advice(ctx, {})
+    segs = advice["segments"]
+    assert segs["spot"]["stance"] == "看涨"
+    assert segs["spot"]["available"] is True
+    assert segs["perp"]["stance"] == "看涨"
+    assert segs["perp"]["suggested_position_pct"] >= 0.4
+    assert segs["options"]["available"] is True
+    assert segs["options"]["alignment"] == "共振"
+    assert "### 现货" in advice["markdown"]
+    assert "### 合约" in advice["markdown"]
+    assert "### 期权" in advice["markdown"]
 
 
 def test_run_workflow_mocked(monkeypatch, tmp_path):

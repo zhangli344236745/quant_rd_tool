@@ -137,6 +137,35 @@ def test_evaluate_var_symbol_breach(tmp_path, monkeypatch):
     assert fired[0]["rule"] == "var_symbol_breach"
 
 
+def test_evaluate_var_rolling_breach(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    from quant_rd_tool.schedule_alerts import evaluate_var_breaches, save_alert_rules
+
+    save_alert_rules(
+        var={
+            "enabled": True,
+            "on_rolling_var_breach": True,
+            "timeframe": "4h",
+        },
+        cooldown_minutes=0,
+    )
+    fired = evaluate_var_breaches(
+        "job-2",
+        last_cycle_summary=[
+            {
+                "symbol": "BTC",
+                "var_enabled": True,
+                "var_breach": True,
+                "var_actual_return": -0.08,
+                "var_pct": 0.04,
+                "var_timeframe": "4h",
+            },
+        ],
+    )
+    assert len(fired) == 1
+    assert fired[0]["rule"] == "var_rolling_breach"
+
+
 def test_validate_custom_rule():
     assert validate_custom_rule({"id": "x", "conditions": []})
     errs = validate_custom_rule({"conditions": [{"field": "bad", "op": "eq", "value": "1"}]})
