@@ -1154,6 +1154,59 @@ export const cryptoApi = {
       params: { hours, limit },
     }),
 
+  polymarketBacktest: (hours = 168) =>
+    http.get<PolymarketBacktestReport>("/crypto/polymarket/analytics/backtest", { params: { hours } }),
+
+  polymarketRoiDistribution: (hours = 168, strategyType?: string) =>
+    http.get<PolymarketRoiDistribution>("/crypto/polymarket/analytics/roi-distribution", {
+      params: { hours, strategy_type: strategyType },
+    }),
+
+  polymarketAdvisorCalibration: (hours = 720) =>
+    http.get<PolymarketAdvisorCalibrationReport>("/crypto/polymarket/analytics/advisor-calibration", {
+      params: { hours },
+    }),
+
+  polymarketStrategyCompare: (hours = 168) =>
+    http.get<PolymarketStrategyCompareReport>("/crypto/polymarket/analytics/strategy-compare", {
+      params: { hours },
+    }),
+
+  polymarketCrossVenue: (base = "BTC", persist = false) =>
+    http.get<PolymarketCrossVenueReport>("/crypto/polymarket/cross-venue", {
+      params: { base, persist },
+    }),
+
+  polymarketCrossVenueAll: (bases = "BTC,ETH", persist = false) =>
+    http.get<PolymarketCrossVenueAllReport>("/crypto/polymarket/cross-venue/all", {
+      params: { bases, persist },
+    }),
+
+  polymarketCrossVenueHistory: (hours = 168, limit = 100) =>
+    http.get<{ hours: number; items: PolymarketCrossVenueHistoryItem[]; count: number }>(
+      "/crypto/polymarket/cross-venue/history",
+      { params: { hours, limit } },
+    ),
+
+  polymarketContext: (
+    symbol = "BTC",
+    maxMarkets = 5,
+    includeArbSummary = true,
+    spotStance = "中性",
+    spotAction = "hold",
+  ) =>
+    http.get<PolymarketContextReport>("/crypto/polymarket/context", {
+      params: {
+        symbol,
+        max_markets: maxMarkets,
+        include_arb_summary: includeArbSummary,
+        spot_stance: spotStance,
+        spot_action: spotAction,
+      },
+    }),
+
+  polymarketStreamStatus: () => http.get<PolymarketStreamStatus>("/crypto/polymarket/stream/status"),
+
   polymarketAdvisorRecommendations: (minWinRate = 0.6, limit = 10) =>
     http.get<PolymarketAdvisorReport>("/crypto/polymarket/advisor/recommendations", {
       params: { min_win_rate: minWinRate, limit },
@@ -1931,6 +1984,7 @@ export interface CryptoWorkflowTemplate {
 
 export interface CryptoWorkflowPriceGuidance {
   available: boolean;
+  market_type?: "spot" | "perp" | "options";
   spot?: number;
   side?: string;
   atm_iv?: number;
@@ -1945,12 +1999,30 @@ export interface CryptoWorkflowPriceGuidance {
   entry_note?: string;
   stop_loss_pct?: number;
   take_profit_pct?: number;
+  /** Perp */
+  spot_index?: number;
+  perp_mark?: number;
+  basis_bps?: number;
+  var_tightened_stop?: boolean;
+  liquidation_hint?: string;
+  /** Options */
+  option_type?: string;
+  entry_strike?: number;
+  alt_strike?: number;
+  expiry_dte?: number;
+  premium_budget_usd?: number;
+  stop_loss_premium_pct?: number;
+  take_profit_premium_pct?: number;
+  stop_loss_spot?: number;
+  take_profit_spot?: number;
+  strategy_hint?: string;
+  itm_prob?: number;
   disclaimer?: string;
   reason?: string;
 }
 
 export interface CryptoWorkflowAdviceSegment {
-  segment: "spot" | "perp" | "options";
+  segment: "spot" | "perp" | "options" | "prediction";
   label: string;
   available?: boolean;
   stance: string;
@@ -1981,10 +2053,16 @@ export interface CryptoWorkflowAdvice {
   var_gate_triggered?: boolean;
   signal_agreement?: string;
   price_guidance?: CryptoWorkflowPriceGuidance;
+  price_guidance_by_market?: {
+    spot?: CryptoWorkflowPriceGuidance | null;
+    perp?: CryptoWorkflowPriceGuidance | null;
+    options?: CryptoWorkflowPriceGuidance | null;
+  };
   segments?: {
     spot: CryptoWorkflowAdviceSegment;
     perp: CryptoWorkflowAdviceSegment;
     options: CryptoWorkflowAdviceSegment;
+    prediction: CryptoWorkflowAdviceSegment;
   };
   headline: string;
   bullets: string[];
@@ -2061,6 +2139,11 @@ export interface PolymarketArbConfig {
   max_depth_levels?: number;
   enabled_strategies?: string[];
   min_outcomes_multi?: number;
+  crypto_universe_enabled?: boolean;
+  crypto_symbol_keywords?: Record<string, string[]>;
+  stream_mode?: "rest" | "websocket" | "hybrid";
+  stream_debounce_s?: number;
+  stream_poll_interval_s?: number;
 }
 
 export type PolymarketStrategyType = "binary_ask" | "binary_bid" | "multi_ask";
@@ -2118,6 +2201,7 @@ export interface PolymarketScanResult {
   errors?: number;
   books_fetched?: number;
   items: PolymarketOpportunity[];
+  detected_bases?: string[];
 }
 
 export interface PolymarketSummary {
@@ -2225,6 +2309,112 @@ export interface PolymarketLeaderboardItem {
   best_edge_at_size_bps?: number | null;
   strategies?: string[];
   last_ts?: string;
+}
+
+export interface PolymarketStrategyBacktestItem {
+  strategy_type: string;
+  hit_count: number;
+  avg_edge_bps?: number | null;
+  avg_edge_at_size_bps?: number | null;
+  avg_profit_at_size_usd?: number | null;
+  fill_rate?: number;
+  unique_markets?: number;
+}
+
+export interface PolymarketBacktestReport {
+  hours: number;
+  opportunity_hits: number;
+  strategies: PolymarketStrategyBacktestItem[];
+  summary: {
+    closed_positions?: number;
+    paper_win_rate?: number | null;
+    total_realized_pnl_usd?: number;
+  };
+}
+
+export interface PolymarketRoiDistribution {
+  hours: number;
+  strategy_type?: string | null;
+  edge_buckets: Array<{ bucket: string; count: number }>;
+  paper_pnl_buckets: Array<{ bucket: string; count: number }>;
+  n_opportunities: number;
+  n_closed_positions: number;
+}
+
+export interface PolymarketCalibrationTier {
+  level: string;
+  level_label: string;
+  predicted_wr: number;
+  actual_wr?: number | null;
+  n: number;
+}
+
+export interface PolymarketAdvisorCalibrationReport {
+  hours: number;
+  tiers: PolymarketCalibrationTier[];
+  sample_closed: number;
+}
+
+export interface PolymarketStrategyCompareReport {
+  hours: number;
+  items: PolymarketStrategyBacktestItem[];
+  summary: PolymarketBacktestReport["summary"];
+}
+
+export interface PolymarketCrossVenuePair {
+  base?: string;
+  match_score?: number;
+  prob_spread_bps?: number | null;
+  poly_yes?: number | null;
+  kalshi_yes?: number | null;
+  arb_hint?: string;
+  poly?: { condition_id?: string; question?: string; implied_prob_yes?: number; market_url?: string | null };
+  kalshi?: { ticker?: string; title?: string; implied_prob_yes?: number | null };
+}
+
+export interface PolymarketCrossVenueReport {
+  base: string;
+  polymarket_enabled?: boolean;
+  polymarket_markets?: number;
+  pairs: PolymarketCrossVenuePair[];
+  kalshi_count?: number;
+  top_market?: Record<string, unknown> | null;
+}
+
+export interface PolymarketCrossVenueAllReport {
+  reports: PolymarketCrossVenueReport[];
+  pairs: PolymarketCrossVenuePair[];
+  pair_count: number;
+}
+
+export interface PolymarketCrossVenueHistoryItem {
+  ts?: string;
+  base?: string;
+  condition_id?: string;
+  kalshi_ticker?: string;
+  prob_spread_bps?: number | null;
+  poly_yes?: number | null;
+  kalshi_yes?: number | null;
+}
+
+export interface PolymarketContextReport {
+  enabled?: boolean;
+  symbol?: string;
+  markets?: Array<Record<string, unknown>>;
+  top_market?: Record<string, unknown> | null;
+  market_count?: number;
+  cross_view?: Record<string, unknown>;
+  error?: string;
+}
+
+export interface PolymarketStreamStatus {
+  mode?: string;
+  running?: boolean;
+  cached_books?: number;
+  token_count?: number;
+  last_poll_at?: string | null;
+  last_error?: string | null;
+  degraded?: boolean;
 }
 
 export type PolymarketRecommendationLevel = "strong_buy" | "buy" | "watch" | "pass";
@@ -2404,6 +2594,7 @@ export interface CarryPositionLiveStatus {
   pending_funding_usdt: number;
   pnl_breakdown: CarryPnlBreakdown;
   expected_income_if_hold?: CarryProfitEstimate;
+  price_guidance?: CarryPriceGuidance;
 }
 
 export interface CarryProfitEstimate {
@@ -2424,6 +2615,27 @@ export interface CarryProfitEstimate {
   breakeven_days: number | null;
 }
 
+export interface CarryPriceGuidance {
+  available?: boolean;
+  spot_mark?: number;
+  perp_mark?: number;
+  spot_buy_price?: number;
+  perp_short_price?: number;
+  spot_sell_price?: number;
+  perp_cover_price?: number;
+  entry_spot_price?: number;
+  entry_perp_price?: number;
+  stop_loss_perp_mark?: number | null;
+  take_profit_perp_mark?: number | null;
+  stop_loss_basis_bps?: number;
+  take_profit_basis_bps?: number;
+  stop_loss_pnl_usdt?: number;
+  take_profit_pnl_usdt?: number;
+  stop_loss_hint?: string;
+  take_profit_hint?: string;
+  profit_summary?: CarryProfitEstimate;
+}
+
 export interface CarryOpportunity {
   symbol: string;
   notional_usdt?: number;
@@ -2439,6 +2651,7 @@ export interface CarryOpportunity {
   exit_alert?: boolean;
   has_open_position?: boolean;
   carry_plan?: CarryExecutionPlan;
+  price_guidance?: CarryPriceGuidance;
   error?: string;
   ts?: string;
 }
@@ -2487,6 +2700,10 @@ export interface CarrySummary {
   exit_alert_count: number;
   total_realized_pnl: number;
   total_accrued_funding: number;
+  total_open_notional_usdt?: number;
+  total_unrealized_pnl_usdt?: number;
+  total_open_daily_income_usdt?: number;
+  scan_entry_daily_income_usdt?: number;
   recent_events: CarryEvent[];
   last_scan_ts?: string | null;
 }
@@ -2629,6 +2846,7 @@ export interface CarryPreview {
   };
   cost_breakdown: Record<string, number>;
   execution_plan?: CarryExecutionPlan;
+  price_guidance?: CarryPriceGuidance;
   risk_warnings: CarryRiskWarning[];
   disclaimer: string;
 }
@@ -2671,6 +2889,7 @@ export interface CarryClosePreview {
   execution_plan?: CarryExecutionPlan;
   open_legs?: CarryExecutionPlan;
   pnl_breakdown?: CarryPnlBreakdown;
+  price_guidance?: CarryPriceGuidance;
   risk_warnings: CarryRiskWarning[];
   disclaimer: string;
 }

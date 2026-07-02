@@ -34,12 +34,23 @@ def test_polymarket_config_put(monkeypatch, tmp_path):
 
     r = client.put(
         "/api/v1/crypto/polymarket/config",
-        json={"top_n_volume": 30, "min_edge_bps": 25},
+        json={
+            "top_n_volume": 30,
+            "min_edge_bps": 25,
+            "crypto_universe_enabled": True,
+            "stream_mode": "hybrid",
+            "stream_debounce_s": 3,
+            "stream_poll_interval_s": 8,
+        },
     )
     assert r.status_code == 200
     body = r.json()
     assert body["top_n_volume"] == 30
     assert body["min_edge_bps"] == 25
+    assert body["crypto_universe_enabled"] is True
+    assert body["stream_mode"] == "hybrid"
+    assert body["stream_debounce_s"] == 3
+    assert body["stream_poll_interval_s"] == 8
 
 
 def test_polymarket_open_route(monkeypatch):
@@ -171,3 +182,109 @@ def test_polymarket_edge_trend_route(monkeypatch, tmp_path):
     )
     assert r.status_code == 200
     assert r.json()["condition_id"] == "c1"
+
+
+def test_polymarket_backtest_routes(monkeypatch, tmp_path):
+    from quant_rd_tool import crypto_polymarket_arb as pa
+
+    monkeypatch.setattr(pa, "POLYMARKET_DIR", tmp_path)
+    (tmp_path / "positions").mkdir()
+
+    for path in (
+        "/api/v1/crypto/polymarket/analytics/backtest",
+        "/api/v1/crypto/polymarket/analytics/roi-distribution",
+        "/api/v1/crypto/polymarket/analytics/advisor-calibration",
+        "/api/v1/crypto/polymarket/analytics/strategy-compare",
+    ):
+        r = client.get(path)
+        assert r.status_code == 200, r.text
+
+
+def test_polymarket_cross_venue_route(monkeypatch):
+    from quant_rd_tool import crypto_polymarket_cross_venue as cv
+
+    monkeypatch.setattr(
+        cv,
+        "build_cross_venue_report",
+        lambda base, **k: {
+            "base": base.upper(),
+            "polymarket_enabled": True,
+            "pairs": [],
+            "kalshi_count": 0,
+        },
+    )
+
+    r = client.get("/api/v1/crypto/polymarket/cross-venue", params={"base": "BTC"})
+    assert r.status_code == 200
+    assert r.json()["base"] == "BTC"
+
+
+def test_polymarket_cross_venue_all_route(monkeypatch):
+    from quant_rd_tool import crypto_polymarket_cross_venue as cv
+
+    monkeypatch.setattr(
+        cv,
+        "build_cross_venue_report",
+        lambda base, **k: {
+            "base": base.upper(),
+            "pairs": [{"base": base.upper(), "prob_spread_bps": 100}],
+        },
+    )
+
+    r = client.get("/api/v1/crypto/polymarket/cross-venue/all", params={"bases": "BTC,ETH"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["pair_count"] == 2
+    assert len(body["reports"]) == 2
+
+
+def test_polymarket_context_route(monkeypatch):
+    from quant_rd_tool import crypto_polymarket_context as pmc
+    from quant_rd_tool import crypto_polymarket_integration as pmi
+
+    captured: dict[str, str] = {}
+
+    monkeypatch.setattr(
+        pmc,
+        "fetch_polymarket_context",
+        lambda sym, **k: {"enabled": True, "symbol": sym, "markets": [], "top_market": None},
+    )
+
+    def _cross(**kwargs):
+        captured["stance"] = kwargs.get("spot_stance", "")
+        return {"alignment": "共振", "summary": "ok"}
+
+    monkeypatch.setattr(pmi, "synthesize_prediction_cross_view", _cross)
+
+    r = client.get(
+        "/api/v1/crypto/polymarket/context",
+        params={"symbol": "BTC", "spot_stance": "看涨", "spot_action": "buy"},
+    )
+    assert r.status_code == 200
+    assert r.json()["cross_view"]["alignment"] == "共振"
+    assert captured["stance"] == "看涨"
+
+
+def test_polymarket_cross_venue_history_route(monkeypatch, tmp_path):
+    import json
+    from datetime import UTC, datetime
+
+    from quant_rd_tool import crypto_polymarket_arb as pa
+
+    monkeypatch.setattr(pa, "POLYMARKET_DIR", tmp_path)
+    hist = tmp_path / "cross_venue_history.jsonl"
+    hist.write_text(
+        json.dumps({"ts": datetime.now(UTC).isoformat(), "base": "BTC", "prob_spread_bps": 120})
+        + "\n",
+        encoding="utf-8",
+    )
+
+    r = client.get("/api/v1/crypto/polymarket/cross-venue/history", params={"hours": 168})
+    assert r.status_code == 200
+    assert r.json()["count"] == 1
+
+
+def test_polymarket_stream_status_route():
+    r = client.get("/api/v1/crypto/polymarket/stream/status")
+    assert r.status_code == 200
+    assert "mode" in r.json()

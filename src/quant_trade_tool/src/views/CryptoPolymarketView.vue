@@ -5,16 +5,22 @@ import {
   cryptoApi,
   type PolymarketAdvisorPick,
   type PolymarketAdvisorReport,
+  type PolymarketAdvisorCalibrationReport,
   type PolymarketArbConfig,
+  type PolymarketBacktestReport,
   type PolymarketClosePreview,
+  type PolymarketCrossVenuePair,
+  type PolymarketCrossVenueHistoryItem,
   type PolymarketEdgeHistoryPoint,
   type PolymarketEvent,
   type PolymarketLeaderboardItem,
   type PolymarketOpenPreview,
   type PolymarketOpportunity,
   type PolymarketPosition,
+  type PolymarketRoiDistribution,
   type PolymarketScanHistoryItem,
   type PolymarketScanResult,
+  type PolymarketStreamStatus,
   type PolymarketStrategyType,
   type PolymarketSummary,
 } from "@/api/crypto";
@@ -41,6 +47,12 @@ const leaderboard = ref<PolymarketLeaderboardItem[]>([]);
 const advisorReport = ref<PolymarketAdvisorReport | null>(null);
 const minWinRate = ref(0.6);
 const edgeTrendCache = ref<Record<string, PolymarketEdgeHistoryPoint[]>>({});
+const mainTab = ref<"scan" | "backtest" | "crossVenue">("scan");
+const backtestHours = ref(168);
+const backtestReport = ref<PolymarketBacktestReport | null>(null);
+const roiDistribution = ref<PolymarketRoiDistribution | null>(null);
+const calibrationReport = ref<PolymarketAdvisorCalibrationReport | null>(null);
+const backtestLoading = ref(false);
 
 const previewVisible = ref(false);
 const preview = ref<PolymarketOpenPreview | null>(null);
@@ -66,7 +78,19 @@ const config = reactive<PolymarketArbConfig>({
   use_depth_for_opportunity: true,
   depth_target_shares: 100,
   enabled_strategies: ["binary_ask", "binary_bid", "multi_ask"],
+  crypto_universe_enabled: false,
+  stream_mode: "rest",
+  stream_poll_interval_s: 5,
+  stream_debounce_s: 2,
 });
+const streamStatus = ref<PolymarketStreamStatus | null>(null);
+const crossVenueByCid = ref<Record<string, PolymarketCrossVenuePair>>({});
+const crossVenuePairs = ref<PolymarketCrossVenuePair[]>([]);
+const crossVenueHistory = ref<PolymarketCrossVenueHistoryItem[]>([]);
+const crossVenueBases = ref("BTC,ETH");
+const crossVenueLoading = ref(false);
+const crossVenueLoaded = ref(false);
+const crossVenuePersist = ref(false);
 
 const opportunities = computed(() => {
   let rows = showAllMarkets.value
@@ -150,10 +174,80 @@ async function loadConfig() {
   }
 }
 
+async function loadBacktest() {
+  backtestLoading.value = true;
+  try {
+    const [bt, roi, cal] = await Promise.all([
+      cryptoApi.polymarketBacktest(backtestHours.value),
+      cryptoApi.polymarketRoiDistribution(backtestHours.value),
+      cryptoApi.polymarketAdvisorCalibration(720),
+    ]);
+    backtestReport.value = bt.data;
+    roiDistribution.value = roi.data;
+    calibrationReport.value = cal.data;
+  } catch (e) {
+    ElMessage.error(extractError(e));
+  } finally {
+    backtestLoading.value = false;
+  }
+}
+
+async function onMainTabChange(name: string | number) {
+  if (name === "backtest" && !backtestReport.value) {
+    await loadBacktest();
+  }
+  if (name === "crossVenue") {
+    await loadCrossVenue();
+  }
+}
+
+function basesFromScan(meta: { detected_bases?: string[] } | null | undefined, items: PolymarketOpportunity[]): string {
+  const detected = meta?.detected_bases;
+  if (detected?.length) return detected.join(",");
+  if (!items.length) return "BTC,ETH";
+  return "BTC,ETH";
+}
+
+function applyCrossVenuePairs(pairs: PolymarketCrossVenuePair[]) {
+  crossVenuePairs.value = pairs;
+  const cvMap: Record<string, PolymarketCrossVenuePair> = {};
+  for (const p of pairs) {
+    const cid = p.poly?.condition_id;
+    if (cid) cvMap[cid] = p;
+  }
+  crossVenueByCid.value = cvMap;
+}
+
+async function loadCrossVenue(bases?: string) {
+  crossVenueLoading.value = true;
+  try {
+    const query = bases ?? crossVenueBases.value;
+    const [cvRes, histRes] = await Promise.all([
+      cryptoApi.polymarketCrossVenueAll(query, crossVenuePersist.value),
+      cryptoApi.polymarketCrossVenueHistory(168, 50),
+    ]);
+    applyCrossVenuePairs(cvRes.data.pairs ?? []);
+    crossVenueBases.value = query;
+    crossVenueHistory.value = histRes.data.items ?? [];
+    crossVenueLoaded.value = true;
+  } catch (e) {
+    ElMessage.error(extractError(e));
+  } finally {
+    crossVenueLoading.value = false;
+  }
+}
+
+function pct(v: unknown) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return "—";
+  return (n * 100).toFixed(1) + "%";
+}
+
 async function refresh() {
   loading.value = true;
   try {
-    const [scanRes, openRes, closedRes, sumRes, stRes, evRes, histRes, lbRes, advRes] = await Promise.all([
+    const [scanRes, openRes, closedRes, sumRes, stRes, evRes, histRes, lbRes, advRes, streamRes] =
+      await Promise.all([
       cryptoApi.polymarketScanLatest(),
       cryptoApi.polymarketPositions({ status: "open" }),
       cryptoApi.polymarketPositions({ status: "closed", limit: 50 }),
@@ -163,8 +257,13 @@ async function refresh() {
       cryptoApi.polymarketScanHistory(10),
       cryptoApi.polymarketLeaderboard(168, 10),
       cryptoApi.polymarketAdvisorRecommendations(minWinRate.value, 8),
+      cryptoApi.polymarketStreamStatus(),
     ]);
     allMarkets.value = scanRes.data?.items ?? [];
+    crossVenueBases.value = basesFromScan(scanRes.data, allMarkets.value);
+    if (crossVenueLoaded.value) {
+      await loadCrossVenue(crossVenueBases.value);
+    }
     openPositions.value = openRes.data?.items ?? [];
     closedPositions.value = closedRes.data?.items ?? [];
     summary.value = sumRes.data ?? null;
@@ -173,6 +272,7 @@ async function refresh() {
     scanHistory.value = histRes.data?.items ?? [];
     leaderboard.value = lbRes.data?.items ?? [];
     advisorReport.value = advRes.data ?? null;
+    streamStatus.value = streamRes.data ?? null;
     lastScanDuration.value = scanRes.data?.duration_sec ?? summary.value?.last_duration_sec ?? null;
     lastScanMeta.value = scanRes.data ?? {};
   } catch (e) {
@@ -189,6 +289,10 @@ async function runScan() {
     allMarkets.value = data.items ?? [];
     lastScanDuration.value = data.duration_sec ?? null;
     lastScanMeta.value = data;
+    crossVenueBases.value = basesFromScan(data, allMarkets.value);
+    if (crossVenueLoaded.value) {
+      await loadCrossVenue(crossVenueBases.value);
+    }
     const dur = data.duration_sec != null ? ` · ${num(data.duration_sec, 1)}s` : "";
     ElMessage.success(`扫描完成：${data.opportunities_count} 个机会${dur}`);
     const sum = await cryptoApi.polymarketStats();
@@ -340,6 +444,13 @@ onMounted(async () => {
       </div>
     </header>
 
+    <el-tabs v-model="mainTab" class="mb main-tabs" @tab-change="onMainTabChange">
+      <el-tab-pane label="扫描监控" name="scan" />
+      <el-tab-pane label="回测分析" name="backtest" />
+      <el-tab-pane label="跨所对比" name="crossVenue" />
+    </el-tabs>
+
+    <template v-if="mainTab === 'scan'">
     <el-row :gutter="12" class="mb stats-row">
       <el-col :span="4">
         <el-card shadow="never" class="stat-card">
@@ -382,12 +493,20 @@ onMounted(async () => {
     </el-row>
 
     <el-alert
+      v-if="streamStatus?.degraded"
+      class="mb scan-health"
+      type="warning"
+      :closable="false"
+      show-icon
+      :title="`盘口流降级：${streamStatus?.last_error || '轮询异常'}`"
+    />
+    <el-alert
       v-if="lastScanMeta.markets_scanned_ok != null"
       class="mb scan-health"
       type="info"
       :closable="false"
       show-icon
-      :title="`扫描健康：成功 ${lastScanMeta.markets_scanned_ok ?? 0} · 跳过 ${lastScanMeta.markets_skipped ?? 0} · 错误 ${lastScanMeta.markets_errors ?? 0}`"
+      :title="`扫描健康：成功 ${lastScanMeta.markets_scanned_ok ?? 0} · 跳过 ${lastScanMeta.markets_skipped ?? 0} · 错误 ${lastScanMeta.markets_errors ?? 0}${streamStatus?.mode && streamStatus.mode !== 'rest' ? ` · 流 ${streamStatus.running ? '运行' : '停止'}${streamStatus.degraded ? ' (降级)' : ''}` : ''}`"
     />
 
     <el-row :gutter="16" class="mb">
@@ -463,6 +582,30 @@ onMounted(async () => {
                 </el-form-item>
               </el-col>
               <el-col :span="12">
+                <el-form-item label="Crypto 主题扫描">
+                  <el-switch v-model="config.crypto_universe_enabled" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="12">
+                <el-form-item label="盘口模式">
+                  <el-select v-model="config.stream_mode" style="width: 100%">
+                    <el-option label="REST 轮询" value="rest" />
+                    <el-option label="快速轮询 (hybrid)" value="hybrid" />
+                    <el-option label="流式 (hybrid)" value="websocket" />
+                  </el-select>
+                </el-form-item>
+              </el-col>
+              <el-col :span="12">
+                <el-form-item label="流轮询秒">
+                  <el-input-number v-model="config.stream_poll_interval_s" :min="1" :max="60" :step="1" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="12">
+                <el-form-item label="流 debounce 秒">
+                  <el-input-number v-model="config.stream_debounce_s" :min="0.5" :max="60" :step="0.5" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="12">
                 <el-form-item label="扫描去重秒">
                   <el-input-number v-model="config.scan_dedupe_sec" :min="0" :max="600" />
                 </el-form-item>
@@ -518,6 +661,9 @@ onMounted(async () => {
             <span>胜率 <strong>{{ num(pick.win_rate_pct, 1) }}%</strong></span>
             <span>净利 <strong :class="profitClass(pick.profit_analysis?.net_profit_usd)">{{ signedUsd(pick.profit_analysis?.net_profit_usd, 2) }}</strong></span>
             <span>ROI <strong>{{ num(pick.profit_analysis?.roi_pct, 1) }}%</strong></span>
+            <span v-if="pick.win_rate_breakdown?.calibrated_prior != null">
+              校准 <strong>{{ num((pick.win_rate_breakdown.calibrated_prior as number) * 100, 1) }}%</strong>
+            </span>
             <span>建议 {{ num(pick.profit_analysis?.recommended_size_shares, 0) }} 份</span>
           </div>
           <p class="advisor-text">{{ pick.advice }}</p>
@@ -552,6 +698,13 @@ onMounted(async () => {
             inactive-text="仅机会"
             inline-prompt
           />
+          <el-button
+            size="small"
+            :loading="crossVenueLoading"
+            @click="loadCrossVenue(crossVenueBases)"
+          >
+            {{ crossVenueLoaded ? "刷新跨所价差" : "加载跨所价差" }}
+          </el-button>
         </div>
       </template>
       <el-table
@@ -598,6 +751,16 @@ onMounted(async () => {
               >
                 <polyline :points="sparklinePoints(row.condition_id)" fill="none" stroke="var(--el-color-primary)" stroke-width="1.5" />
               </svg>
+              <div v-if="crossVenueByCid[row.condition_id]" class="cross-venue-detail">
+                <div class="ladder-title">跨所对比 · Kalshi</div>
+                <p class="muted small">
+                  匹配 {{ crossVenueByCid[row.condition_id].kalshi?.title || "—" }}
+                  · Poly YES {{ num(crossVenueByCid[row.condition_id].poly_yes, 3) }}
+                  · Kalshi YES {{ num(crossVenueByCid[row.condition_id].kalshi_yes, 3) }}
+                  · 价差 {{ num(crossVenueByCid[row.condition_id].prob_spread_bps, 0) }} bps
+                </p>
+                <p class="muted small">{{ crossVenueByCid[row.condition_id].arb_hint }}</p>
+              </div>
             </div>
           </template>
         </el-table-column>
@@ -648,6 +811,15 @@ onMounted(async () => {
         </el-table-column>
         <el-table-column label="可成交" width="75">
           <template #default="{ row }">{{ num(row.fillable_shares ?? row.size_cap, 0) }}</template>
+        </el-table-column>
+        <el-table-column label="跨所价差" width="88">
+          <template #default="{ row }">
+            <span v-if="crossVenueByCid[row.condition_id]?.prob_spread_bps != null">
+              {{ num(crossVenueByCid[row.condition_id].prob_spread_bps, 0) }} bps
+            </span>
+            <span v-else-if="!crossVenueLoaded" class="muted">未加载</span>
+            <span v-else class="muted">—</span>
+          </template>
         </el-table-column>
         <el-table-column label="操作" width="90" fixed="right">
           <template #default="{ row }">
@@ -738,6 +910,157 @@ onMounted(async () => {
         </el-card>
       </el-col>
     </el-row>
+    </template>
+
+    <div v-else-if="mainTab === 'backtest'" v-loading="backtestLoading" class="backtest-panel">
+      <div class="backtest-toolbar mb">
+        <span>统计窗口</span>
+        <el-input-number v-model="backtestHours" :min="24" :max="720" :step="24" size="small" />
+        <span class="muted">小时</span>
+        <el-button size="small" @click="loadBacktest">刷新回测</el-button>
+      </div>
+
+      <el-row :gutter="12" class="mb">
+        <el-col :span="6">
+          <el-card shadow="never" class="stat-card">
+            <div class="stat-label">机会命中</div>
+            <div class="stat-value">{{ backtestReport?.opportunity_hits ?? 0 }}</div>
+          </el-card>
+        </el-col>
+        <el-col :span="6">
+          <el-card shadow="never" class="stat-card">
+            <div class="stat-label">纸面胜率</div>
+            <div class="stat-value">{{ pct(backtestReport?.summary?.paper_win_rate) }}</div>
+          </el-card>
+        </el-col>
+        <el-col :span="6">
+          <el-card shadow="never" class="stat-card">
+            <div class="stat-label">已平仓</div>
+            <div class="stat-value">{{ backtestReport?.summary?.closed_positions ?? 0 }}</div>
+          </el-card>
+        </el-col>
+        <el-col :span="6">
+          <el-card shadow="never" class="stat-card">
+            <div class="stat-label">累计盈亏</div>
+            <div class="stat-value" :class="profitClass(backtestReport?.summary?.total_realized_pnl_usd)">
+              {{ signedUsd(backtestReport?.summary?.total_realized_pnl_usd, 2) }}
+            </div>
+          </el-card>
+        </el-col>
+      </el-row>
+
+      <el-card shadow="never" class="mb">
+        <template #header>策略对比</template>
+        <el-table :data="backtestReport?.strategies ?? []" size="small" stripe>
+          <el-table-column prop="strategy_type" label="策略" width="100">
+            <template #default="{ row }">{{ strategyLabel[row.strategy_type] || row.strategy_type }}</template>
+          </el-table-column>
+          <el-table-column prop="hit_count" label="命中次数" width="90" />
+          <el-table-column prop="unique_markets" label="市场数" width="80" />
+          <el-table-column label="平均 edge@size" width="110">
+            <template #default="{ row }">{{ num(row.avg_edge_at_size_bps, 1) }} bps</template>
+          </el-table-column>
+          <el-table-column label="平均收益@size" width="110">
+            <template #default="{ row }">{{ num(row.avg_profit_at_size_usd, 2) }} USDC</template>
+          </el-table-column>
+          <el-table-column label="成交率" width="80">
+            <template #default="{ row }">{{ pct(row.fill_rate) }}</template>
+          </el-table-column>
+        </el-table>
+      </el-card>
+
+      <el-row :gutter="12" class="mb">
+        <el-col :span="12">
+          <el-card shadow="never">
+            <template #header>Edge 分布</template>
+            <el-table :data="roiDistribution?.edge_buckets ?? []" size="small">
+              <el-table-column prop="bucket" label="区间 (bps)" />
+              <el-table-column prop="count" label="次数" width="80" />
+            </el-table>
+          </el-card>
+        </el-col>
+        <el-col :span="12">
+          <el-card shadow="never">
+            <template #header>纸面 ROI 分布</template>
+            <el-table :data="roiDistribution?.paper_pnl_buckets ?? []" size="small">
+              <el-table-column prop="bucket" label="ROI 区间" />
+              <el-table-column prop="count" label="笔数" width="80" />
+            </el-table>
+          </el-card>
+        </el-col>
+      </el-row>
+
+      <el-card shadow="never">
+        <template #header>Advisor 校准（近 720h 纸面平仓）</template>
+        <el-table :data="calibrationReport?.tiers ?? []" size="small" stripe>
+          <el-table-column prop="level_label" label="推荐档位" width="100" />
+          <el-table-column label="预测胜率" width="100">
+            <template #default="{ row }">{{ pct(row.predicted_wr) }}</template>
+          </el-table-column>
+          <el-table-column label="实际胜率" width="100">
+            <template #default="{ row }">{{ row.n ? pct(row.actual_wr) : "—" }}</template>
+          </el-table-column>
+          <el-table-column prop="n" label="样本" width="70" />
+        </el-table>
+        <p class="muted small mt">样本 {{ calibrationReport?.sample_closed ?? 0 }} 笔已平仓；每档 n≥5 时 Advisor 会融合实际胜率。</p>
+      </el-card>
+    </div>
+
+    <div v-else v-loading="crossVenueLoading" class="cross-venue-panel">
+      <div class="backtest-toolbar mb">
+        <span>标的</span>
+        <el-input v-model="crossVenueBases" size="small" style="width: 160px" placeholder="BTC,ETH,SOL" />
+        <el-checkbox v-model="crossVenuePersist" size="small">写入历史</el-checkbox>
+        <el-button size="small" @click="loadCrossVenue()">刷新对比</el-button>
+        <span class="muted">Polymarket ↔ Kalshi 隐含概率价差（研究用途）</span>
+      </div>
+      <el-table :data="crossVenuePairs" size="small" stripe max-height="520">
+        <el-table-column prop="base" label="标的" width="64" />
+        <el-table-column label="Polymarket" min-width="180" show-overflow-tooltip>
+          <template #default="{ row }">
+            <a
+              v-if="row.poly?.market_url"
+              :href="row.poly.market_url"
+              target="_blank"
+              rel="noopener"
+              class="market-link"
+            >{{ row.poly?.question }}</a>
+            <span v-else>{{ row.poly?.question || "—" }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="Poly YES" width="88">
+          <template #default="{ row }">{{ num(row.poly_yes, 3) }}</template>
+        </el-table-column>
+        <el-table-column label="Kalshi" min-width="160" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.kalshi?.title || "—" }}</template>
+        </el-table-column>
+        <el-table-column label="Kalshi YES" width="96">
+          <template #default="{ row }">{{ num(row.kalshi_yes, 3) }}</template>
+        </el-table-column>
+        <el-table-column label="价差 bps" width="96">
+          <template #default="{ row }">{{ num(row.prob_spread_bps, 0) }}</template>
+        </el-table-column>
+        <el-table-column label="匹配分" width="80">
+          <template #default="{ row }">{{ num(row.match_score, 2) }}</template>
+        </el-table-column>
+        <el-table-column prop="arb_hint" label="提示" min-width="200" show-overflow-tooltip />
+      </el-table>
+      <p v-if="!crossVenuePairs.length" class="empty muted">暂无跨所匹配对，请扩大标的或刷新扫描后再试。</p>
+
+      <el-card v-if="crossVenueHistory.length" shadow="never" class="mt">
+        <template #header>价差历史（近 168h）</template>
+        <el-table :data="crossVenueHistory" size="small" max-height="240">
+          <el-table-column label="时间" min-width="140">
+            <template #default="{ row }">{{ formatBeijing(row.ts, "datetime_min") }}</template>
+          </el-table-column>
+          <el-table-column prop="base" label="标的" width="64" />
+          <el-table-column prop="kalshi_ticker" label="Kalshi" width="100" show-overflow-tooltip />
+          <el-table-column label="价差 bps" width="88">
+            <template #default="{ row }">{{ num(row.prob_spread_bps, 0) }}</template>
+          </el-table-column>
+        </el-table>
+      </el-card>
+    </div>
 
     <el-dialog v-model="previewVisible" title="开仓预览" width="480px">
       <template v-if="preview">
@@ -785,7 +1108,9 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.page { padding: 16px 20px 32px; }
+.main-tabs :deep(.el-tabs__header) { margin-bottom: 12px; }
+.backtest-toolbar { display: flex; align-items: center; gap: 8px; }
+.backtest-panel .mt { margin-top: 12px; }
 .head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
 .head h1 { margin: 0 0 6px; font-size: 22px; }
 .sub { margin: 0; color: var(--el-text-color-secondary); font-size: 13px; }

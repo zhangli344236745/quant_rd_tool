@@ -8,6 +8,7 @@ import {
   type CarryOpportunity,
   type CarryPosition,
   type CarryPreview,
+  type CarryPriceGuidance,
   type CarryProfitEstimate,
   type CarryRiskWarning,
   type CarrySummary,
@@ -89,6 +90,7 @@ function profitClass(v: number | undefined | null) {
 
 function rowProfit(row: CarryOpportunity): CarryProfitEstimate | null {
   if (row.profit_estimate) return row.profit_estimate;
+  if (row.price_guidance?.profit_summary) return row.price_guidance.profit_summary;
   const ei = row.carry_plan?.expected_income;
   if (!ei) return null;
   const notional = row.notional_usdt ?? config.default_notional_usdt;
@@ -129,6 +131,10 @@ function positionProfit(row: CarryPosition): CarryProfitEstimate | null {
     net_30d_after_open_cost_usdt: (ei.funding_30d_usdt ?? ei.funding_daily_usdt * 30) - openFees,
     breakeven_days: null,
   };
+}
+
+function positionPriceGuidance(row: CarryPosition): CarryPriceGuidance | null {
+  return row.live_status?.price_guidance ?? null;
 }
 
 function incomeBrief(p: CarryProfitEstimate | null) {
@@ -445,6 +451,47 @@ onMounted(loadScan);
       </el-col>
     </el-row>
 
+    <el-row :gutter="16" class="mb">
+      <el-col :span="6">
+        <el-card shadow="never">
+          <div class="stat-label">
+            <TermLabel label="开放仓名义" :hint="H.openNotional" />
+          </div>
+          <div class="stat-value">{{ num(summary?.total_open_notional_usdt, 0) }} USDT</div>
+        </el-card>
+      </el-col>
+      <el-col :span="6">
+        <el-card shadow="never">
+          <div class="stat-label">
+            <TermLabel label="开放仓浮动盈亏" :hint="H.unrealizedPnl" />
+          </div>
+          <div class="stat-value" :class="profitClass(summary?.total_unrealized_pnl_usdt)">
+            {{ signedUsdt(summary?.total_unrealized_pnl_usdt) }} USDT
+          </div>
+        </el-card>
+      </el-col>
+      <el-col :span="6">
+        <el-card shadow="never">
+          <div class="stat-label">
+            <TermLabel label="开放仓预估日收入" :hint="H.openDailyIncome" />
+          </div>
+          <div class="stat-value" :class="profitClass(summary?.total_open_daily_income_usdt)">
+            {{ signedUsdt(summary?.total_open_daily_income_usdt) }} USDT
+          </div>
+        </el-card>
+      </el-col>
+      <el-col :span="6">
+        <el-card shadow="never">
+          <div class="stat-label">
+            <TermLabel label="可入场日收入合计" :hint="H.scanEntryDaily" />
+          </div>
+          <div class="stat-value" :class="profitClass(summary?.scan_entry_daily_income_usdt)">
+            {{ signedUsdt(summary?.scan_entry_daily_income_usdt) }} USDT
+          </div>
+        </el-card>
+      </el-col>
+    </el-row>
+
     <el-card shadow="never" class="mb">
       <template #header>策略配置</template>
       <el-form label-width="140px" class="config-form">
@@ -580,6 +627,35 @@ onMounted(loadScan);
                 <span>扣费后日净：{{ signedUsdt(row.carry_plan.expected_income.net_daily_after_open_fee_usdt) }} USDT</span>
                 <span>开仓手续费：{{ num(row.carry_plan.open_fees_usdt) }} USDT</span>
               </div>
+              <div v-if="row.price_guidance?.available" class="price-guidance mt">
+                <h4 class="mini-title">价格与风控参考</h4>
+                <el-descriptions :column="2" border size="small">
+                  <el-descriptions-item>
+                    <template #label><TermLabel label="现货买入" :hint="H.spotBuyPrice" /></template>
+                    {{ num(row.price_guidance.spot_buy_price) }}
+                  </el-descriptions-item>
+                  <el-descriptions-item>
+                    <template #label><TermLabel label="永续开空" :hint="H.perpShortPrice" /></template>
+                    {{ num(row.price_guidance.perp_short_price) }}
+                  </el-descriptions-item>
+                  <el-descriptions-item>
+                    <template #label><TermLabel label="止损参考" :hint="H.stopLoss" /></template>
+                    {{ num(row.price_guidance.stop_loss_perp_mark) }}
+                    <span v-if="row.price_guidance.stop_loss_pnl_usdt != null" class="hint">
+                      （约 {{ signedUsdt(row.price_guidance.stop_loss_pnl_usdt) }} USDT）
+                    </span>
+                  </el-descriptions-item>
+                  <el-descriptions-item>
+                    <template #label><TermLabel label="止盈参考" :hint="H.takeProfit" /></template>
+                    {{ num(row.price_guidance.take_profit_perp_mark) }}
+                    <span v-if="row.price_guidance.take_profit_pnl_usdt != null" class="hint">
+                      （目标 {{ signedUsdt(row.price_guidance.take_profit_pnl_usdt) }} USDT）
+                    </span>
+                  </el-descriptions-item>
+                </el-descriptions>
+                <p v-if="row.price_guidance.stop_loss_hint" class="hint mt-sm">{{ row.price_guidance.stop_loss_hint }}</p>
+                <p v-if="row.price_guidance.take_profit_hint" class="hint">{{ row.price_guidance.take_profit_hint }}</p>
+              </div>
             </div>
             <span v-else class="hint">暂无套利方案</span>
           </template>
@@ -650,6 +726,44 @@ onMounted(loadScan);
             <TermLabel label="综合年化" :hint="H.compositeApr" />
           </template>
           <template #default="{ row }">{{ pct(row.composite_apr) }}</template>
+        </el-table-column>
+        <el-table-column width="110">
+          <template #header>
+            <TermLabel label="现货买入" :hint="H.spotBuyPrice" />
+          </template>
+          <template #default="{ row }">
+            {{ num(row.price_guidance?.spot_buy_price ?? row.spot_mark) }}
+          </template>
+        </el-table-column>
+        <el-table-column width="110">
+          <template #header>
+            <TermLabel label="永续开空" :hint="H.perpShortPrice" />
+          </template>
+          <template #default="{ row }">
+            {{ num(row.price_guidance?.perp_short_price ?? row.perp_mark) }}
+          </template>
+        </el-table-column>
+        <el-table-column width="110">
+          <template #header>
+            <TermLabel label="止损参考" :hint="H.stopLoss" />
+          </template>
+          <template #default="{ row }">
+            <span v-if="row.price_guidance?.stop_loss_perp_mark != null">
+              {{ num(row.price_guidance.stop_loss_perp_mark) }}
+            </span>
+            <span v-else class="hint">—</span>
+          </template>
+        </el-table-column>
+        <el-table-column width="110">
+          <template #header>
+            <TermLabel label="止盈参考" :hint="H.takeProfit" />
+          </template>
+          <template #default="{ row }">
+            <span v-if="row.price_guidance?.take_profit_perp_mark != null">
+              {{ num(row.price_guidance.take_profit_perp_mark) }}
+            </span>
+            <span v-else class="hint">—</span>
+          </template>
         </el-table-column>
         <el-table-column label="套利操作（默认名义）" min-width="200">
           <template #default="{ row }">
@@ -764,6 +878,33 @@ onMounted(loadScan);
                   <strong>{{ signedUsdt(row.live_status.pnl_breakdown.unrealized_pnl_if_close_now_usdt) }} USDT</strong>
                 </el-descriptions-item>
               </el-descriptions>
+              <div v-if="positionPriceGuidance(row)?.available" class="price-guidance mt">
+                <h4 class="mini-title">入场价与风控参考</h4>
+                <el-descriptions :column="2" border size="small">
+                  <el-descriptions-item label="入场现货">
+                    {{ num(positionPriceGuidance(row)!.entry_spot_price) }}
+                  </el-descriptions-item>
+                  <el-descriptions-item label="入场永续">
+                    {{ num(positionPriceGuidance(row)!.entry_perp_price) }}
+                  </el-descriptions-item>
+                  <el-descriptions-item>
+                    <template #label><TermLabel label="平仓卖现货" :hint="H.spotSellPrice" /></template>
+                    {{ num(positionPriceGuidance(row)!.spot_sell_price) }}
+                  </el-descriptions-item>
+                  <el-descriptions-item>
+                    <template #label><TermLabel label="平仓回补永续" :hint="H.perpCoverPrice" /></template>
+                    {{ num(positionPriceGuidance(row)!.perp_cover_price) }}
+                  </el-descriptions-item>
+                  <el-descriptions-item>
+                    <template #label><TermLabel label="止损参考" :hint="H.stopLoss" /></template>
+                    {{ num(positionPriceGuidance(row)!.stop_loss_perp_mark) }}
+                  </el-descriptions-item>
+                  <el-descriptions-item>
+                    <template #label><TermLabel label="止盈参考" :hint="H.takeProfit" /></template>
+                    {{ num(positionPriceGuidance(row)!.take_profit_perp_mark) }}
+                  </el-descriptions-item>
+                </el-descriptions>
+              </div>
             </div>
             <div v-else-if="row.execution_plan" class="expand-plan">
               <div v-if="positionProfit(row)" class="income-banner mb">
@@ -807,6 +948,38 @@ onMounted(loadScan);
             <TermLabel label="名义金额" :hint="H.notionalItem" />
           </template>
           <template #default="{ row }">{{ num(row.notional_usdt, 0) }} USDT</template>
+        </el-table-column>
+        <el-table-column width="100">
+          <template #header>
+            <TermLabel label="入场现货" :hint="H.spotBuyPrice" />
+          </template>
+          <template #default="{ row }">
+            {{ num(positionPriceGuidance(row)?.entry_spot_price ?? row.spot_entry) }}
+          </template>
+        </el-table-column>
+        <el-table-column width="100">
+          <template #header>
+            <TermLabel label="入场永续" :hint="H.perpShortPrice" />
+          </template>
+          <template #default="{ row }">
+            {{ num(positionPriceGuidance(row)?.entry_perp_price ?? row.perp_entry) }}
+          </template>
+        </el-table-column>
+        <el-table-column width="100">
+          <template #header>
+            <TermLabel label="止损参考" :hint="H.stopLoss" />
+          </template>
+          <template #default="{ row }">
+            {{ num(positionPriceGuidance(row)?.stop_loss_perp_mark) }}
+          </template>
+        </el-table-column>
+        <el-table-column width="100">
+          <template #header>
+            <TermLabel label="止盈参考" :hint="H.takeProfit" />
+          </template>
+          <template #default="{ row }">
+            {{ num(positionPriceGuidance(row)?.take_profit_perp_mark) }}
+          </template>
         </el-table-column>
         <el-table-column width="120">
           <template #header>
@@ -908,6 +1081,36 @@ onMounted(loadScan);
           {{ num(preview.profit_estimate.open_cost_usdt) }} USDT ·
           收回成本约 {{ preview.profit_estimate.breakeven_days ?? "—" }} 天
         </p>
+
+        <div v-if="preview.price_guidance?.available" class="price-guidance mb">
+          <h3 class="section-title">价格与风控参考</h3>
+          <el-descriptions :column="2" border size="small">
+            <el-descriptions-item>
+              <template #label><TermLabel label="现货买入" :hint="H.spotBuyPrice" /></template>
+              {{ num(preview.price_guidance.spot_buy_price) }}
+            </el-descriptions-item>
+            <el-descriptions-item>
+              <template #label><TermLabel label="永续开空" :hint="H.perpShortPrice" /></template>
+              {{ num(preview.price_guidance.perp_short_price) }}
+            </el-descriptions-item>
+            <el-descriptions-item>
+              <template #label><TermLabel label="止损参考" :hint="H.stopLoss" /></template>
+              {{ num(preview.price_guidance.stop_loss_perp_mark) }}
+              <span v-if="preview.price_guidance.stop_loss_pnl_usdt != null" class="hint">
+                （约 {{ signedUsdt(preview.price_guidance.stop_loss_pnl_usdt) }} USDT）
+              </span>
+            </el-descriptions-item>
+            <el-descriptions-item>
+              <template #label><TermLabel label="止盈参考" :hint="H.takeProfit" /></template>
+              {{ num(preview.price_guidance.take_profit_perp_mark) }}
+              <span v-if="preview.price_guidance.take_profit_pnl_usdt != null" class="hint">
+                （目标 {{ signedUsdt(preview.price_guidance.take_profit_pnl_usdt) }} USDT）
+              </span>
+            </el-descriptions-item>
+          </el-descriptions>
+          <p v-if="preview.price_guidance.stop_loss_hint" class="hint mt-sm">{{ preview.price_guidance.stop_loss_hint }}</p>
+          <p v-if="preview.price_guidance.take_profit_hint" class="hint">{{ preview.price_guidance.take_profit_hint }}</p>
+        </div>
 
         <h3 v-if="openIncomeRows.length" class="section-title">预期收益（按当前 funding）</h3>
         <el-table v-if="openIncomeRows.length" :data="openIncomeRows" size="small" stripe class="mb">
@@ -1020,6 +1223,34 @@ onMounted(loadScan);
           :closable="false"
           class="mb"
         />
+
+        <div v-if="closePreview.price_guidance?.available" class="price-guidance mb">
+          <h3 class="section-title">平仓价格与风控参考</h3>
+          <el-descriptions :column="2" border size="small">
+            <el-descriptions-item label="入场现货">
+              {{ num(closePreview.price_guidance.entry_spot_price) }}
+            </el-descriptions-item>
+            <el-descriptions-item label="入场永续">
+              {{ num(closePreview.price_guidance.entry_perp_price) }}
+            </el-descriptions-item>
+            <el-descriptions-item>
+              <template #label><TermLabel label="卖出现货" :hint="H.spotSellPrice" /></template>
+              {{ num(closePreview.price_guidance.spot_sell_price) }}
+            </el-descriptions-item>
+            <el-descriptions-item>
+              <template #label><TermLabel label="回补永续" :hint="H.perpCoverPrice" /></template>
+              {{ num(closePreview.price_guidance.perp_cover_price) }}
+            </el-descriptions-item>
+            <el-descriptions-item>
+              <template #label><TermLabel label="当前现货" :hint="H.spotMark" /></template>
+              {{ num(closePreview.price_guidance.spot_mark) }}
+            </el-descriptions-item>
+            <el-descriptions-item>
+              <template #label><TermLabel label="当前永续" :hint="H.perpMark" /></template>
+              {{ num(closePreview.price_guidance.perp_mark) }}
+            </el-descriptions-item>
+          </el-descriptions>
+        </div>
 
         <h3 class="section-title">当前持仓（开仓时）</h3>
         <el-timeline v-if="closePreview.open_legs" class="mb">
@@ -1155,6 +1386,15 @@ onMounted(loadScan);
 }
 .mb {
   margin-bottom: 16px;
+}
+.mt {
+  margin-top: 12px;
+}
+.mt-sm {
+  margin-top: 6px;
+}
+.price-guidance {
+  padding: 8px 0;
 }
 .stat-label {
   font-size: 12px;

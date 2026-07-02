@@ -57,6 +57,11 @@ class PolymarketArbConfig:
         default_factory=lambda: ["binary_ask", "binary_bid", "multi_ask"]
     )
     min_outcomes_multi: int = 3
+    crypto_universe_enabled: bool = False
+    crypto_symbol_keywords: dict[str, list[str]] = field(default_factory=dict)
+    stream_mode: str = "rest"
+    stream_debounce_s: float = 2.0
+    stream_poll_interval_s: float = 5.0
 
 
 def _iso_now() -> str:
@@ -101,6 +106,14 @@ def load_config() -> PolymarketArbConfig:
             for x in raw.get("enabled_strategies") or ["binary_ask", "binary_bid", "multi_ask"]
         ],
         min_outcomes_multi=int(raw.get("min_outcomes_multi", 3)),
+        crypto_universe_enabled=bool(raw.get("crypto_universe_enabled", False)),
+        crypto_symbol_keywords={
+            str(k): [str(x) for x in v]
+            for k, v in (raw.get("crypto_symbol_keywords") or {}).items()
+        },
+        stream_mode=str(raw.get("stream_mode") or "rest"),
+        stream_debounce_s=float(raw.get("stream_debounce_s", 2.0)),
+        stream_poll_interval_s=float(raw.get("stream_poll_interval_s", 5.0)),
     )
 
 
@@ -450,6 +463,19 @@ def scan_markets(
         http_get=http_get,
     )
     universe = merge_market_universe(top, watchlist)
+    if cfg.crypto_universe_enabled:
+        from quant_rd_tool.crypto_polymarket_context import CRYPTO_SYMBOL_KEYWORDS, score_market_relevance
+
+        extra = fetch_gamma_markets(limit=200, http_get=http_get, use_cache=True)
+        kw_overrides = cfg.crypto_symbol_keywords or {}
+        crypto_markets: list[dict[str, Any]] = []
+        for gm in extra:
+            for base, default_kw in CRYPTO_SYMBOL_KEYWORDS.items():
+                kw = [str(x) for x in kw_overrides.get(base, default_kw)]
+                if score_market_relevance(gm, kw) > 0:
+                    crypto_markets.append(gm)
+                    break
+        universe = merge_market_universe(universe, crypto_markets)
     watchlist_ids = set(cfg.watchlist_condition_ids)
     filtered, markets_filtered_pre = filter_markets(
         universe,
@@ -557,6 +583,7 @@ def empty_scan_result() -> dict[str, Any]:
         "books_failed": 0,
         "duration_sec": None,
         "items": [],
+        "detected_bases": [],
     }
 
 
@@ -714,8 +741,12 @@ def preview_close_paper_position(
     size = float(doc.get("size_shares") or 0)
     cost = float(doc.get("cost_usd") or 0)
     fee = float(doc.get("fee_usd") or 0)
-    payout = size * 1.0
+    from quant_rd_tool.crypto_polymarket_backtest import resolve_market_outcome, settlement_payout_for_position
+
+    suggested = settlement_payout_for_position(doc)
+    payout = float(suggested if suggested is not None else size * 1.0)
     net_pnl = payout - cost - fee
+    resolution = resolve_market_outcome(str(doc.get("condition_id") or ""))
     latest = scan if scan is not None else load_latest_scan()
     scan_row = _scan_row_by_condition(latest, str(doc.get("condition_id") or ""))
     live = build_position_live_status(doc, scan_row, config)
@@ -728,6 +759,8 @@ def preview_close_paper_position(
         "fee_usd": round(fee, 4),
         "payout_usd": round(payout, 4),
         "net_pnl_usd": round(net_pnl, 4),
+        "market_resolved": bool(resolution.get("resolved")),
+        "winning_outcome": resolution.get("winning_outcome"),
         "live_status": live,
     }
 
@@ -861,9 +894,13 @@ def open_paper_position(
         "status": "open",
         "condition_id": cid,
         "question": opportunity.get("question"),
+        "strategy_type": str(opportunity.get("strategy_type") or "binary_ask"),
         "size_shares": preview["size_shares"],
         "entry_ask_yes": preview["ask_yes"],
         "entry_ask_no": preview["ask_no"],
+        "entry_edge_bps": opportunity.get("edge_bps"),
+        "entry_edge_at_size_bps": opportunity.get("edge_at_size_bps"),
+        "entry_profit_at_size_usd": opportunity.get("profit_at_size_usd"),
         "cost_usd": preview["cost_usd"],
         "fee_usd": preview["fee_usd"],
         "opened_at": _iso_now(),
@@ -893,7 +930,13 @@ def close_paper_position(
     size = float(doc.get("size_shares") or 0)
     cost = float(doc.get("cost_usd") or 0)
     fee = float(doc.get("fee_usd") or 0)
-    payout = float(settlement_payout_usd if settlement_payout_usd is not None else size * 1.0)
+    if settlement_payout_usd is not None:
+        payout = float(settlement_payout_usd)
+    else:
+        from quant_rd_tool.crypto_polymarket_backtest import settlement_payout_for_position
+
+        suggested = settlement_payout_for_position(doc)
+        payout = float(suggested if suggested is not None else size * 1.0)
     pnl = payout - cost - fee
     doc.update(
         {
@@ -905,6 +948,12 @@ def close_paper_position(
     )
     path.write_text(json.dumps(doc, ensure_ascii=False, indent=2), encoding="utf-8")
     append_event({"type": "position_closed", "position_id": position_id, "pnl_usd": pnl})
+    try:
+        from quant_rd_tool.crypto_polymarket_backtest import invalidate_calibration_cache
+
+        invalidate_calibration_cache()
+    except Exception:  # noqa: BLE001
+        pass
     return doc
 
 

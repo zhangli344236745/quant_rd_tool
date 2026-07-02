@@ -119,3 +119,17 @@ def test_build_recommendations_from_scan():
     assert report["total_opportunities"] == 2
     assert len(report["top_picks"]) >= 1
     assert report["top_picks"][0]["score"] >= report["top_picks"][-1]["score"]
+
+
+def test_estimate_win_rate_uses_spec_weights_with_calibration():
+    row = {
+        "condition_id": "c1",
+        "strategy_type": "binary_ask",
+        "fillable_shares": 100,
+        "slippage_bps": 1,
+        "depth_levels": 2,
+    }
+    base = estimate_win_rate(row, history_hours=168, target_shares=100)
+    calibrated = estimate_win_rate(row, history_hours=168, target_shares=100, calibrated_wr=0.9)
+    assert calibrated["win_rate"] != base["win_rate"]
+    assert calibrated["calibrated_prior"] == 0.9

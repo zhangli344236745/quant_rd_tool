@@ -15,7 +15,11 @@ from quant_rd_tool.crypto_analysis import crypto_root, format_period_bounds
 from quant_rd_tool.crypto_analyzer import analyze_crypto_ohlcv, derive_trading_signal
 from quant_rd_tool.crypto_ml import merge_crypto_signals, run_crypto_ml_analysis
 from quant_rd_tool.crypto_time import utc_now_beijing_str
-from quant_rd_tool.crypto_workflow_price_levels import compute_iv_price_guidance
+from quant_rd_tool.crypto_workflow_price_levels import (
+    compute_iv_price_guidance,
+    compute_options_price_guidance,
+    compute_perp_price_guidance,
+)
 from quant_rd_tool.crypto_workflow_storage import save_run
 from quant_rd_tool.openbb_equity import compute_technical_overlay
 from quant_rd_tool.crypto_zipline_runner import run_pandas_backtest
@@ -74,6 +78,15 @@ STEP_CATALOG: list[dict[str, Any]] = [
         "description": "成交量 / 成交额趋势、价量配合与现货建议（BTC/ETH）",
         "params_schema": {
             "include_ticker": {"type": "boolean", "default": True},
+        },
+    },
+    {
+        "id": "polymarket_context",
+        "name": "预测市场",
+        "description": "Polymarket crypto 主题市场隐含概率与套利摘要",
+        "params_schema": {
+            "max_markets": {"type": "integer", "default": 5},
+            "include_arb_summary": {"type": "boolean", "default": True},
         },
     },
     {
@@ -188,6 +201,16 @@ def _compact_output(sid: str, output: dict[str, Any]) -> dict[str, Any]:
             "iv_percentile": scan.get("iv_percentile"),
             "cross_summary": cross.get("summary"),
         }
+    if sid == "polymarket_context":
+        top = output.get("top_market") or {}
+        cross = output.get("cross_view") or {}
+        return {
+            "enabled": output.get("enabled"),
+            "implied_prob_yes": top.get("implied_prob_yes"),
+            "alignment": cross.get("alignment"),
+            "cross_summary": cross.get("summary"),
+            "market_count": output.get("market_count"),
+        }
     if sid == ADVICE_STEP:
         return {
             k: output[k]
@@ -237,6 +260,15 @@ def summarize_step(sid: str, output: dict[str, Any], *, status: str) -> str:
         if iv is not None:
             return f"ATM IV {float(iv) * 100:.1f}%"
         return cross.get("summary") or "已加载"
+    if sid == "polymarket_context":
+        if not output.get("enabled"):
+            return str(output.get("error") or "预测市场不可用")
+        top = output.get("top_market") or {}
+        prob = top.get("implied_prob_yes")
+        cross = output.get("cross_view") or {}
+        if prob is not None:
+            return f"YES {float(prob) * 100:.0f}% · {cross.get('alignment', '—')}"
+        return str(top.get("question") or "已匹配")
     if sid == ADVICE_STEP:
         pg = output.get("price_guidance") or {}
         if pg.get("available"):
@@ -488,6 +520,31 @@ def _step_volume_analysis(ctx: dict[str, Any], params: dict[str, Any]) -> dict[s
     }
 
 
+def _step_polymarket_context(ctx: dict[str, Any], params: dict[str, Any]) -> dict[str, Any]:
+    from quant_rd_tool.crypto_polymarket_context import fetch_polymarket_context
+    from quant_rd_tool.crypto_polymarket_integration import synthesize_prediction_cross_view
+
+    tech_out = ctx["steps"].get("technical", {}).get("output") or {}
+    ml_out = ctx["steps"].get("qlib_ml", {}).get("output") or {}
+    combined = ml_out.get("combined_signal") or {}
+    spot_stance = str(combined.get("stance") or tech_out.get("stance") or "中性")
+    spot_action = str(combined.get("action") or "hold")
+
+    pm = fetch_polymarket_context(
+        ctx["symbol"],
+        data_dir=ctx.get("data_dir") or "data/crypto",
+        max_markets=int(params.get("max_markets") or 5),
+        include_arb_summary=bool(params.get("include_arb_summary", True)),
+    )
+    cross = synthesize_prediction_cross_view(
+        spot_stance=spot_stance,
+        spot_action=spot_action,
+        pm_ctx=pm,
+    )
+    pm["cross_view"] = cross
+    return pm
+
+
 def _stance_to_score(stance: str | None) -> int:
     if stance == "看涨":
         return 1
@@ -514,6 +571,13 @@ _PERP_ADVICE = {
     "看涨": "永续/合约可小仓位顺势，严格止损与杠杆上限；VaR 突破时勿加仓。",
     "看跌": "建议减多或轻仓空单，控制杠杆与强平距离。",
     "中性": "合约宜轻仓或对冲，等待策略目标与风控信号一致后再调整。",
+}
+
+_PREDICTION_ADVICE = {
+    "偏多": "预测市场定价偏乐观，可与现货共振时小仓参与，注意事件反转风险。",
+    "偏空": "预测市场定价偏悲观，宜控制多头敞口或对冲。",
+    "中性": "预测市场未给出强方向，参考代表市场问题与到期时间自行评估。",
+    "不可用": "暂无 Polymarket 匹配市场，可启用 polymarket_context 步骤或扩大 watchlist。",
 }
 
 
@@ -595,6 +659,7 @@ def _synthesize_perp_advice(
     tech_out: dict[str, Any] | None,
     var_gate_pct: float,
     max_position_pct: float,
+    price_context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     score = 0
     bullets: list[str] = []
@@ -672,6 +737,32 @@ def _synthesize_perp_advice(
         f"，风险等级 {risk_level}"
     )
 
+    pg: dict[str, Any] | None = None
+    if price_context and price_context.get("spot"):
+        pg = compute_perp_price_guidance(
+            spot=float(price_context["spot"]),
+            perp_mark=price_context.get("perp_mark"),
+            stance=stance,
+            action=action,
+            timeframe=str(price_context.get("timeframe") or "1d"),
+            atm_iv=price_context.get("atm_iv"),
+            dte_days=price_context.get("dte_days"),
+            iv_percentile=price_context.get("iv_percentile"),
+            annualized_realized_vol=price_context.get("annualized_realized_vol"),
+            bollinger=price_context.get("bollinger"),
+            sl_sigma=float(price_context.get("sl_sigma") or 1.0),
+            tp_sigma=float(price_context.get("tp_sigma") or 1.5),
+            entry_sigma=float(price_context.get("entry_sigma") or 0.35),
+            horizon_days=price_context.get("horizon_days"),
+            var_ratio=var_ratio if var_out else None,
+            var_gate_pct=var_gate_pct,
+        )
+        if pg.get("available"):
+            bullets.append(
+                f"永续价位：开 {pg['entry_price']} / 止损 {pg['stop_loss_price']} / 止盈 {pg['take_profit_price']}"
+                f"（标记 {pg.get('perp_mark')}，基差 {pg.get('basis_bps')} bps）"
+            )
+
     return {
         "segment": "perp",
         "label": "合约",
@@ -686,6 +777,7 @@ def _synthesize_perp_advice(
         "headline": headline,
         "bullets": bullets,
         "advice": _PERP_ADVICE[stance],
+        "price_guidance": pg if pg and pg.get("available") else None,
     }
 
 
@@ -694,6 +786,7 @@ def _synthesize_options_advice(
     symbol: str,
     opt_out: dict[str, Any] | None,
     spot_stance: str,
+    price_context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     if not opt_out or not opt_out.get("enabled"):
         return {
@@ -730,6 +823,31 @@ def _synthesize_options_advice(
         advice_item.get("summary") or cross.get("summary") or "维持常规期权风控与仓位管理。"
     )
 
+    pg: dict[str, Any] | None = None
+    if price_context and price_context.get("spot"):
+        opt_block = opt_out.get("options_vol") or {}
+        pg = compute_options_price_guidance(
+            spot=float(price_context["spot"]),
+            opt_stance=opt_stance,
+            spot_stance=spot_stance,
+            timeframe=str(price_context.get("timeframe") or "1d"),
+            atm_iv=price_context.get("atm_iv") or scan.get("atm_iv"),
+            atm_strike=price_context.get("atm_strike") or scan.get("strike"),
+            dte_days=price_context.get("dte_days") or scan.get("dte"),
+            iv_percentile=price_context.get("iv_percentile") or scan.get("iv_percentile"),
+            annualized_realized_vol=price_context.get("annualized_realized_vol"),
+            strike_ladder=opt_block.get("strike_ladder") or opt_out.get("strike_ladder"),
+            strategy_pack=opt_block.get("strategy_pack") or opt_out.get("strategy_pack"),
+        )
+        if pg.get("available"):
+            bullets.append(
+                f"期权价位：{pg.get('option_type', '').upper()} K={pg.get('entry_strike')}，"
+                f"权利金预算约 {pg.get('premium_budget_usd')} USD，"
+                f"标的止盈 {pg.get('take_profit_spot')} / 止损 {pg.get('stop_loss_spot')}"
+            )
+            if pg.get("strategy_hint"):
+                bullets.append(f"策略模板：{pg['strategy_hint']}")
+
     return {
         "segment": "options",
         "label": "期权",
@@ -745,6 +863,63 @@ def _synthesize_options_advice(
         "bullets": bullets,
         "advice": advice_text,
         "risks": advice_item.get("risks"),
+        "price_guidance": pg if pg and pg.get("available") else None,
+    }
+
+
+def _synthesize_prediction_advice(
+    *,
+    symbol: str,
+    pm_out: dict[str, Any] | None,
+    spot_stance: str,
+) -> dict[str, Any]:
+    if not pm_out or not pm_out.get("enabled"):
+        return {
+            "segment": "prediction",
+            "label": "预测市场",
+            "available": False,
+            "stance": "不可用",
+            "action": "hold",
+            "headline": f"{symbol} 预测市场：数据不可用",
+            "bullets": [str((pm_out or {}).get("error") or "未运行 polymarket_context 或无匹配市场。")],
+            "advice": _PREDICTION_ADVICE["不可用"],
+        }
+
+    cross = pm_out.get("cross_view") or {}
+    top = pm_out.get("top_market") or {}
+    pred_stance = str(cross.get("prediction_stance") or "中性")
+    alignment = str(cross.get("alignment") or "补充")
+
+    bullets: list[str] = []
+    if cross.get("summary"):
+        bullets.append(str(cross["summary"]))
+    for note in cross.get("notes") or []:
+        bullets.append(str(note))
+    arb = pm_out.get("arb_summary") or {}
+    if arb.get("opportunity_hits"):
+        bullets.append(f"相关套利机会 {arb['opportunity_hits']} 条")
+
+    prob = top.get("implied_prob_yes")
+    headline = f"{symbol} 预测市场：{pred_stance}"
+    if prob is not None:
+        headline += f"（YES {float(prob) * 100:.0f}%）"
+    headline += f"，与现货 {alignment}"
+
+    advice_key = pred_stance if pred_stance in _PREDICTION_ADVICE else "中性"
+    return {
+        "segment": "prediction",
+        "label": "预测市场",
+        "available": True,
+        "stance": pred_stance,
+        "action": "hold",
+        "alignment": alignment,
+        "spot_stance": spot_stance,
+        "implied_prob_yes": prob,
+        "top_question": top.get("question"),
+        "market_url": top.get("market_url"),
+        "headline": headline,
+        "bullets": bullets,
+        "advice": _PREDICTION_ADVICE[advice_key],
     }
 
 
@@ -761,13 +936,35 @@ def _render_segment_markdown(seg: dict[str, Any]) -> list[str]:
         lines.append(f"- {b}")
     pg = seg.get("price_guidance")
     if pg and pg.get("available"):
-        lines.extend(
-            [
-                "",
-                f"- 参考买入：**{pg.get('entry_price')}**，止损 **{pg.get('stop_loss_price')}**，"
-                f"止盈 **{pg.get('take_profit_price')}**",
-            ]
-        )
+        market = pg.get("market_type") or "spot"
+        if market == "options":
+            lines.extend(
+                [
+                    "",
+                    f"- 期权类型：**{pg.get('option_type')}**，行权价 **{pg.get('entry_strike')}**"
+                    f"（备选 {pg.get('alt_strike')}）",
+                    f"- 权利金预算约 **{pg.get('premium_budget_usd')} USD**，"
+                    f"止损权利金 -{float(pg.get('stop_loss_premium_pct') or 0) * 100:.0f}%",
+                    f"- 标的止盈 **{pg.get('take_profit_spot')}**，止损 **{pg.get('stop_loss_spot')}**",
+                ]
+            )
+        elif market == "perp":
+            lines.extend(
+                [
+                    "",
+                    f"- 永续标记：**{pg.get('perp_mark')}**（指数 {pg.get('spot_index')}，基差 {pg.get('basis_bps')} bps）",
+                    f"- 参考开仓：**{pg.get('entry_price')}**，止损 **{pg.get('stop_loss_price')}**，"
+                    f"止盈 **{pg.get('take_profit_price')}**",
+                ]
+            )
+        else:
+            lines.extend(
+                [
+                    "",
+                    f"- 参考买入：**{pg.get('entry_price')}**，止损 **{pg.get('stop_loss_price')}**，"
+                    f"止盈 **{pg.get('take_profit_price')}**",
+                ]
+            )
     lines.append("")
     return lines
 
@@ -858,6 +1055,19 @@ def synthesize_advice(ctx: dict[str, Any], params: dict[str, Any]) -> dict[str, 
             if cross.get("summary"):
                 bullets.append(f"期权：{cross['summary']}")
             sources["options_vol"] = {"cross_summary": cross.get("summary")}
+
+    pm_step = ctx["steps"].get("polymarket_context", {})
+    if pm_step.get("status") == "ok":
+        out = pm_step.get("output") or {}
+        if out.get("enabled"):
+            cross = out.get("cross_view") or {}
+            top = out.get("top_market") or {}
+            if cross.get("summary"):
+                bullets.append(f"预测市场：{cross['summary']}")
+            sources["polymarket_context"] = {
+                "alignment": cross.get("alignment"),
+                "implied_prob_yes": top.get("implied_prob_yes"),
+            }
 
     vol = ctx["steps"].get("volume_analysis", {})
     if vol.get("status") == "ok":
@@ -1010,6 +1220,7 @@ def synthesize_advice(ctx: dict[str, Any], params: dict[str, Any]) -> dict[str, 
     ]
     for b in bullets:
         markdown_lines.append(f"- {b}")
+    opt_out = (opt.get("output") or {}) if opt.get("status") == "ok" else None
     spot_seg = _synthesize_spot_advice(
         symbol=str(ctx["symbol"]),
         tech_out=(tech.get("output") or {}) if tech.get("status") == "ok" else None,
@@ -1018,6 +1229,21 @@ def synthesize_advice(ctx: dict[str, Any], params: dict[str, Any]) -> dict[str, 
         price_guidance=price_guidance,
         max_position_pct=max_position_pct,
     )
+    price_context = {
+        "spot": spot,
+        "perp_mark": None,
+        "timeframe": str(ctx.get("timeframe") or "1d"),
+        "atm_iv": atm_iv,
+        "dte_days": dte_days,
+        "iv_percentile": iv_percentile,
+        "annualized_realized_vol": realized_vol,
+        "bollinger": bollinger,
+        "sl_sigma": float(params.get("sl_sigma") or 1.0),
+        "tp_sigma": float(params.get("tp_sigma") or 1.5),
+        "entry_sigma": float(params.get("entry_sigma") or 0.35),
+        "horizon_days": float(params["horizon_days"]) if params.get("horizon_days") else None,
+        "atm_strike": (opt_out or {}).get("scan_item", {}).get("strike") if opt_out else None,
+    }
     perp_seg = _synthesize_perp_advice(
         symbol=str(ctx["symbol"]),
         strat_out=(strat.get("output") or {}) if strat.get("status") == "ok" else None,
@@ -1025,16 +1251,28 @@ def synthesize_advice(ctx: dict[str, Any], params: dict[str, Any]) -> dict[str, 
         tech_out=(tech.get("output") or {}) if tech.get("status") == "ok" else None,
         var_gate_pct=var_gate_pct,
         max_position_pct=max_position_pct,
+        price_context=price_context,
     )
-    opt_out = (opt.get("output") or {}) if opt.get("status") == "ok" else None
     options_seg = _synthesize_options_advice(
         symbol=str(ctx["symbol"]),
         opt_out=opt_out,
         spot_stance=str(spot_seg.get("stance") or stance),
+        price_context=price_context,
     )
-    segments = {"spot": spot_seg, "perp": perp_seg, "options": options_seg}
+    pm_out = (pm_step.get("output") or {}) if pm_step.get("status") == "ok" else None
+    prediction_seg = _synthesize_prediction_advice(
+        symbol=str(ctx["symbol"]),
+        pm_out=pm_out,
+        spot_stance=str(spot_seg.get("stance") or stance),
+    )
+    segments = {
+        "spot": spot_seg,
+        "perp": perp_seg,
+        "options": options_seg,
+        "prediction": prediction_seg,
+    }
     markdown_lines.extend(["", "## 分市场建议", ""])
-    for seg in (spot_seg, perp_seg, options_seg):
+    for seg in (spot_seg, perp_seg, options_seg, prediction_seg):
         markdown_lines.extend(_render_segment_markdown(seg))
     if price_guidance.get("available"):
         markdown_lines.extend(
@@ -1076,6 +1314,11 @@ def synthesize_advice(ctx: dict[str, Any], params: dict[str, Any]) -> dict[str, 
         "bullets": bullets,
         "advice": advice_map[stance],
         "price_guidance": price_guidance,
+        "price_guidance_by_market": {
+            "spot": spot_seg.get("price_guidance"),
+            "perp": perp_seg.get("price_guidance"),
+            "options": options_seg.get("price_guidance"),
+        },
         "segments": segments,
         "sources": sources,
         "markdown": "\n".join(markdown_lines),
@@ -1090,6 +1333,7 @@ _STEP_HANDLERS: dict[str, Callable[[dict[str, Any], dict[str, Any]], dict[str, A
     "var_symbol": _step_var_symbol,
     "options_vol": _step_options_vol,
     "volume_analysis": _step_volume_analysis,
+    "polymarket_context": _step_polymarket_context,
 }
 
 

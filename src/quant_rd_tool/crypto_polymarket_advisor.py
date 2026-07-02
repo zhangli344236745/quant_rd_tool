@@ -67,19 +67,32 @@ def execution_confidence(row: dict[str, Any], target_shares: float) -> float:
     return round(fill_ratio * slip_penalty * depth_bonus, 4)
 
 
-def estimate_win_rate(row: dict[str, Any], *, history_hours: float, target_shares: float) -> dict[str, Any]:
+def estimate_win_rate(
+    row: dict[str, Any],
+    *,
+    history_hours: float,
+    target_shares: float,
+    calibrated_wr: float | None = None,
+) -> dict[str, Any]:
     st = str(row.get("strategy_type") or "binary_ask")
     certainty = _STRATEGY_CERTAINTY.get(st, 0.75)
     cid = str(row.get("condition_id") or "")
     persist = persistence_rate(cid, st, hours=history_hours) if cid else 0.35
     execution = execution_confidence(row, target_shares)
-    composite = round(certainty * 0.40 + persist * 0.25 + execution * 0.35, 4)
+    if calibrated_wr is not None:
+        composite = round(
+            certainty * 0.35 + persist * 0.25 + execution * 0.25 + calibrated_wr * 0.15,
+            4,
+        )
+    else:
+        composite = round(certainty * 0.40 + persist * 0.25 + execution * 0.35, 4)
     return {
         "strategy_certainty": certainty,
         "persistence_rate": persist,
         "execution_confidence": execution,
         "win_rate": composite,
         "win_rate_pct": round(composite * 100, 1),
+        "calibrated_prior": calibrated_wr,
     }
 
 
@@ -198,14 +211,35 @@ def score_opportunity(
     *,
     config: PolymarketArbConfig | None = None,
     advisor: AdvisorConfig | None = None,
+    skip_calibration: bool = False,
+    calibration_report: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     from quant_rd_tool.crypto_polymarket_arb import PolymarketArbConfig, load_config
 
     cfg = config or load_config()
     adv = advisor or AdvisorConfig()
     target = float(cfg.depth_target_shares)
-    win = estimate_win_rate(row, history_hours=adv.history_hours, target_shares=target)
+
+    base_win = estimate_win_rate(row, history_hours=adv.history_hours, target_shares=target)
     profit = profit_analysis(row, target_shares=target, taker_fee_bps=cfg.taker_fee_bps)
+    level = classify_recommendation(base_win["win_rate"], profit, row, adv)
+
+    calibrated_wr: float | None = None
+    if not skip_calibration:
+        from quant_rd_tool.crypto_polymarket_backtest import (
+            get_advisor_calibration_report,
+            lookup_calibration_prior,
+        )
+
+        report = calibration_report or get_advisor_calibration_report(hours=adv.history_hours)
+        calibrated_wr = lookup_calibration_prior(report, level)
+
+    win = estimate_win_rate(
+        row,
+        history_hours=adv.history_hours,
+        target_shares=target,
+        calibrated_wr=calibrated_wr,
+    )
     level = classify_recommendation(win["win_rate"], profit, row, adv)
     advice = build_advice_text(level, row, win, profit)
     score = round(
@@ -256,7 +290,14 @@ def build_recommendations(
         )
     latest = scan if scan is not None else load_latest_scan()
     items = list((latest or {}).get("items") or [])
-    scored = [score_opportunity(r, config=cfg, advisor=adv) for r in items if r.get("opportunity")]
+    from quant_rd_tool.crypto_polymarket_backtest import get_advisor_calibration_report
+
+    cal_report = get_advisor_calibration_report(hours=adv.history_hours)
+    scored = [
+        score_opportunity(r, config=cfg, advisor=adv, calibration_report=cal_report)
+        for r in items
+        if r.get("opportunity")
+    ]
     scored.sort(key=lambda r: (float(r.get("score") or 0), float(r.get("win_rate") or 0)), reverse=True)
 
     high_win = [r for r in scored if float(r.get("win_rate") or 0) >= adv.min_win_rate]

@@ -126,6 +126,65 @@ def build_carry_profit_estimate(
     }
 
 
+def build_carry_price_guidance(
+    *,
+    spot_mark: float,
+    perp_mark: float,
+    basis_bps: float,
+    funding_rate: float,
+    notional_usdt: float,
+    config: CarryConfig,
+    entry_spot: float | None = None,
+    entry_perp: float | None = None,
+    entry_basis_bps: float | None = None,
+) -> dict[str, Any]:
+    """Entry/exit prices and carry-specific stop/take-profit references."""
+    spot_buy = spot_mark * (1 + config.slippage_pct)
+    perp_short = perp_mark * (1 - config.slippage_pct)
+    spot_sell = spot_mark * (1 - config.slippage_pct)
+    perp_cover = perp_mark * (1 + config.slippage_pct)
+    ref_basis = entry_basis_bps if entry_basis_bps is not None else basis_bps
+    # Adverse basis move for carry: perp premium expands vs entry
+    stop_basis_bps = ref_basis + 50.0
+    take_basis_bps = max(ref_basis - 30.0, 0.0)
+    stop_perp_mark = spot_mark * (1 + stop_basis_bps / 10_000) if spot_mark > 0 else None
+    take_perp_mark = spot_mark * (1 + take_basis_bps / 10_000) if spot_mark > 0 else None
+    profit = build_carry_profit_estimate(
+        notional_usdt=notional_usdt,
+        funding_rate=funding_rate,
+        basis_bps=basis_bps,
+        config=config,
+    )
+    stop_loss_pnl_usdt = -notional_usdt * 0.01
+    take_profit_pnl_usdt = float(profit.get("net_30d_after_open_cost_usdt") or 0.0)
+    return {
+        "available": True,
+        "spot_mark": round(spot_mark, 4),
+        "perp_mark": round(perp_mark, 4),
+        "spot_buy_price": round(spot_buy, 4),
+        "perp_short_price": round(perp_short, 4),
+        "spot_sell_price": round(spot_sell, 4),
+        "perp_cover_price": round(perp_cover, 4),
+        "entry_spot_price": round(entry_spot or spot_buy, 4),
+        "entry_perp_price": round(entry_perp or perp_short, 4),
+        "stop_loss_perp_mark": round(stop_perp_mark, 4) if stop_perp_mark else None,
+        "take_profit_perp_mark": round(take_perp_mark, 4) if take_perp_mark else None,
+        "stop_loss_basis_bps": round(stop_basis_bps, 2),
+        "take_profit_basis_bps": round(take_basis_bps, 2),
+        "stop_loss_pnl_usdt": round(stop_loss_pnl_usdt, 2),
+        "take_profit_pnl_usdt": round(take_profit_pnl_usdt, 2),
+        "stop_loss_hint": (
+            f"基差 ≥ {stop_basis_bps:.0f} bps、composite APR ≤ {config.exit_threshold_apr:.0%} "
+            f"或 funding 转负时建议平仓（参考亏损 {stop_loss_pnl_usdt:.0f} USDT）"
+        ),
+        "take_profit_hint": (
+            f"累计 funding 覆盖开平仓成本（约 {profit.get('round_trip_cost_usdt', 0):.0f} USDT）"
+            f"或 30 日净收益达 {take_profit_pnl_usdt:.0f} USDT 时可考虑止盈"
+        ),
+        "profit_summary": profit,
+    }
+
+
 def build_carry_open_plan(
     symbol: str,
     *,
@@ -328,6 +387,17 @@ def build_position_live_status(
         "current_spot_mark": round(spot_mark, 8),
         "current_perp_mark": round(perp_mark, 8),
         "pending_funding_usdt": accrual["pending_funding_usdt"],
+        "price_guidance": build_carry_price_guidance(
+            spot_mark=spot_mark,
+            perp_mark=perp_mark,
+            basis_bps=basis_bps,
+            funding_rate=funding_rate,
+            notional_usdt=notional,
+            config=config,
+            entry_spot=spot_entry,
+            entry_perp=perp_entry,
+            entry_basis_bps=float(position.get("entry_basis_bps") or 0),
+        ),
         "pnl_breakdown": {
             "accrued_funding_usdt": pnl["accrued_funding"],
             "spot_leg_mtm_usdt": round(spot_leg_mtm, 4),
@@ -623,6 +693,7 @@ def preview_close_paper_carry(
         "execution_plan": close_plan,
         "open_legs": live_status["open_plan"],
         "pnl_breakdown": live_status["pnl_breakdown"],
+        "price_guidance": live_status.get("price_guidance"),
         "risk_warnings": build_carry_close_risk_warnings(
             funding_rate=funding_rate,
             composite_apr=composite_apr,
@@ -697,6 +768,14 @@ def preview_paper_carry(
         },
         "profit_estimate": profit_estimate,
         "cost_breakdown": costs,
+        "price_guidance": build_carry_price_guidance(
+            spot_mark=spot_mark,
+            perp_mark=perp_mark,
+            basis_bps=basis_bps,
+            funding_rate=funding_rate,
+            notional_usdt=notional,
+            config=cfg,
+        ),
         "execution_plan": open_plan,
         "risk_warnings": build_carry_risk_warnings(
             funding_rate=funding_rate,
@@ -1005,6 +1084,14 @@ def build_opportunity(
         "basis_apr_hint": round(basis_bps / 10_000 * 365, 6),
         "composite_apr": round(composite_apr, 6),
         "profit_estimate": profit_estimate,
+        "price_guidance": build_carry_price_guidance(
+            spot_mark=float(snapshot["spot_mark"]),
+            perp_mark=float(snapshot["perp_mark"]),
+            basis_bps=basis_bps,
+            funding_rate=funding_rate,
+            notional_usdt=notional,
+            config=config,
+        ),
         "entry_alert": entry_alert(
             composite_apr=composite_apr,
             config=config,
@@ -1279,9 +1366,10 @@ def build_carry_summary(
     config: CarryConfig | None = None,
     *,
     scan_items: list[dict[str, Any]] | None = None,
+    open_positions: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     cfg = config or load_config()
-    open_rows = list_positions(status="open", limit=500)
+    open_rows = open_positions if open_positions is not None else list_positions(status="open", limit=500)
     closed_rows = list_positions(status="closed", limit=500)
     items = scan_items or []
     entry_alerts = sum(1 for row in items if row.get("entry_alert"))
@@ -1292,6 +1380,26 @@ def build_carry_summary(
     )
     total_realized = sum(float(r.get("realized_pnl") or 0.0) for r in closed_rows)
     total_accrued = sum(float(r.get("accrued_funding") or 0.0) for r in open_rows)
+    total_notional = sum(float(r.get("notional_usdt") or 0.0) for r in open_rows)
+    total_unrealized = 0.0
+    total_daily_income = 0.0
+    for row in open_rows:
+        live = row.get("live_status") or {}
+        pnl = (live.get("pnl_breakdown") or {}).get("unrealized_pnl_if_close_now_usdt")
+        if pnl is not None:
+            total_unrealized += float(pnl)
+        inc = live.get("expected_income_if_hold") or (live.get("price_guidance") or {}).get(
+            "profit_summary"
+        )
+        if inc and inc.get("funding_daily_usdt") is not None:
+            total_daily_income += float(inc["funding_daily_usdt"])
+        elif row.get("profit_estimate"):
+            total_daily_income += float(row["profit_estimate"].get("funding_daily_usdt") or 0)
+    scan_daily_income = sum(
+        float((row.get("profit_estimate") or {}).get("funding_daily_usdt") or 0)
+        for row in items
+        if row.get("entry_alert") and not row.get("error")
+    )
     return {
         "open_count": len(open_rows),
         "closed_count": len(closed_rows),
@@ -1299,6 +1407,10 @@ def build_carry_summary(
         "exit_alert_count": exit_alerts,
         "total_realized_pnl": round(total_realized, 6),
         "total_accrued_funding": round(total_accrued, 6),
+        "total_open_notional_usdt": round(total_notional, 2),
+        "total_unrealized_pnl_usdt": round(total_unrealized, 4),
+        "total_open_daily_income_usdt": round(total_daily_income, 4),
+        "scan_entry_daily_income_usdt": round(scan_daily_income, 4),
         "recent_events": read_events(limit=20),
         "last_scan_ts": items[0]["ts"] if items else None,
     }

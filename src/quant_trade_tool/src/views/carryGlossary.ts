@@ -41,6 +41,10 @@ export const CARRY_GLOSSARY = [
     term: "Pending funding",
     desc: "自上次 8 小时结算点以来、尚未入账的 funding 估算，平仓时会一并结算进盈亏。",
   },
+  {
+    term: "止损 / 止盈参考",
+    desc: "基于基差变化与 funding 成本的参考线，不是自动下单。止损：基差不利扩大或 funding 转负；止盈：累计 funding 覆盖开平仓成本。",
+  },
 ] as const;
 
 export const CARRY_TERM_HINTS = {
@@ -72,5 +76,14 @@ export const CARRY_TERM_HINTS = {
   breakevenDays: "按当前 funding 估算，多少天能覆盖开平仓总成本。",
   funding8h: "每 8 小时结算一次的 funding 收入估算。",
   net7d: "7 日 funding 减去开仓成本后的净额估算。",
-  basisAnnualHint: "把当前基差换算成年化参考，不保证能赚到。",
+  stopLoss: "基差不利扩大或 funding 转负时的参考平仓线（永续标记价）。",
+  takeProfit: "累计 funding 覆盖成本或达到目标净收益时的参考止盈线。",
+  spotBuyPrice: "开仓现货买入参考价（含滑点）。",
+  perpShortPrice: "开仓永续做空参考价（含滑点）。",
+  spotSellPrice: "平仓卖出现货参考价（含滑点）。",
+  perpCoverPrice: "平仓永续回补参考价（含滑点）。",
+  unrealizedPnl: "若按当前市价平仓，开放仓合计浮动盈亏（含 pending funding）。",
+  openDailyIncome: "所有开放仓按当前 funding 估算的日收入合计。",
+  scanEntryDaily: "扫描结果中「可入场」机会按默认名义估算的日收入合计。",
+  openNotional: "所有开放纸面 Carry 的名义金额合计。",
 } as const;

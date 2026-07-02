@@ -40,6 +40,18 @@ class PolymarketArbRunner:
         if self.is_running():
             return self.public()
         self._stop.clear()
+        try:
+            cfg = load_config()
+            if cfg.stream_mode in ("websocket", "hybrid"):
+                from quant_rd_tool.crypto_polymarket_stream import resolve_watchlist_token_ids, start_stream
+
+                start_stream(
+                    resolve_watchlist_token_ids(cfg),
+                    mode=cfg.stream_mode,
+                    poll_interval_s=cfg.stream_poll_interval_s,
+                )
+        except Exception as e:  # noqa: BLE001
+            logger.warning("polymarket stream start: %s", e)
         self._thread = threading.Thread(target=self._loop, name="polymarket-arb", daemon=True)
         self._thread.start()
         return self.public()
@@ -49,6 +61,12 @@ class PolymarketArbRunner:
         if self._thread:
             self._thread.join(timeout=5)
         self._thread = None
+        try:
+            from quant_rd_tool.crypto_polymarket_stream import stop_stream
+
+            stop_stream()
+        except Exception:  # noqa: BLE001
+            pass
         return self.public()
 
     def run_once(self) -> dict[str, Any]:
@@ -68,15 +86,28 @@ class PolymarketArbRunner:
             raise
 
     def _loop(self) -> None:
+        from quant_rd_tool.crypto_polymarket_stream import consume_dirty
+
+        last_scan_at = 0.0
+
         while not self._stop.is_set():
             started = time.time()
             try:
-                self.run_once()
+                cfg = load_config()
+                stream_active = cfg.stream_mode in ("websocket", "hybrid")
+                dirty = consume_dirty() if stream_active else False
+                interval_due = (started - last_scan_at) >= max(int(cfg.builtin_interval_sec), 30)
+                debounce_ok = (started - last_scan_at) >= float(cfg.stream_debounce_s)
+                if interval_due or (stream_active and dirty and debounce_ok):
+                    self.run_once()
+                    last_scan_at = time.time()
             except Exception:
                 pass
             try:
                 cfg = load_config()
                 wait_s = max(int(cfg.builtin_interval_sec), 30)
+                if cfg.stream_mode in ("websocket", "hybrid"):
+                    wait_s = min(wait_s, max(int(cfg.stream_poll_interval_s * 2), 10))
             except Exception:
                 wait_s = 300
             elapsed = time.time() - started

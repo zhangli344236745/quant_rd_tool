@@ -7,6 +7,7 @@ import pytest
 from quant_rd_tool.crypto_carry_arbitrage import (
     CarryConfig,
     accrue_open_positions,
+    build_carry_price_guidance,
     close_paper_carry,
     compute_basis_bps,
     compute_composite_apr,
@@ -30,6 +31,34 @@ def test_compute_funding_apr():
 
 def test_compute_composite_apr():
     assert compute_composite_apr(funding_apr=0.1, basis_bps=20.0) == pytest.approx(0.1 + 20.0 / 10_000 * 365)
+
+
+def test_build_carry_price_guidance():
+    cfg = CarryConfig(
+        default_notional_usdt=10_000,
+        slippage_pct=0.001,
+        spot_fee_pct=0.001,
+        perp_fee_pct=0.001,
+        exit_threshold_apr=0.05,
+    )
+    pg = build_carry_price_guidance(
+        spot_mark=100.0,
+        perp_mark=100.5,
+        basis_bps=50.0,
+        funding_rate=0.0002,
+        notional_usdt=10_000,
+        config=cfg,
+    )
+    assert pg["available"] is True
+    assert pg["spot_buy_price"] == pytest.approx(100.1)
+    assert pg["perp_short_price"] == pytest.approx(100.3995)
+    assert pg["stop_loss_basis_bps"] == pytest.approx(100.0)
+    assert pg["take_profit_basis_bps"] == pytest.approx(20.0)
+    assert pg["stop_loss_perp_mark"] == pytest.approx(101.0)
+    assert pg["take_profit_perp_mark"] == pytest.approx(100.2)
+    assert pg["profit_summary"]["funding_daily_usdt"] == pytest.approx(6.0)
+    assert "stop_loss_hint" in pg
+    assert "take_profit_hint" in pg
 
 
 def test_entry_exit_alerts():
@@ -67,6 +96,8 @@ def test_scan_watchlist_builds_opportunities(monkeypatch, tmp_path):
     assert rows[0]["symbol"] == "BTC"
     assert rows[0]["basis_bps"] == pytest.approx(20.0)
     assert "composite_apr" in rows[0]
+    assert rows[0].get("price_guidance", {}).get("available") is True
+    assert rows[0]["price_guidance"]["spot_buy_price"] == pytest.approx(100.05)
 
 
 def test_fetch_watchlist_snapshots_uses_cache(monkeypatch):

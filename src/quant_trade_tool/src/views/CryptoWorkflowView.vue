@@ -67,6 +67,12 @@ function loadTemplateIntoEditor(tpl: CryptoWorkflowTemplate) {
     order: s.order ?? i,
     params: { ...(s.params || {}) },
   }));
+  for (const s of editSteps.value) {
+    if (s.id === "polymarket_context") {
+      ensureParam(s, "max_markets", 5);
+      ensureParam(s, "include_arb_summary", true);
+    }
+  }
 }
 
 async function loadVolumeAdvice() {
@@ -297,14 +303,14 @@ const priceGuidance = computed(() => result.value?.advice?.price_guidance);
 const adviceSegments = computed(() => {
   const segs = result.value?.advice?.segments;
   if (!segs) return [] as CryptoWorkflowAdviceSegment[];
-  return [segs.spot, segs.perp, segs.options].filter(Boolean);
+  return [segs.spot, segs.perp, segs.options, segs.prediction].filter(Boolean);
 });
 
 function segmentAlertType(seg: CryptoWorkflowAdviceSegment) {
   if (!seg.available) return "info";
   const s = seg.stance;
-  if (s === "看涨" || s.includes("偏多")) return "success";
-  if (s === "看跌" || s.includes("偏空")) return "warning";
+  if (s === "看涨" || s === "偏多" || s.includes("偏多")) return "success";
+  if (s === "看跌" || s === "偏空" || s.includes("偏空")) return "warning";
   if (s.includes("偏高") || s.includes("高波动")) return "warning";
   return "info";
 }
@@ -314,6 +320,46 @@ function statusTagType(status: string) {
   if (status === "skipped") return "info";
   if (status === "error") return "danger";
   return "info";
+}
+
+function segmentPriceTitle(seg: CryptoWorkflowAdviceSegment) {
+  const mt = seg.price_guidance?.market_type || seg.segment;
+  if (mt === "perp") return "合约参考价位";
+  if (mt === "options") return "期权参考价位";
+  return "现货参考价位";
+}
+
+function segmentPriceRows(seg: CryptoWorkflowAdviceSegment) {
+  const pg = seg.price_guidance;
+  if (!pg?.available) return [];
+  if (pg.market_type === "options") {
+    return [
+      { label: "期权类型", value: String(pg.option_type || "—").toUpperCase() },
+      { label: "行权价", value: fmtPrice(pg.entry_strike) },
+      { label: "备选行权价", value: fmtPrice(pg.alt_strike) },
+      { label: "权利金预算", value: `${fmtPrice(pg.premium_budget_usd)} USD` },
+      { label: "止损（权利金）", value: pg.stop_loss_premium_pct != null ? pct(pg.stop_loss_premium_pct) : "—" },
+      { label: "标的止盈", value: fmtPrice(pg.take_profit_spot) },
+      { label: "标的止损", value: fmtPrice(pg.stop_loss_spot) },
+      { label: "到期 DTE", value: pg.expiry_dte != null ? `${pg.expiry_dte} 天` : "—" },
+    ];
+  }
+  if (pg.market_type === "perp") {
+    return [
+      { label: "指数价", value: fmtPrice(pg.spot_index) },
+      { label: "永续标记", value: fmtPrice(pg.perp_mark) },
+      { label: "基差", value: pg.basis_bps != null ? `${Number(pg.basis_bps).toFixed(1)} bps` : "—" },
+      { label: "参考开仓", value: fmtPrice(pg.entry_price) },
+      { label: "止损", value: fmtPrice(pg.stop_loss_price) },
+      { label: "止盈", value: fmtPrice(pg.take_profit_price) },
+    ];
+  }
+  return [
+    { label: "参考买入", value: fmtPrice(pg.entry_price) },
+    { label: "止损", value: fmtPrice(pg.stop_loss_price) },
+    { label: "止盈", value: fmtPrice(pg.take_profit_price) },
+    { label: "预期波动", value: pg.horizon_days != null ? `${pg.horizon_days} 日 · ${pct(pg.expected_move_pct)}` : pct(pg.expected_move_pct) },
+  ];
 }
 
 async function copyMarkdown() {
@@ -506,6 +552,19 @@ watch([symbol, timeframe], () => {
                 复用缓存（数据未变免重训）
               </el-checkbox>
             </template>
+            <template v-if="step.enabled && step.id === 'polymarket_context'">
+              <p class="param-label">预测市场</p>
+              最大市场数
+              <el-input-number
+                v-model="stepParams(step).max_markets"
+                :min="1"
+                :max="20"
+                size="small"
+              />
+              <el-checkbox v-model="stepParams(step).include_arb_summary" size="small">
+                含套利扫描摘要
+              </el-checkbox>
+            </template>
             <template v-if="step.enabled && step.id === 'advice_synth'">
               <p class="param-label">建议合成</p>
               VaR 门控
@@ -584,7 +643,7 @@ watch([symbol, timeframe], () => {
           </div>
           <p class="mt">{{ result.advice.advice }}</p>
           <el-card v-if="priceGuidance?.available" shadow="never" class="price-card mt">
-            <template #header>IV 参考价位</template>
+            <template #header>现货 IV 参考价位（综合）</template>
             <el-descriptions :column="2" size="small" border>
               <el-descriptions-item label="现价">{{ fmtPrice(priceGuidance.spot) }}</el-descriptions-item>
               <el-descriptions-item label="IV 来源">
@@ -655,18 +714,25 @@ watch([symbol, timeframe], () => {
                   shadow="never"
                   class="price-card mt"
                 >
-                  <template #header>IV 参考价位（现货）</template>
+                  <template #header>{{ segmentPriceTitle(seg) }}</template>
+                  <p v-if="seg.price_guidance.entry_note" class="hint mb-sm">{{ seg.price_guidance.entry_note }}</p>
                   <el-descriptions :column="2" size="small" border>
-                    <el-descriptions-item label="参考买入">
-                      <strong>{{ fmtPrice(seg.price_guidance.entry_price) }}</strong>
-                    </el-descriptions-item>
-                    <el-descriptions-item label="止损">
-                      {{ fmtPrice(seg.price_guidance.stop_loss_price) }}
-                    </el-descriptions-item>
-                    <el-descriptions-item label="止盈">
-                      {{ fmtPrice(seg.price_guidance.take_profit_price) }}
+                    <el-descriptions-item
+                      v-for="row in segmentPriceRows(seg)"
+                      :key="row.label"
+                      :label="row.label"
+                    >
+                      <strong v-if="row.label.includes('参考') || row.label.includes('行权')">{{ row.value }}</strong>
+                      <span v-else>{{ row.value }}</span>
                     </el-descriptions-item>
                   </el-descriptions>
+                  <p v-if="seg.price_guidance.liquidation_hint" class="hint mt-sm">
+                    {{ seg.price_guidance.liquidation_hint }}
+                  </p>
+                  <p v-if="seg.price_guidance.strategy_hint" class="hint mt-sm">
+                    策略模板：{{ seg.price_guidance.strategy_hint }}
+                  </p>
+                  <p class="muted small mt">{{ seg.price_guidance.disclaimer }}</p>
                 </el-card>
               </el-tab-pane>
             </el-tabs>
@@ -737,6 +803,12 @@ watch([symbol, timeframe], () => {
 }
 .mt {
   margin-top: 12px;
+}
+.mt-sm {
+  margin-top: 6px;
+}
+.mb-sm {
+  margin-bottom: 6px;
 }
 .mb {
   margin-bottom: 16px;

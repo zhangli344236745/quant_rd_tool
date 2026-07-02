@@ -20,7 +20,10 @@ def test_carry_scan_route(monkeypatch):
     monkeypatch.setattr(
         cca,
         "build_carry_summary",
-        lambda cfg, scan_items=None: {"open_count": 0, "entry_alert_count": 1},
+        lambda cfg, scan_items=None, open_positions=None: {
+            "open_count": 0,
+            "entry_alert_count": 1,
+        },
     )
 
     r = client.get("/api/v1/crypto/carry/scan")

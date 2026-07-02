@@ -2229,7 +2229,7 @@ def crypto_carry_scan() -> dict[str, Any]:
                     "live_status": build_position_live_status(p, snap, cfg),
                 }
             positions.append(p)
-        summary = build_carry_summary(cfg, scan_items=items)
+        summary = build_carry_summary(cfg, scan_items=items, open_positions=positions)
         return {"items": items, "positions": positions, "config": cfg.__dict__, "summary": summary}
     except Exception as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
@@ -2356,6 +2356,11 @@ class PolymarketConfigUpdate(BaseModel):
     max_depth_levels: int | None = Field(default=None, ge=1, le=50)
     enabled_strategies: list[str] | None = None
     min_outcomes_multi: int | None = Field(default=None, ge=2, le=20)
+    crypto_universe_enabled: bool | None = None
+    crypto_symbol_keywords: dict[str, list[str]] | None = None
+    stream_mode: str | None = None
+    stream_debounce_s: float | None = Field(default=None, ge=0.5, le=60)
+    stream_poll_interval_s: float | None = Field(default=None, ge=1, le=60)
 
 
 class PolymarketOpenRequest(BaseModel):
@@ -2373,9 +2378,12 @@ class PolymarketCloseRequest(BaseModel):
 @router.get("/polymarket/scan")
 def crypto_polymarket_scan(force: bool = Query(default=False)) -> dict[str, Any]:
     from quant_rd_tool.crypto_polymarket_arb import load_config, scan_markets
+    from quant_rd_tool.crypto_polymarket_cross_venue import detect_bases_in_scan
 
     try:
-        return scan_markets(load_config(), force=force)
+        result = scan_markets(load_config(), force=force)
+        result["detected_bases"] = detect_bases_in_scan(result.get("items") or [])
+        return result
     except Exception as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
 
@@ -2383,11 +2391,14 @@ def crypto_polymarket_scan(force: bool = Query(default=False)) -> dict[str, Any]
 @router.get("/polymarket/scan/latest")
 def crypto_polymarket_scan_latest() -> dict[str, Any]:
     from quant_rd_tool.crypto_polymarket_arb import empty_scan_result, load_latest_scan
+    from quant_rd_tool.crypto_polymarket_cross_venue import detect_bases_in_scan
 
     latest = load_latest_scan()
     if not latest:
         return empty_scan_result()
-    return latest
+    out = dict(latest)
+    out["detected_bases"] = detect_bases_in_scan(out.get("items") or [])
+    return out
 
 
 @router.get("/polymarket/config")
@@ -2528,6 +2539,114 @@ def crypto_polymarket_leaderboard(
     from quant_rd_tool.crypto_polymarket_analytics import leaderboard
 
     return {"items": leaderboard(hours=hours, limit=limit)}
+
+
+@router.get("/polymarket/analytics/backtest")
+def crypto_polymarket_analytics_backtest(
+    hours: float = Query(168, ge=1, le=720),
+) -> dict[str, Any]:
+    from quant_rd_tool.crypto_polymarket_backtest import build_strategy_backtest
+
+    return build_strategy_backtest(hours=hours)
+
+
+@router.get("/polymarket/analytics/roi-distribution")
+def crypto_polymarket_analytics_roi_distribution(
+    hours: float = Query(168, ge=1, le=720),
+    strategy_type: str | None = Query(None),
+) -> dict[str, Any]:
+    from quant_rd_tool.crypto_polymarket_backtest import build_roi_distribution
+
+    return build_roi_distribution(hours=hours, strategy_type=strategy_type)
+
+
+@router.get("/polymarket/analytics/advisor-calibration")
+def crypto_polymarket_analytics_advisor_calibration(
+    hours: float = Query(720, ge=1, le=2160),
+) -> dict[str, Any]:
+    from quant_rd_tool.crypto_polymarket_backtest import build_advisor_calibration
+
+    return build_advisor_calibration(hours=hours)
+
+
+@router.get("/polymarket/analytics/strategy-compare")
+def crypto_polymarket_analytics_strategy_compare(
+    hours: float = Query(168, ge=1, le=720),
+) -> dict[str, Any]:
+    from quant_rd_tool.crypto_polymarket_backtest import build_strategy_compare
+
+    return build_strategy_compare(hours=hours)
+
+
+@router.get("/polymarket/context")
+def crypto_polymarket_context_route(
+    symbol: str = Query("BTC"),
+    max_markets: int = Query(5, ge=1, le=20),
+    include_arb_summary: bool = Query(True),
+    spot_stance: str = Query("中性"),
+    spot_action: str = Query("hold"),
+) -> dict[str, Any]:
+    from quant_rd_tool.crypto_polymarket_context import fetch_polymarket_context
+    from quant_rd_tool.crypto_polymarket_integration import synthesize_prediction_cross_view
+
+    pm = fetch_polymarket_context(
+        symbol,
+        max_markets=max_markets,
+        include_arb_summary=include_arb_summary,
+    )
+    if pm.get("enabled"):
+        pm["cross_view"] = synthesize_prediction_cross_view(
+            spot_stance=spot_stance.strip() or "中性",
+            spot_action=spot_action.strip() or "hold",
+            pm_ctx=pm,
+        )
+    return pm
+
+
+@router.get("/polymarket/cross-venue")
+def crypto_polymarket_cross_venue(
+    base: str = Query("BTC"),
+    persist: bool = Query(False),
+) -> dict[str, Any]:
+    from quant_rd_tool.crypto_polymarket_cross_venue import build_cross_venue_report
+
+    return build_cross_venue_report(base, persist=persist)
+
+
+@router.get("/polymarket/cross-venue/all")
+def crypto_polymarket_cross_venue_all(
+    bases: str = Query("BTC,ETH"),
+    persist: bool = Query(False),
+) -> dict[str, Any]:
+    from quant_rd_tool.crypto_polymarket_cross_venue import build_cross_venue_report
+
+    items: list[dict[str, Any]] = []
+    for raw in bases.split(","):
+        sym = raw.strip().upper()
+        if not sym:
+            continue
+        items.append(build_cross_venue_report(sym, persist=persist))
+    all_pairs = [p for rep in items for p in rep.get("pairs") or []]
+    all_pairs.sort(key=lambda x: abs(float(x.get("prob_spread_bps") or 0)), reverse=True)
+    return {"reports": items, "pairs": all_pairs, "pair_count": len(all_pairs)}
+
+
+@router.get("/polymarket/cross-venue/history")
+def crypto_polymarket_cross_venue_history(
+    hours: float = Query(168, ge=1, le=720),
+    limit: int = Query(100, ge=1, le=500),
+) -> dict[str, Any]:
+    from quant_rd_tool.crypto_polymarket_cross_venue import load_cross_venue_history
+
+    items = load_cross_venue_history(hours=hours, limit=limit)
+    return {"hours": hours, "items": items, "count": len(items)}
+
+
+@router.get("/polymarket/stream/status")
+def crypto_polymarket_stream_status() -> dict[str, Any]:
+    from quant_rd_tool.crypto_polymarket_stream import get_stream_status
+
+    return get_stream_status()
 
 
 @router.get("/polymarket/advisor/recommendations")

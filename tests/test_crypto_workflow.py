@@ -143,6 +143,41 @@ def test_synthesize_advice_segments_spot_perp_options():
     assert "### 期权" in advice["markdown"]
 
 
+def test_workflow_catalog_includes_polymarket_context():
+    from quant_rd_tool.crypto_workflow import list_step_catalog
+
+    ids = {s["id"] for s in list_step_catalog()}
+    assert "polymarket_context" in ids
+
+
+def test_synthesize_advice_prediction_segment():
+    ctx = {
+        "symbol": "BTC",
+        "timeframe": "1d",
+        "steps": {
+            "polymarket_context": {
+                "status": "ok",
+                "output": {
+                    "enabled": True,
+                    "top_market": {"question": "BTC 100k?", "implied_prob_yes": 0.62},
+                    "cross_view": {
+                        "summary": "现货与预测市场共振",
+                        "alignment": "共振",
+                        "prediction_stance": "偏多",
+                        "notes": ["YES 62%"],
+                    },
+                    "arb_summary": {},
+                },
+            },
+        },
+    }
+    advice = synthesize_advice(ctx, {})
+    pred = advice["segments"]["prediction"]
+    assert pred["label"] == "预测市场"
+    assert pred["stance"] == "偏多"
+    assert "### 预测市场" in advice["markdown"] or pred["label"] in advice["markdown"]
+
+
 def test_run_workflow_mocked(monkeypatch, tmp_path):
     from quant_rd_tool import crypto_workflow as cw
 
